@@ -47,7 +47,8 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:18/12}
 #ov[hidden]{display:none}
 #readyBtn{position:absolute;top:9%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
   background-image:linear-gradient(90deg,rgba(255,255,255,.65) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
-.ovbtn.hold{background-image:linear-gradient(90deg,rgba(243,183,58,.55) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
+.ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
+.ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
 #readyBtn[hidden]{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
 .box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
@@ -141,7 +142,7 @@ body.touch .narrow{display:none}
 'use strict';
 // ---------- constants ----------
 const T=48, GW=18, GH=12;
-const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=3;
+const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const DRIVE=65, PREP=15, SERVICE=120, SPEED=0.45, STOPS=4, WMARGIN=0.6;
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
@@ -972,7 +973,7 @@ function showChoose(){
       <span class="tn">${t.e} ${t.n}</span>
       <span class="menu">${t.menu.map(r=>RECIPES[r].e+' '+RECIPES[r].n).join('<br>')}</span>
       <span class="needs">${townNeeds(t).map(id=>needLine(id,t)).join('')}</span>
-      <span class="pay">${payLabel(t.pay,true)}</span>${t.lively?'<span class="sub">駅前なので、にぎわいやすい</span>':''}</button>`).join('');
+      <span class="pay">${MOOD[Math.round((t.pay-1)*100)]||""}<br>${payLabel(t.pay,true).replace(/^[^（]*/,"")}</span>${t.lively?'<span class="sub">駅前なので、にぎわいやすい</span>':''}</button>`).join('');
   showOv(`<div class="box"><h2>${S.stop+1}つ目の町を選ぶ（全${STOPS}町）</h2>
     <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。所持金 ${S.money}G</p>
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}

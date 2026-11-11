@@ -1,0 +1,1769 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style><script>/* PeerJS 1.5.4 (MIT License, https://github.com/peers/peerjs) */
+(()=>{function e(e,t,n,r){Object.defineProperty(e,t,{get:n,set:r,enumerable:!0,configurable:!0})}function t(e){return e&&e.__esModule?e.default:e}class n{constructor(){this.chunkedMTU=16300,this._dataCount=1,this.chunk=e=>{let t=[],n=e.byteLength,r=Math.ceil(n/this.chunkedMTU),i=0,o=0;for(;o<n;){let s=Math.min(n,o+this.chunkedMTU),a=e.slice(o,s),c={__peerData:this._dataCount,n:i,data:a,total:r};t.push(c),o=s,i++}return this._dataCount++,t}}}class r{append_buffer(e){this.flush(),this._parts.push(e)}append(e){this._pieces.push(e)}flush(){if(this._pieces.length>0){let e=new Uint8Array(this._pieces);this._parts.push(e),this._pieces=[]}}toArrayBuffer(){let e=[];for(let t of this._parts)e.push(t);return function(e){let t=0;for(let n of e)t+=n.byteLength;let n=new Uint8Array(t),r=0;for(let t of e){let e=new Uint8Array(t.buffer,t.byteOffset,t.byteLength);n.set(e,r),r+=t.byteLength}return n}(e).buffer}constructor(){this.encoder=new TextEncoder,this._pieces=[],this._parts=[]}}function i(e){return new s(e).unpack()}function o(e){let t=new a,n=t.pack(e);return n instanceof Promise?n.then(()=>t.getBuffer()):t.getBuffer()}class s{unpack(){let e;let t=this.unpack_uint8();if(t<128)return t;if((224^t)<32)return(224^t)-32;if((e=160^t)<=15)return this.unpack_raw(e);if((e=176^t)<=15)return this.unpack_string(e);if((e=144^t)<=15)return this.unpack_array(e);if((e=128^t)<=15)return this.unpack_map(e);switch(t){case 192:return null;case 193:case 212:case 213:case 214:case 215:return;case 194:return!1;case 195:return!0;case 202:return this.unpack_float();case 203:return this.unpack_double();case 204:return this.unpack_uint8();case 205:return this.unpack_uint16();case 206:return this.unpack_uint32();case 207:return this.unpack_uint64();case 208:return this.unpack_int8();case 209:return this.unpack_int16();case 210:return this.unpack_int32();case 211:return this.unpack_int64();case 216:return e=this.unpack_uint16(),this.unpack_string(e);case 217:return e=this.unpack_uint32(),this.unpack_string(e);case 218:return e=this.unpack_uint16(),this.unpack_raw(e);case 219:return e=this.unpack_uint32(),this.unpack_raw(e);case 220:return e=this.unpack_uint16(),this.unpack_array(e);case 221:return e=this.unpack_uint32(),this.unpack_array(e);case 222:return e=this.unpack_uint16(),this.unpack_map(e);case 223:return e=this.unpack_uint32(),this.unpack_map(e)}}unpack_uint8(){let e=255&this.dataView[this.index];return this.index++,e}unpack_uint16(){let e=this.read(2),t=(255&e[0])*256+(255&e[1]);return this.index+=2,t}unpack_uint32(){let e=this.read(4),t=((256*e[0]+e[1])*256+e[2])*256+e[3];return this.index+=4,t}unpack_uint64(){let e=this.read(8),t=((((((256*e[0]+e[1])*256+e[2])*256+e[3])*256+e[4])*256+e[5])*256+e[6])*256+e[7];return this.index+=8,t}unpack_int8(){let e=this.unpack_uint8();return e<128?e:e-256}unpack_int16(){let e=this.unpack_uint16();return e<32768?e:e-65536}unpack_int32(){let e=this.unpack_uint32();return e<2147483648?e:e-4294967296}unpack_int64(){let e=this.unpack_uint64();return e<0x7fffffffffffffff?e:e-18446744073709552e3}unpack_raw(e){if(this.length<this.index+e)throw Error(`BinaryPackFailure: index is out of range ${this.index} ${e} ${this.length}`);let t=this.dataBuffer.slice(this.index,this.index+e);return this.index+=e,t}unpack_string(e){let t,n;let r=this.read(e),i=0,o="";for(;i<e;)(t=r[i])<160?(n=t,i++):(192^t)<32?(n=(31&t)<<6|63&r[i+1],i+=2):(224^t)<16?(n=(15&t)<<12|(63&r[i+1])<<6|63&r[i+2],i+=3):(n=(7&t)<<18|(63&r[i+1])<<12|(63&r[i+2])<<6|63&r[i+3],i+=4),o+=String.fromCodePoint(n);return this.index+=e,o}unpack_array(e){let t=Array(e);for(let n=0;n<e;n++)t[n]=this.unpack();return t}unpack_map(e){let t={};for(let n=0;n<e;n++)t[this.unpack()]=this.unpack();return t}unpack_float(){let e=this.unpack_uint32();return(0==e>>31?1:-1)*(8388607&e|8388608)*2**((e>>23&255)-127-23)}unpack_double(){let e=this.unpack_uint32(),t=this.unpack_uint32(),n=(e>>20&2047)-1023;return(0==e>>31?1:-1)*((1048575&e|1048576)*2**(n-20)+t*2**(n-52))}read(e){let t=this.index;if(t+e<=this.length)return this.dataView.subarray(t,t+e);throw Error("BinaryPackFailure: read index out of range")}constructor(e){this.index=0,this.dataBuffer=e,this.dataView=new Uint8Array(this.dataBuffer),this.length=this.dataBuffer.byteLength}}class a{getBuffer(){return this._bufferBuilder.toArrayBuffer()}pack(e){if("string"==typeof e)this.pack_string(e);else if("number"==typeof e)Math.floor(e)===e?this.pack_integer(e):this.pack_double(e);else if("boolean"==typeof e)!0===e?this._bufferBuilder.append(195):!1===e&&this._bufferBuilder.append(194);else if(void 0===e)this._bufferBuilder.append(192);else if("object"==typeof e){if(null===e)this._bufferBuilder.append(192);else{let t=e.constructor;if(e instanceof Array){let t=this.pack_array(e);if(t instanceof Promise)return t.then(()=>this._bufferBuilder.flush())}else if(e instanceof ArrayBuffer)this.pack_bin(new Uint8Array(e));else if("BYTES_PER_ELEMENT"in e)this.pack_bin(new Uint8Array(e.buffer,e.byteOffset,e.byteLength));else if(e instanceof Date)this.pack_string(e.toString());else if(e instanceof Blob)return e.arrayBuffer().then(e=>{this.pack_bin(new Uint8Array(e)),this._bufferBuilder.flush()});else if(t==Object||t.toString().startsWith("class")){let t=this.pack_object(e);if(t instanceof Promise)return t.then(()=>this._bufferBuilder.flush())}else throw Error(`Type "${t.toString()}" not yet supported`)}}else throw Error(`Type "${typeof e}" not yet supported`);this._bufferBuilder.flush()}pack_bin(e){let t=e.length;if(t<=15)this.pack_uint8(160+t);else if(t<=65535)this._bufferBuilder.append(218),this.pack_uint16(t);else if(t<=4294967295)this._bufferBuilder.append(219),this.pack_uint32(t);else throw Error("Invalid length");this._bufferBuilder.append_buffer(e)}pack_string(e){let t=this._textEncoder.encode(e),n=t.length;if(n<=15)this.pack_uint8(176+n);else if(n<=65535)this._bufferBuilder.append(216),this.pack_uint16(n);else if(n<=4294967295)this._bufferBuilder.append(217),this.pack_uint32(n);else throw Error("Invalid length");this._bufferBuilder.append_buffer(t)}pack_array(e){let t=e.length;if(t<=15)this.pack_uint8(144+t);else if(t<=65535)this._bufferBuilder.append(220),this.pack_uint16(t);else if(t<=4294967295)this._bufferBuilder.append(221),this.pack_uint32(t);else throw Error("Invalid length");let n=r=>{if(r<t){let t=this.pack(e[r]);return t instanceof Promise?t.then(()=>n(r+1)):n(r+1)}};return n(0)}pack_integer(e){if(e>=-32&&e<=127)this._bufferBuilder.append(255&e);else if(e>=0&&e<=255)this._bufferBuilder.append(204),this.pack_uint8(e);else if(e>=-128&&e<=127)this._bufferBuilder.append(208),this.pack_int8(e);else if(e>=0&&e<=65535)this._bufferBuilder.append(205),this.pack_uint16(e);else if(e>=-32768&&e<=32767)this._bufferBuilder.append(209),this.pack_int16(e);else if(e>=0&&e<=4294967295)this._bufferBuilder.append(206),this.pack_uint32(e);else if(e>=-2147483648&&e<=2147483647)this._bufferBuilder.append(210),this.pack_int32(e);else if(e>=-0x8000000000000000&&e<=0x7fffffffffffffff)this._bufferBuilder.append(211),this.pack_int64(e);else if(e>=0&&e<=18446744073709552e3)this._bufferBuilder.append(207),this.pack_uint64(e);else throw Error("Invalid integer")}pack_double(e){let t=0;e<0&&(t=1,e=-e);let n=Math.floor(Math.log(e)/Math.LN2),r=Math.floor((e/2**n-1)*4503599627370496),i=t<<31|n+1023<<20|r/4294967296&1048575;this._bufferBuilder.append(203),this.pack_int32(i),this.pack_int32(r%4294967296)}pack_object(e){let t=Object.keys(e),n=t.length;if(n<=15)this.pack_uint8(128+n);else if(n<=65535)this._bufferBuilder.append(222),this.pack_uint16(n);else if(n<=4294967295)this._bufferBuilder.append(223),this.pack_uint32(n);else throw Error("Invalid length");let r=n=>{if(n<t.length){let i=t[n];if(e.hasOwnProperty(i)){this.pack(i);let t=this.pack(e[i]);if(t instanceof Promise)return t.then(()=>r(n+1))}return r(n+1)}};return r(0)}pack_uint8(e){this._bufferBuilder.append(e)}pack_uint16(e){this._bufferBuilder.append(e>>8),this._bufferBuilder.append(255&e)}pack_uint32(e){let t=4294967295&e;this._bufferBuilder.append((4278190080&t)>>>24),this._bufferBuilder.append((16711680&t)>>>16),this._bufferBuilder.append((65280&t)>>>8),this._bufferBuilder.append(255&t)}pack_uint64(e){let t=e/4294967296,n=e%4294967296;this._bufferBuilder.append((4278190080&t)>>>24),this._bufferBuilder.append((16711680&t)>>>16),this._bufferBuilder.append((65280&t)>>>8),this._bufferBuilder.append(255&t),this._bufferBuilder.append((4278190080&n)>>>24),this._bufferBuilder.append((16711680&n)>>>16),this._bufferBuilder.append((65280&n)>>>8),this._bufferBuilder.append(255&n)}pack_int8(e){this._bufferBuilder.append(255&e)}pack_int16(e){this._bufferBuilder.append((65280&e)>>8),this._bufferBuilder.append(255&e)}pack_int32(e){this._bufferBuilder.append(e>>>24&255),this._bufferBuilder.append((16711680&e)>>>16),this._bufferBuilder.append((65280&e)>>>8),this._bufferBuilder.append(255&e)}pack_int64(e){let t=Math.floor(e/4294967296),n=e%4294967296;this._bufferBuilder.append((4278190080&t)>>>24),this._bufferBuilder.append((16711680&t)>>>16),this._bufferBuilder.append((65280&t)>>>8),this._bufferBuilder.append(255&t),this._bufferBuilder.append((4278190080&n)>>>24),this._bufferBuilder.append((16711680&n)>>>16),this._bufferBuilder.append((65280&n)>>>8),this._bufferBuilder.append(255&n)}constructor(){this._bufferBuilder=new r,this._textEncoder=new TextEncoder}}let c=!0,l=!0;function p(e,t,n){let r=e.match(t);return r&&r.length>=n&&parseInt(r[n],10)}function d(e,t,n){if(!e.RTCPeerConnection)return;let r=e.RTCPeerConnection.prototype,i=r.addEventListener;r.addEventListener=function(e,r){if(e!==t)return i.apply(this,arguments);let o=e=>{let t=n(e);t&&(r.handleEvent?r.handleEvent(t):r(t))};return this._eventMap=this._eventMap||{},this._eventMap[t]||(this._eventMap[t]=new Map),this._eventMap[t].set(r,o),i.apply(this,[e,o])};let o=r.removeEventListener;r.removeEventListener=function(e,n){if(e!==t||!this._eventMap||!this._eventMap[t]||!this._eventMap[t].has(n))return o.apply(this,arguments);let r=this._eventMap[t].get(n);return this._eventMap[t].delete(n),0===this._eventMap[t].size&&delete this._eventMap[t],0===Object.keys(this._eventMap).length&&delete this._eventMap,o.apply(this,[e,r])},Object.defineProperty(r,"on"+t,{get(){return this["_on"+t]},set(e){this["_on"+t]&&(this.removeEventListener(t,this["_on"+t]),delete this["_on"+t]),e&&this.addEventListener(t,this["_on"+t]=e)},enumerable:!0,configurable:!0})}function h(e){return"boolean"!=typeof e?Error("Argument type: "+typeof e+". Please use a boolean."):(c=e,e?"adapter.js logging disabled":"adapter.js logging enabled")}function u(e){return"boolean"!=typeof e?Error("Argument type: "+typeof e+". Please use a boolean."):(l=!e,"adapter.js deprecation warnings "+(e?"disabled":"enabled"))}function f(){"object"!=typeof window||c||"undefined"==typeof console||"function"!=typeof console.log||console.log.apply(console,arguments)}function m(e,t){l&&console.warn(e+" is deprecated, please use "+t+" instead.")}function g(e){return"[object Object]"===Object.prototype.toString.call(e)}function y(e,t,n){let r=n?"outbound-rtp":"inbound-rtp",i=new Map;if(null===t)return i;let o=[];return e.forEach(e=>{"track"===e.type&&e.trackIdentifier===t.id&&o.push(e)}),o.forEach(t=>{e.forEach(n=>{n.type===r&&n.trackId===t.id&&function e(t,n,r){!n||r.has(n.id)||(r.set(n.id,n),Object.keys(n).forEach(i=>{i.endsWith("Id")?e(t,t.get(n[i]),r):i.endsWith("Ids")&&n[i].forEach(n=>{e(t,t.get(n),r)})}))}(e,n,i)})}),i}var _,C,b,v,k,T,S,R,P,w,E,D,x,I,M,O,j={};function L(e,t){let n=e&&e.navigator;if(!n.mediaDevices)return;let r=function(e){if("object"!=typeof e||e.mandatory||e.optional)return e;let t={};return Object.keys(e).forEach(n=>{if("require"===n||"advanced"===n||"mediaSource"===n)return;let r="object"==typeof e[n]?e[n]:{ideal:e[n]};void 0!==r.exact&&"number"==typeof r.exact&&(r.min=r.max=r.exact);let i=function(e,t){return e?e+t.charAt(0).toUpperCase()+t.slice(1):"deviceId"===t?"sourceId":t};if(void 0!==r.ideal){t.optional=t.optional||[];let e={};"number"==typeof r.ideal?(e[i("min",n)]=r.ideal,t.optional.push(e),(e={})[i("max",n)]=r.ideal):e[i("",n)]=r.ideal,t.optional.push(e)}void 0!==r.exact&&"number"!=typeof r.exact?(t.mandatory=t.mandatory||{},t.mandatory[i("",n)]=r.exact):["min","max"].forEach(e=>{void 0!==r[e]&&(t.mandatory=t.mandatory||{},t.mandatory[i(e,n)]=r[e])})}),e.advanced&&(t.optional=(t.optional||[]).concat(e.advanced)),t},i=function(e,i){if(t.version>=61)return i(e);if((e=JSON.parse(JSON.stringify(e)))&&"object"==typeof e.audio){let t=function(e,t,n){t in e&&!(n in e)&&(e[n]=e[t],delete e[t])};t((e=JSON.parse(JSON.stringify(e))).audio,"autoGainControl","googAutoGainControl"),t(e.audio,"noiseSuppression","googNoiseSuppression"),e.audio=r(e.audio)}if(e&&"object"==typeof e.video){let o=e.video.facingMode;o=o&&("object"==typeof o?o:{ideal:o});let s=t.version<66;if(o&&("user"===o.exact||"environment"===o.exact||"user"===o.ideal||"environment"===o.ideal)&&!(n.mediaDevices.getSupportedConstraints&&n.mediaDevices.getSupportedConstraints().facingMode&&!s)){let t;if(delete e.video.facingMode,"environment"===o.exact||"environment"===o.ideal?t=["back","rear"]:("user"===o.exact||"user"===o.ideal)&&(t=["front"]),t)return n.mediaDevices.enumerateDevices().then(n=>{let s=(n=n.filter(e=>"videoinput"===e.kind)).find(e=>t.some(t=>e.label.toLowerCase().includes(t)));return!s&&n.length&&t.includes("back")&&(s=n[n.length-1]),s&&(e.video.deviceId=o.exact?{exact:s.deviceId}:{ideal:s.deviceId}),e.video=r(e.video),f("chrome: "+JSON.stringify(e)),i(e)})}e.video=r(e.video)}return f("chrome: "+JSON.stringify(e)),i(e)},o=function(e){return t.version>=64?e:{name:({PermissionDeniedError:"NotAllowedError",PermissionDismissedError:"NotAllowedError",InvalidStateError:"NotAllowedError",DevicesNotFoundError:"NotFoundError",ConstraintNotSatisfiedError:"OverconstrainedError",TrackStartError:"NotReadableError",MediaDeviceFailedDueToShutdown:"NotAllowedError",MediaDeviceKillSwitchOn:"NotAllowedError",TabCaptureError:"AbortError",ScreenCaptureError:"AbortError",DeviceCaptureError:"AbortError"})[e.name]||e.name,message:e.message,constraint:e.constraint||e.constraintName,toString(){return this.name+(this.message&&": ")+this.message}}};if(n.getUserMedia=(function(e,t,r){i(e,e=>{n.webkitGetUserMedia(e,t,e=>{r&&r(o(e))})})}).bind(n),n.mediaDevices.getUserMedia){let e=n.mediaDevices.getUserMedia.bind(n.mediaDevices);n.mediaDevices.getUserMedia=function(t){return i(t,t=>e(t).then(e=>{if(t.audio&&!e.getAudioTracks().length||t.video&&!e.getVideoTracks().length)throw e.getTracks().forEach(e=>{e.stop()}),new DOMException("","NotFoundError");return e},e=>Promise.reject(o(e))))}}}function A(e){e.MediaStream=e.MediaStream||e.webkitMediaStream}function B(e){if("object"!=typeof e||!e.RTCPeerConnection||"ontrack"in e.RTCPeerConnection.prototype)d(e,"track",e=>(e.transceiver||Object.defineProperty(e,"transceiver",{value:{receiver:e.receiver}}),e));else{Object.defineProperty(e.RTCPeerConnection.prototype,"ontrack",{get(){return this._ontrack},set(e){this._ontrack&&this.removeEventListener("track",this._ontrack),this.addEventListener("track",this._ontrack=e)},enumerable:!0,configurable:!0});let t=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(){return this._ontrackpoly||(this._ontrackpoly=t=>{t.stream.addEventListener("addtrack",n=>{let r;r=e.RTCPeerConnection.prototype.getReceivers?this.getReceivers().find(e=>e.track&&e.track.id===n.track.id):{track:n.track};let i=new Event("track");i.track=n.track,i.receiver=r,i.transceiver={receiver:r},i.streams=[t.stream],this.dispatchEvent(i)}),t.stream.getTracks().forEach(n=>{let r;r=e.RTCPeerConnection.prototype.getReceivers?this.getReceivers().find(e=>e.track&&e.track.id===n.id):{track:n};let i=new Event("track");i.track=n,i.receiver=r,i.transceiver={receiver:r},i.streams=[t.stream],this.dispatchEvent(i)})},this.addEventListener("addstream",this._ontrackpoly)),t.apply(this,arguments)}}}function F(e){if("object"==typeof e&&e.RTCPeerConnection&&!("getSenders"in e.RTCPeerConnection.prototype)&&"createDTMFSender"in e.RTCPeerConnection.prototype){let t=function(e,t){return{track:t,get dtmf(){return void 0===this._dtmf&&("audio"===t.kind?this._dtmf=e.createDTMFSender(t):this._dtmf=null),this._dtmf},_pc:e}};if(!e.RTCPeerConnection.prototype.getSenders){e.RTCPeerConnection.prototype.getSenders=function(){return this._senders=this._senders||[],this._senders.slice()};let n=e.RTCPeerConnection.prototype.addTrack;e.RTCPeerConnection.prototype.addTrack=function(e,r){let i=n.apply(this,arguments);return i||(i=t(this,e),this._senders.push(i)),i};let r=e.RTCPeerConnection.prototype.removeTrack;e.RTCPeerConnection.prototype.removeTrack=function(e){r.apply(this,arguments);let t=this._senders.indexOf(e);-1!==t&&this._senders.splice(t,1)}}let n=e.RTCPeerConnection.prototype.addStream;e.RTCPeerConnection.prototype.addStream=function(e){this._senders=this._senders||[],n.apply(this,[e]),e.getTracks().forEach(e=>{this._senders.push(t(this,e))})};let r=e.RTCPeerConnection.prototype.removeStream;e.RTCPeerConnection.prototype.removeStream=function(e){this._senders=this._senders||[],r.apply(this,[e]),e.getTracks().forEach(e=>{let t=this._senders.find(t=>t.track===e);t&&this._senders.splice(this._senders.indexOf(t),1)})}}else if("object"==typeof e&&e.RTCPeerConnection&&"getSenders"in e.RTCPeerConnection.prototype&&"createDTMFSender"in e.RTCPeerConnection.prototype&&e.RTCRtpSender&&!("dtmf"in e.RTCRtpSender.prototype)){let t=e.RTCPeerConnection.prototype.getSenders;e.RTCPeerConnection.prototype.getSenders=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e},Object.defineProperty(e.RTCRtpSender.prototype,"dtmf",{get(){return void 0===this._dtmf&&("audio"===this.track.kind?this._dtmf=this._pc.createDTMFSender(this.track):this._dtmf=null),this._dtmf}})}}function U(e){if(!("object"==typeof e&&e.RTCPeerConnection&&e.RTCRtpSender&&e.RTCRtpReceiver))return;if(!("getStats"in e.RTCRtpSender.prototype)){let t=e.RTCPeerConnection.prototype.getSenders;t&&(e.RTCPeerConnection.prototype.getSenders=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e});let n=e.RTCPeerConnection.prototype.addTrack;n&&(e.RTCPeerConnection.prototype.addTrack=function(){let e=n.apply(this,arguments);return e._pc=this,e}),e.RTCRtpSender.prototype.getStats=function(){let e=this;return this._pc.getStats().then(t=>y(t,e.track,!0))}}if(!("getStats"in e.RTCRtpReceiver.prototype)){let t=e.RTCPeerConnection.prototype.getReceivers;t&&(e.RTCPeerConnection.prototype.getReceivers=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e}),d(e,"track",e=>(e.receiver._pc=e.srcElement,e)),e.RTCRtpReceiver.prototype.getStats=function(){let e=this;return this._pc.getStats().then(t=>y(t,e.track,!1))}}if(!("getStats"in e.RTCRtpSender.prototype&&"getStats"in e.RTCRtpReceiver.prototype))return;let t=e.RTCPeerConnection.prototype.getStats;e.RTCPeerConnection.prototype.getStats=function(){if(arguments.length>0&&arguments[0]instanceof e.MediaStreamTrack){let e,t,n;let r=arguments[0];return(this.getSenders().forEach(t=>{t.track===r&&(e?n=!0:e=t)}),this.getReceivers().forEach(e=>(e.track===r&&(t?n=!0:t=e),e.track===r)),n||e&&t)?Promise.reject(new DOMException("There are more than one sender or receiver for the track.","InvalidAccessError")):e?e.getStats():t?t.getStats():Promise.reject(new DOMException("There is no sender or receiver for the track.","InvalidAccessError"))}return t.apply(this,arguments)}}function z(e){e.RTCPeerConnection.prototype.getLocalStreams=function(){return this._shimmedLocalStreams=this._shimmedLocalStreams||{},Object.keys(this._shimmedLocalStreams).map(e=>this._shimmedLocalStreams[e][0])};let t=e.RTCPeerConnection.prototype.addTrack;e.RTCPeerConnection.prototype.addTrack=function(e,n){if(!n)return t.apply(this,arguments);this._shimmedLocalStreams=this._shimmedLocalStreams||{};let r=t.apply(this,arguments);return this._shimmedLocalStreams[n.id]?-1===this._shimmedLocalStreams[n.id].indexOf(r)&&this._shimmedLocalStreams[n.id].push(r):this._shimmedLocalStreams[n.id]=[n,r],r};let n=e.RTCPeerConnection.prototype.addStream;e.RTCPeerConnection.prototype.addStream=function(e){this._shimmedLocalStreams=this._shimmedLocalStreams||{},e.getTracks().forEach(e=>{if(this.getSenders().find(t=>t.track===e))throw new DOMException("Track already exists.","InvalidAccessError")});let t=this.getSenders();n.apply(this,arguments);let r=this.getSenders().filter(e=>-1===t.indexOf(e));this._shimmedLocalStreams[e.id]=[e].concat(r)};let r=e.RTCPeerConnection.prototype.removeStream;e.RTCPeerConnection.prototype.removeStream=function(e){return this._shimmedLocalStreams=this._shimmedLocalStreams||{},delete this._shimmedLocalStreams[e.id],r.apply(this,arguments)};let i=e.RTCPeerConnection.prototype.removeTrack;e.RTCPeerConnection.prototype.removeTrack=function(e){return this._shimmedLocalStreams=this._shimmedLocalStreams||{},e&&Object.keys(this._shimmedLocalStreams).forEach(t=>{let n=this._shimmedLocalStreams[t].indexOf(e);-1!==n&&this._shimmedLocalStreams[t].splice(n,1),1===this._shimmedLocalStreams[t].length&&delete this._shimmedLocalStreams[t]}),i.apply(this,arguments)}}function N(e,t){if(!e.RTCPeerConnection)return;if(e.RTCPeerConnection.prototype.addTrack&&t.version>=65)return z(e);let n=e.RTCPeerConnection.prototype.getLocalStreams;e.RTCPeerConnection.prototype.getLocalStreams=function(){let e=n.apply(this);return this._reverseStreams=this._reverseStreams||{},e.map(e=>this._reverseStreams[e.id])};let r=e.RTCPeerConnection.prototype.addStream;e.RTCPeerConnection.prototype.addStream=function(t){if(this._streams=this._streams||{},this._reverseStreams=this._reverseStreams||{},t.getTracks().forEach(e=>{if(this.getSenders().find(t=>t.track===e))throw new DOMException("Track already exists.","InvalidAccessError")}),!this._reverseStreams[t.id]){let n=new e.MediaStream(t.getTracks());this._streams[t.id]=n,this._reverseStreams[n.id]=t,t=n}r.apply(this,[t])};let i=e.RTCPeerConnection.prototype.removeStream;function o(e,t){let n=t.sdp;return Object.keys(e._reverseStreams||[]).forEach(t=>{let r=e._reverseStreams[t],i=e._streams[r.id];n=n.replace(RegExp(i.id,"g"),r.id)}),new RTCSessionDescription({type:t.type,sdp:n})}e.RTCPeerConnection.prototype.removeStream=function(e){this._streams=this._streams||{},this._reverseStreams=this._reverseStreams||{},i.apply(this,[this._streams[e.id]||e]),delete this._reverseStreams[this._streams[e.id]?this._streams[e.id].id:e.id],delete this._streams[e.id]},e.RTCPeerConnection.prototype.addTrack=function(t,n){if("closed"===this.signalingState)throw new DOMException("The RTCPeerConnection's signalingState is 'closed'.","InvalidStateError");let r=[].slice.call(arguments,1);if(1!==r.length||!r[0].getTracks().find(e=>e===t))throw new DOMException("The adapter.js addTrack polyfill only supports a single  stream which is associated with the specified track.","NotSupportedError");if(this.getSenders().find(e=>e.track===t))throw new DOMException("Track already exists.","InvalidAccessError");this._streams=this._streams||{},this._reverseStreams=this._reverseStreams||{};let i=this._streams[n.id];if(i)i.addTrack(t),Promise.resolve().then(()=>{this.dispatchEvent(new Event("negotiationneeded"))});else{let r=new e.MediaStream([t]);this._streams[n.id]=r,this._reverseStreams[r.id]=n,this.addStream(r)}return this.getSenders().find(e=>e.track===t)},["createOffer","createAnswer"].forEach(function(t){let n=e.RTCPeerConnection.prototype[t];e.RTCPeerConnection.prototype[t]=({[t](){let e=arguments,t=arguments.length&&"function"==typeof arguments[0];return t?n.apply(this,[t=>{let n=o(this,t);e[0].apply(null,[n])},t=>{e[1]&&e[1].apply(null,t)},arguments[2]]):n.apply(this,arguments).then(e=>o(this,e))}})[t]});let s=e.RTCPeerConnection.prototype.setLocalDescription;e.RTCPeerConnection.prototype.setLocalDescription=function(){var e,t;let n;return arguments.length&&arguments[0].type&&(arguments[0]=(e=this,t=arguments[0],n=t.sdp,Object.keys(e._reverseStreams||[]).forEach(t=>{let r=e._reverseStreams[t],i=e._streams[r.id];n=n.replace(RegExp(r.id,"g"),i.id)}),new RTCSessionDescription({type:t.type,sdp:n}))),s.apply(this,arguments)};let a=Object.getOwnPropertyDescriptor(e.RTCPeerConnection.prototype,"localDescription");Object.defineProperty(e.RTCPeerConnection.prototype,"localDescription",{get(){let e=a.get.apply(this);return""===e.type?e:o(this,e)}}),e.RTCPeerConnection.prototype.removeTrack=function(e){let t;if("closed"===this.signalingState)throw new DOMException("The RTCPeerConnection's signalingState is 'closed'.","InvalidStateError");if(!e._pc)throw new DOMException("Argument 1 of RTCPeerConnection.removeTrack does not implement interface RTCRtpSender.","TypeError");if(e._pc!==this)throw new DOMException("Sender was not created by this connection.","InvalidAccessError");this._streams=this._streams||{},Object.keys(this._streams).forEach(n=>{this._streams[n].getTracks().find(t=>e.track===t)&&(t=this._streams[n])}),t&&(1===t.getTracks().length?this.removeStream(this._reverseStreams[t.id]):t.removeTrack(e.track),this.dispatchEvent(new Event("negotiationneeded")))}}function $(e,t){!e.RTCPeerConnection&&e.webkitRTCPeerConnection&&(e.RTCPeerConnection=e.webkitRTCPeerConnection),e.RTCPeerConnection&&t.version<53&&["setLocalDescription","setRemoteDescription","addIceCandidate"].forEach(function(t){let n=e.RTCPeerConnection.prototype[t];e.RTCPeerConnection.prototype[t]=({[t](){return arguments[0]=new("addIceCandidate"===t?e.RTCIceCandidate:e.RTCSessionDescription)(arguments[0]),n.apply(this,arguments)}})[t]})}function J(e,t){d(e,"negotiationneeded",e=>{let n=e.target;if(!(t.version<72)&&(!n.getConfiguration||"plan-b"!==n.getConfiguration().sdpSemantics)||"stable"===n.signalingState)return e})}e(j,"shimMediaStream",()=>A),e(j,"shimOnTrack",()=>B),e(j,"shimGetSendersWithDtmf",()=>F),e(j,"shimSenderReceiverGetStats",()=>U),e(j,"shimAddTrackRemoveTrackWithNative",()=>z),e(j,"shimAddTrackRemoveTrack",()=>N),e(j,"shimPeerConnection",()=>$),e(j,"fixNegotiationNeeded",()=>J),e(j,"shimGetUserMedia",()=>L);var V={};function G(e,t){let n=e&&e.navigator,r=e&&e.MediaStreamTrack;if(n.getUserMedia=function(e,t,r){m("navigator.getUserMedia","navigator.mediaDevices.getUserMedia"),n.mediaDevices.getUserMedia(e).then(t,r)},!(t.version>55&&"autoGainControl"in n.mediaDevices.getSupportedConstraints())){let e=function(e,t,n){t in e&&!(n in e)&&(e[n]=e[t],delete e[t])},t=n.mediaDevices.getUserMedia.bind(n.mediaDevices);if(n.mediaDevices.getUserMedia=function(n){return"object"==typeof n&&"object"==typeof n.audio&&(e((n=JSON.parse(JSON.stringify(n))).audio,"autoGainControl","mozAutoGainControl"),e(n.audio,"noiseSuppression","mozNoiseSuppression")),t(n)},r&&r.prototype.getSettings){let t=r.prototype.getSettings;r.prototype.getSettings=function(){let n=t.apply(this,arguments);return e(n,"mozAutoGainControl","autoGainControl"),e(n,"mozNoiseSuppression","noiseSuppression"),n}}if(r&&r.prototype.applyConstraints){let t=r.prototype.applyConstraints;r.prototype.applyConstraints=function(n){return"audio"===this.kind&&"object"==typeof n&&(e(n=JSON.parse(JSON.stringify(n)),"autoGainControl","mozAutoGainControl"),e(n,"noiseSuppression","mozNoiseSuppression")),t.apply(this,[n])}}}}function W(e,t){e.navigator.mediaDevices&&"getDisplayMedia"in e.navigator.mediaDevices||!e.navigator.mediaDevices||(e.navigator.mediaDevices.getDisplayMedia=function(n){if(!(n&&n.video)){let e=new DOMException("getDisplayMedia without video constraints is undefined");return e.name="NotFoundError",e.code=8,Promise.reject(e)}return!0===n.video?n.video={mediaSource:t}:n.video.mediaSource=t,e.navigator.mediaDevices.getUserMedia(n)})}function H(e){"object"==typeof e&&e.RTCTrackEvent&&"receiver"in e.RTCTrackEvent.prototype&&!("transceiver"in e.RTCTrackEvent.prototype)&&Object.defineProperty(e.RTCTrackEvent.prototype,"transceiver",{get(){return{receiver:this.receiver}}})}function Y(e,t){if("object"!=typeof e||!(e.RTCPeerConnection||e.mozRTCPeerConnection))return;!e.RTCPeerConnection&&e.mozRTCPeerConnection&&(e.RTCPeerConnection=e.mozRTCPeerConnection),t.version<53&&["setLocalDescription","setRemoteDescription","addIceCandidate"].forEach(function(t){let n=e.RTCPeerConnection.prototype[t];e.RTCPeerConnection.prototype[t]=({[t](){return arguments[0]=new("addIceCandidate"===t?e.RTCIceCandidate:e.RTCSessionDescription)(arguments[0]),n.apply(this,arguments)}})[t]});let n={inboundrtp:"inbound-rtp",outboundrtp:"outbound-rtp",candidatepair:"candidate-pair",localcandidate:"local-candidate",remotecandidate:"remote-candidate"},r=e.RTCPeerConnection.prototype.getStats;e.RTCPeerConnection.prototype.getStats=function(){let[e,i,o]=arguments;return r.apply(this,[e||null]).then(e=>{if(t.version<53&&!i)try{e.forEach(e=>{e.type=n[e.type]||e.type})}catch(t){if("TypeError"!==t.name)throw t;e.forEach((t,r)=>{e.set(r,Object.assign({},t,{type:n[t.type]||t.type}))})}return e}).then(i,o)}}function K(e){if(!("object"==typeof e&&e.RTCPeerConnection&&e.RTCRtpSender)||e.RTCRtpSender&&"getStats"in e.RTCRtpSender.prototype)return;let t=e.RTCPeerConnection.prototype.getSenders;t&&(e.RTCPeerConnection.prototype.getSenders=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e});let n=e.RTCPeerConnection.prototype.addTrack;n&&(e.RTCPeerConnection.prototype.addTrack=function(){let e=n.apply(this,arguments);return e._pc=this,e}),e.RTCRtpSender.prototype.getStats=function(){return this.track?this._pc.getStats(this.track):Promise.resolve(new Map)}}function X(e){if(!("object"==typeof e&&e.RTCPeerConnection&&e.RTCRtpSender)||e.RTCRtpSender&&"getStats"in e.RTCRtpReceiver.prototype)return;let t=e.RTCPeerConnection.prototype.getReceivers;t&&(e.RTCPeerConnection.prototype.getReceivers=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e}),d(e,"track",e=>(e.receiver._pc=e.srcElement,e)),e.RTCRtpReceiver.prototype.getStats=function(){return this._pc.getStats(this.track)}}function q(e){!e.RTCPeerConnection||"removeStream"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.removeStream=function(e){m("removeStream","removeTrack"),this.getSenders().forEach(t=>{t.track&&e.getTracks().includes(t.track)&&this.removeTrack(t)})})}function Q(e){e.DataChannel&&!e.RTCDataChannel&&(e.RTCDataChannel=e.DataChannel)}function Z(e){if(!("object"==typeof e&&e.RTCPeerConnection))return;let t=e.RTCPeerConnection.prototype.addTransceiver;t&&(e.RTCPeerConnection.prototype.addTransceiver=function(){this.setParametersPromises=[];let e=arguments[1]&&arguments[1].sendEncodings;void 0===e&&(e=[]);let n=(e=[...e]).length>0;n&&e.forEach(e=>{if("rid"in e&&!/^[a-z0-9]{0,16}$/i.test(e.rid))throw TypeError("Invalid RID value provided.");if("scaleResolutionDownBy"in e&&!(parseFloat(e.scaleResolutionDownBy)>=1))throw RangeError("scale_resolution_down_by must be >= 1.0");if("maxFramerate"in e&&!(parseFloat(e.maxFramerate)>=0))throw RangeError("max_framerate must be >= 0.0")});let r=t.apply(this,arguments);if(n){let{sender:t}=r,n=t.getParameters();"encodings"in n&&(1!==n.encodings.length||0!==Object.keys(n.encodings[0]).length)||(n.encodings=e,t.sendEncodings=e,this.setParametersPromises.push(t.setParameters(n).then(()=>{delete t.sendEncodings}).catch(()=>{delete t.sendEncodings})))}return r})}function ee(e){if(!("object"==typeof e&&e.RTCRtpSender))return;let t=e.RTCRtpSender.prototype.getParameters;t&&(e.RTCRtpSender.prototype.getParameters=function(){let e=t.apply(this,arguments);return"encodings"in e||(e.encodings=[].concat(this.sendEncodings||[{}])),e})}function et(e){if(!("object"==typeof e&&e.RTCPeerConnection))return;let t=e.RTCPeerConnection.prototype.createOffer;e.RTCPeerConnection.prototype.createOffer=function(){return this.setParametersPromises&&this.setParametersPromises.length?Promise.all(this.setParametersPromises).then(()=>t.apply(this,arguments)).finally(()=>{this.setParametersPromises=[]}):t.apply(this,arguments)}}function en(e){if(!("object"==typeof e&&e.RTCPeerConnection))return;let t=e.RTCPeerConnection.prototype.createAnswer;e.RTCPeerConnection.prototype.createAnswer=function(){return this.setParametersPromises&&this.setParametersPromises.length?Promise.all(this.setParametersPromises).then(()=>t.apply(this,arguments)).finally(()=>{this.setParametersPromises=[]}):t.apply(this,arguments)}}e(V,"shimOnTrack",()=>H),e(V,"shimPeerConnection",()=>Y),e(V,"shimSenderGetStats",()=>K),e(V,"shimReceiverGetStats",()=>X),e(V,"shimRemoveStream",()=>q),e(V,"shimRTCDataChannel",()=>Q),e(V,"shimAddTransceiver",()=>Z),e(V,"shimGetParameters",()=>ee),e(V,"shimCreateOffer",()=>et),e(V,"shimCreateAnswer",()=>en),e(V,"shimGetUserMedia",()=>G),e(V,"shimGetDisplayMedia",()=>W);var er={};function ei(e){if("object"==typeof e&&e.RTCPeerConnection){if("getLocalStreams"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.getLocalStreams=function(){return this._localStreams||(this._localStreams=[]),this._localStreams}),!("addStream"in e.RTCPeerConnection.prototype)){let t=e.RTCPeerConnection.prototype.addTrack;e.RTCPeerConnection.prototype.addStream=function(e){this._localStreams||(this._localStreams=[]),this._localStreams.includes(e)||this._localStreams.push(e),e.getAudioTracks().forEach(n=>t.call(this,n,e)),e.getVideoTracks().forEach(n=>t.call(this,n,e))},e.RTCPeerConnection.prototype.addTrack=function(e,...n){return n&&n.forEach(e=>{this._localStreams?this._localStreams.includes(e)||this._localStreams.push(e):this._localStreams=[e]}),t.apply(this,arguments)}}"removeStream"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.removeStream=function(e){this._localStreams||(this._localStreams=[]);let t=this._localStreams.indexOf(e);if(-1===t)return;this._localStreams.splice(t,1);let n=e.getTracks();this.getSenders().forEach(e=>{n.includes(e.track)&&this.removeTrack(e)})})}}function eo(e){if("object"==typeof e&&e.RTCPeerConnection&&("getRemoteStreams"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.getRemoteStreams=function(){return this._remoteStreams?this._remoteStreams:[]}),!("onaddstream"in e.RTCPeerConnection.prototype))){Object.defineProperty(e.RTCPeerConnection.prototype,"onaddstream",{get(){return this._onaddstream},set(e){this._onaddstream&&(this.removeEventListener("addstream",this._onaddstream),this.removeEventListener("track",this._onaddstreampoly)),this.addEventListener("addstream",this._onaddstream=e),this.addEventListener("track",this._onaddstreampoly=e=>{e.streams.forEach(e=>{if(this._remoteStreams||(this._remoteStreams=[]),this._remoteStreams.includes(e))return;this._remoteStreams.push(e);let t=new Event("addstream");t.stream=e,this.dispatchEvent(t)})})}});let t=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(){let e=this;return this._onaddstreampoly||this.addEventListener("track",this._onaddstreampoly=function(t){t.streams.forEach(t=>{if(e._remoteStreams||(e._remoteStreams=[]),e._remoteStreams.indexOf(t)>=0)return;e._remoteStreams.push(t);let n=new Event("addstream");n.stream=t,e.dispatchEvent(n)})}),t.apply(e,arguments)}}}function es(e){if("object"!=typeof e||!e.RTCPeerConnection)return;let t=e.RTCPeerConnection.prototype,n=t.createOffer,r=t.createAnswer,i=t.setLocalDescription,o=t.setRemoteDescription,s=t.addIceCandidate;t.createOffer=function(e,t){let r=arguments.length>=2?arguments[2]:arguments[0],i=n.apply(this,[r]);return t?(i.then(e,t),Promise.resolve()):i},t.createAnswer=function(e,t){let n=arguments.length>=2?arguments[2]:arguments[0],i=r.apply(this,[n]);return t?(i.then(e,t),Promise.resolve()):i};let a=function(e,t,n){let r=i.apply(this,[e]);return n?(r.then(t,n),Promise.resolve()):r};t.setLocalDescription=a,a=function(e,t,n){let r=o.apply(this,[e]);return n?(r.then(t,n),Promise.resolve()):r},t.setRemoteDescription=a,a=function(e,t,n){let r=s.apply(this,[e]);return n?(r.then(t,n),Promise.resolve()):r},t.addIceCandidate=a}function ea(e){let t=e&&e.navigator;if(t.mediaDevices&&t.mediaDevices.getUserMedia){let e=t.mediaDevices,n=e.getUserMedia.bind(e);t.mediaDevices.getUserMedia=e=>n(ec(e))}!t.getUserMedia&&t.mediaDevices&&t.mediaDevices.getUserMedia&&(t.getUserMedia=(function(e,n,r){t.mediaDevices.getUserMedia(e).then(n,r)}).bind(t))}function ec(e){return e&&void 0!==e.video?Object.assign({},e,{video:function e(t){return g(t)?Object.keys(t).reduce(function(n,r){let i=g(t[r]),o=i?e(t[r]):t[r],s=i&&!Object.keys(o).length;return void 0===o||s?n:Object.assign(n,{[r]:o})},{}):t}(e.video)}):e}function el(e){if(!e.RTCPeerConnection)return;let t=e.RTCPeerConnection;e.RTCPeerConnection=function(e,n){if(e&&e.iceServers){let t=[];for(let n=0;n<e.iceServers.length;n++){let r=e.iceServers[n];void 0===r.urls&&r.url?(m("RTCIceServer.url","RTCIceServer.urls"),(r=JSON.parse(JSON.stringify(r))).urls=r.url,delete r.url,t.push(r)):t.push(e.iceServers[n])}e.iceServers=t}return new t(e,n)},e.RTCPeerConnection.prototype=t.prototype,"generateCertificate"in t&&Object.defineProperty(e.RTCPeerConnection,"generateCertificate",{get:()=>t.generateCertificate})}function ep(e){"object"==typeof e&&e.RTCTrackEvent&&"receiver"in e.RTCTrackEvent.prototype&&!("transceiver"in e.RTCTrackEvent.prototype)&&Object.defineProperty(e.RTCTrackEvent.prototype,"transceiver",{get(){return{receiver:this.receiver}}})}function ed(e){let t=e.RTCPeerConnection.prototype.createOffer;e.RTCPeerConnection.prototype.createOffer=function(e){if(e){void 0!==e.offerToReceiveAudio&&(e.offerToReceiveAudio=!!e.offerToReceiveAudio);let t=this.getTransceivers().find(e=>"audio"===e.receiver.track.kind);!1===e.offerToReceiveAudio&&t?"sendrecv"===t.direction?t.setDirection?t.setDirection("sendonly"):t.direction="sendonly":"recvonly"===t.direction&&(t.setDirection?t.setDirection("inactive"):t.direction="inactive"):!0!==e.offerToReceiveAudio||t||this.addTransceiver("audio",{direction:"recvonly"}),void 0!==e.offerToReceiveVideo&&(e.offerToReceiveVideo=!!e.offerToReceiveVideo);let n=this.getTransceivers().find(e=>"video"===e.receiver.track.kind);!1===e.offerToReceiveVideo&&n?"sendrecv"===n.direction?n.setDirection?n.setDirection("sendonly"):n.direction="sendonly":"recvonly"===n.direction&&(n.setDirection?n.setDirection("inactive"):n.direction="inactive"):!0!==e.offerToReceiveVideo||n||this.addTransceiver("video",{direction:"recvonly"})}return t.apply(this,arguments)}}function eh(e){"object"!=typeof e||e.AudioContext||(e.AudioContext=e.webkitAudioContext)}e(er,"shimLocalStreamsAPI",()=>ei),e(er,"shimRemoteStreamsAPI",()=>eo),e(er,"shimCallbacksAPI",()=>es),e(er,"shimGetUserMedia",()=>ea),e(er,"shimConstraints",()=>ec),e(er,"shimRTCIceServerUrls",()=>el),e(er,"shimTrackEventTransceiver",()=>ep),e(er,"shimCreateOfferLegacy",()=>ed),e(er,"shimAudioContext",()=>eh);var eu={};e(eu,"shimRTCIceCandidate",()=>eg),e(eu,"shimRTCIceCandidateRelayProtocol",()=>ey),e(eu,"shimMaxMessageSize",()=>e_),e(eu,"shimSendThrowTypeError",()=>eC),e(eu,"shimConnectionState",()=>eb),e(eu,"removeExtmapAllowMixed",()=>ev),e(eu,"shimAddIceCandidateNullOrEmpty",()=>ek),e(eu,"shimParameterlessSetLocalDescription",()=>eT);var ef={};let em={};function eg(e){if(!e.RTCIceCandidate||e.RTCIceCandidate&&"foundation"in e.RTCIceCandidate.prototype)return;let n=e.RTCIceCandidate;e.RTCIceCandidate=function(e){if("object"==typeof e&&e.candidate&&0===e.candidate.indexOf("a=")&&((e=JSON.parse(JSON.stringify(e))).candidate=e.candidate.substring(2)),e.candidate&&e.candidate.length){let r=new n(e),i=t(ef).parseCandidate(e.candidate);for(let e in i)e in r||Object.defineProperty(r,e,{value:i[e]});return r.toJSON=function(){return{candidate:r.candidate,sdpMid:r.sdpMid,sdpMLineIndex:r.sdpMLineIndex,usernameFragment:r.usernameFragment}},r}return new n(e)},e.RTCIceCandidate.prototype=n.prototype,d(e,"icecandidate",t=>(t.candidate&&Object.defineProperty(t,"candidate",{value:new e.RTCIceCandidate(t.candidate),writable:"false"}),t))}function ey(e){!e.RTCIceCandidate||e.RTCIceCandidate&&"relayProtocol"in e.RTCIceCandidate.prototype||d(e,"icecandidate",e=>{if(e.candidate){let n=t(ef).parseCandidate(e.candidate.candidate);"relay"===n.type&&(e.candidate.relayProtocol=({0:"tls",1:"tcp",2:"udp"})[n.priority>>24])}return e})}function e_(e,n){if(!e.RTCPeerConnection)return;"sctp"in e.RTCPeerConnection.prototype||Object.defineProperty(e.RTCPeerConnection.prototype,"sctp",{get(){return void 0===this._sctp?null:this._sctp}});let r=function(e){if(!e||!e.sdp)return!1;let n=t(ef).splitSections(e.sdp);return n.shift(),n.some(e=>{let n=t(ef).parseMLine(e);return n&&"application"===n.kind&&-1!==n.protocol.indexOf("SCTP")})},i=function(e){let t=e.sdp.match(/mozilla...THIS_IS_SDPARTA-(\d+)/);if(null===t||t.length<2)return -1;let n=parseInt(t[1],10);return n!=n?-1:n},o=function(e){let t=65536;return"firefox"===n.browser&&(t=n.version<57?-1===e?16384:2147483637:n.version<60?57===n.version?65535:65536:2147483637),t},s=function(e,r){let i=65536;"firefox"===n.browser&&57===n.version&&(i=65535);let o=t(ef).matchPrefix(e.sdp,"a=max-message-size:");return o.length>0?i=parseInt(o[0].substring(19),10):"firefox"===n.browser&&-1!==r&&(i=2147483637),i},a=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(){if(this._sctp=null,"chrome"===n.browser&&n.version>=76){let{sdpSemantics:e}=this.getConfiguration();"plan-b"===e&&Object.defineProperty(this,"sctp",{get(){return void 0===this._sctp?null:this._sctp},enumerable:!0,configurable:!0})}if(r(arguments[0])){let e;let t=i(arguments[0]),n=o(t),r=s(arguments[0],t);e=0===n&&0===r?Number.POSITIVE_INFINITY:0===n||0===r?Math.max(n,r):Math.min(n,r);let a={};Object.defineProperty(a,"maxMessageSize",{get:()=>e}),this._sctp=a}return a.apply(this,arguments)}}function eC(e){if(!(e.RTCPeerConnection&&"createDataChannel"in e.RTCPeerConnection.prototype))return;function t(e,t){let n=e.send;e.send=function(){let r=arguments[0],i=r.length||r.size||r.byteLength;if("open"===e.readyState&&t.sctp&&i>t.sctp.maxMessageSize)throw TypeError("Message too large (can send a maximum of "+t.sctp.maxMessageSize+" bytes)");return n.apply(e,arguments)}}let n=e.RTCPeerConnection.prototype.createDataChannel;e.RTCPeerConnection.prototype.createDataChannel=function(){let e=n.apply(this,arguments);return t(e,this),e},d(e,"datachannel",e=>(t(e.channel,e.target),e))}function eb(e){if(!e.RTCPeerConnection||"connectionState"in e.RTCPeerConnection.prototype)return;let t=e.RTCPeerConnection.prototype;Object.defineProperty(t,"connectionState",{get(){return({completed:"connected",checking:"connecting"})[this.iceConnectionState]||this.iceConnectionState},enumerable:!0,configurable:!0}),Object.defineProperty(t,"onconnectionstatechange",{get(){return this._onconnectionstatechange||null},set(e){this._onconnectionstatechange&&(this.removeEventListener("connectionstatechange",this._onconnectionstatechange),delete this._onconnectionstatechange),e&&this.addEventListener("connectionstatechange",this._onconnectionstatechange=e)},enumerable:!0,configurable:!0}),["setLocalDescription","setRemoteDescription"].forEach(e=>{let n=t[e];t[e]=function(){return this._connectionstatechangepoly||(this._connectionstatechangepoly=e=>{let t=e.target;if(t._lastConnectionState!==t.connectionState){t._lastConnectionState=t.connectionState;let n=new Event("connectionstatechange",e);t.dispatchEvent(n)}return e},this.addEventListener("iceconnectionstatechange",this._connectionstatechangepoly)),n.apply(this,arguments)}})}function ev(e,t){if(!e.RTCPeerConnection||"chrome"===t.browser&&t.version>=71||"safari"===t.browser&&t.version>=605)return;let n=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(t){if(t&&t.sdp&&-1!==t.sdp.indexOf("\na=extmap-allow-mixed")){let n=t.sdp.split("\n").filter(e=>"a=extmap-allow-mixed"!==e.trim()).join("\n");e.RTCSessionDescription&&t instanceof e.RTCSessionDescription?arguments[0]=new e.RTCSessionDescription({type:t.type,sdp:n}):t.sdp=n}return n.apply(this,arguments)}}function ek(e,t){if(!(e.RTCPeerConnection&&e.RTCPeerConnection.prototype))return;let n=e.RTCPeerConnection.prototype.addIceCandidate;n&&0!==n.length&&(e.RTCPeerConnection.prototype.addIceCandidate=function(){return arguments[0]?("chrome"===t.browser&&t.version<78||"firefox"===t.browser&&t.version<68||"safari"===t.browser)&&arguments[0]&&""===arguments[0].candidate?Promise.resolve():n.apply(this,arguments):(arguments[1]&&arguments[1].apply(null),Promise.resolve())})}function eT(e,t){if(!(e.RTCPeerConnection&&e.RTCPeerConnection.prototype))return;let n=e.RTCPeerConnection.prototype.setLocalDescription;n&&0!==n.length&&(e.RTCPeerConnection.prototype.setLocalDescription=function(){let e=arguments[0]||{};if("object"!=typeof e||e.type&&e.sdp)return n.apply(this,arguments);if(!(e={type:e.type,sdp:e.sdp}).type)switch(this.signalingState){case"stable":case"have-local-offer":case"have-remote-pranswer":e.type="offer";break;default:e.type="answer"}return e.sdp||"offer"!==e.type&&"answer"!==e.type?n.apply(this,[e]):("offer"===e.type?this.createOffer:this.createAnswer).apply(this).then(e=>n.apply(this,[e]))})}em.generateIdentifier=function(){return Math.random().toString(36).substring(2,12)},em.localCName=em.generateIdentifier(),em.splitLines=function(e){return e.trim().split("\n").map(e=>e.trim())},em.splitSections=function(e){return e.split("\nm=").map((e,t)=>(t>0?"m="+e:e).trim()+"\r\n")},em.getDescription=function(e){let t=em.splitSections(e);return t&&t[0]},em.getMediaSections=function(e){let t=em.splitSections(e);return t.shift(),t},em.matchPrefix=function(e,t){return em.splitLines(e).filter(e=>0===e.indexOf(t))},em.parseCandidate=function(e){let t;let n={foundation:(t=0===e.indexOf("a=candidate:")?e.substring(12).split(" "):e.substring(10).split(" "))[0],component:{1:"rtp",2:"rtcp"}[t[1]]||t[1],protocol:t[2].toLowerCase(),priority:parseInt(t[3],10),ip:t[4],address:t[4],port:parseInt(t[5],10),type:t[7]};for(let e=8;e<t.length;e+=2)switch(t[e]){case"raddr":n.relatedAddress=t[e+1];break;case"rport":n.relatedPort=parseInt(t[e+1],10);break;case"tcptype":n.tcpType=t[e+1];break;case"ufrag":n.ufrag=t[e+1],n.usernameFragment=t[e+1];break;default:void 0===n[t[e]]&&(n[t[e]]=t[e+1])}return n},em.writeCandidate=function(e){let t=[];t.push(e.foundation);let n=e.component;"rtp"===n?t.push(1):"rtcp"===n?t.push(2):t.push(n),t.push(e.protocol.toUpperCase()),t.push(e.priority),t.push(e.address||e.ip),t.push(e.port);let r=e.type;return t.push("typ"),t.push(r),"host"!==r&&e.relatedAddress&&e.relatedPort&&(t.push("raddr"),t.push(e.relatedAddress),t.push("rport"),t.push(e.relatedPort)),e.tcpType&&"tcp"===e.protocol.toLowerCase()&&(t.push("tcptype"),t.push(e.tcpType)),(e.usernameFragment||e.ufrag)&&(t.push("ufrag"),t.push(e.usernameFragment||e.ufrag)),"candidate:"+t.join(" ")},em.parseIceOptions=function(e){return e.substring(14).split(" ")},em.parseRtpMap=function(e){let t=e.substring(9).split(" "),n={payloadType:parseInt(t.shift(),10)};return t=t[0].split("/"),n.name=t[0],n.clockRate=parseInt(t[1],10),n.channels=3===t.length?parseInt(t[2],10):1,n.numChannels=n.channels,n},em.writeRtpMap=function(e){let t=e.payloadType;void 0!==e.preferredPayloadType&&(t=e.preferredPayloadType);let n=e.channels||e.numChannels||1;return"a=rtpmap:"+t+" "+e.name+"/"+e.clockRate+(1!==n?"/"+n:"")+"\r\n"},em.parseExtmap=function(e){let t=e.substring(9).split(" ");return{id:parseInt(t[0],10),direction:t[0].indexOf("/")>0?t[0].split("/")[1]:"sendrecv",uri:t[1],attributes:t.slice(2).join(" ")}},em.writeExtmap=function(e){return"a=extmap:"+(e.id||e.preferredId)+(e.direction&&"sendrecv"!==e.direction?"/"+e.direction:"")+" "+e.uri+(e.attributes?" "+e.attributes:"")+"\r\n"},em.parseFmtp=function(e){let t;let n={},r=e.substring(e.indexOf(" ")+1).split(";");for(let e=0;e<r.length;e++)n[(t=r[e].trim().split("="))[0].trim()]=t[1];return n},em.writeFmtp=function(e){let t="",n=e.payloadType;if(void 0!==e.preferredPayloadType&&(n=e.preferredPayloadType),e.parameters&&Object.keys(e.parameters).length){let r=[];Object.keys(e.parameters).forEach(t=>{void 0!==e.parameters[t]?r.push(t+"="+e.parameters[t]):r.push(t)}),t+="a=fmtp:"+n+" "+r.join(";")+"\r\n"}return t},em.parseRtcpFb=function(e){let t=e.substring(e.indexOf(" ")+1).split(" ");return{type:t.shift(),parameter:t.join(" ")}},em.writeRtcpFb=function(e){let t="",n=e.payloadType;return void 0!==e.preferredPayloadType&&(n=e.preferredPayloadType),e.rtcpFeedback&&e.rtcpFeedback.length&&e.rtcpFeedback.forEach(e=>{t+="a=rtcp-fb:"+n+" "+e.type+(e.parameter&&e.parameter.length?" "+e.parameter:"")+"\r\n"}),t},em.parseSsrcMedia=function(e){let t=e.indexOf(" "),n={ssrc:parseInt(e.substring(7,t),10)},r=e.indexOf(":",t);return r>-1?(n.attribute=e.substring(t+1,r),n.value=e.substring(r+1)):n.attribute=e.substring(t+1),n},em.parseSsrcGroup=function(e){let t=e.substring(13).split(" ");return{semantics:t.shift(),ssrcs:t.map(e=>parseInt(e,10))}},em.getMid=function(e){let t=em.matchPrefix(e,"a=mid:")[0];if(t)return t.substring(6)},em.parseFingerprint=function(e){let t=e.substring(14).split(" ");return{algorithm:t[0].toLowerCase(),value:t[1].toUpperCase()}},em.getDtlsParameters=function(e,t){return{role:"auto",fingerprints:em.matchPrefix(e+t,"a=fingerprint:").map(em.parseFingerprint)}},em.writeDtlsParameters=function(e,t){let n="a=setup:"+t+"\r\n";return e.fingerprints.forEach(e=>{n+="a=fingerprint:"+e.algorithm+" "+e.value+"\r\n"}),n},em.parseCryptoLine=function(e){let t=e.substring(9).split(" ");return{tag:parseInt(t[0],10),cryptoSuite:t[1],keyParams:t[2],sessionParams:t.slice(3)}},em.writeCryptoLine=function(e){return"a=crypto:"+e.tag+" "+e.cryptoSuite+" "+("object"==typeof e.keyParams?em.writeCryptoKeyParams(e.keyParams):e.keyParams)+(e.sessionParams?" "+e.sessionParams.join(" "):"")+"\r\n"},em.parseCryptoKeyParams=function(e){if(0!==e.indexOf("inline:"))return null;let t=e.substring(7).split("|");return{keyMethod:"inline",keySalt:t[0],lifeTime:t[1],mkiValue:t[2]?t[2].split(":")[0]:void 0,mkiLength:t[2]?t[2].split(":")[1]:void 0}},em.writeCryptoKeyParams=function(e){return e.keyMethod+":"+e.keySalt+(e.lifeTime?"|"+e.lifeTime:"")+(e.mkiValue&&e.mkiLength?"|"+e.mkiValue+":"+e.mkiLength:"")},em.getCryptoParameters=function(e,t){return em.matchPrefix(e+t,"a=crypto:").map(em.parseCryptoLine)},em.getIceParameters=function(e,t){let n=em.matchPrefix(e+t,"a=ice-ufrag:")[0],r=em.matchPrefix(e+t,"a=ice-pwd:")[0];return n&&r?{usernameFragment:n.substring(12),password:r.substring(10)}:null},em.writeIceParameters=function(e){let t="a=ice-ufrag:"+e.usernameFragment+"\r\na=ice-pwd:"+e.password+"\r\n";return e.iceLite&&(t+="a=ice-lite\r\n"),t},em.parseRtpParameters=function(e){let t={codecs:[],headerExtensions:[],fecMechanisms:[],rtcp:[]},n=em.splitLines(e)[0].split(" ");t.profile=n[2];for(let r=3;r<n.length;r++){let i=n[r],o=em.matchPrefix(e,"a=rtpmap:"+i+" ")[0];if(o){let n=em.parseRtpMap(o),r=em.matchPrefix(e,"a=fmtp:"+i+" ");switch(n.parameters=r.length?em.parseFmtp(r[0]):{},n.rtcpFeedback=em.matchPrefix(e,"a=rtcp-fb:"+i+" ").map(em.parseRtcpFb),t.codecs.push(n),n.name.toUpperCase()){case"RED":case"ULPFEC":t.fecMechanisms.push(n.name.toUpperCase())}}}em.matchPrefix(e,"a=extmap:").forEach(e=>{t.headerExtensions.push(em.parseExtmap(e))});let r=em.matchPrefix(e,"a=rtcp-fb:* ").map(em.parseRtcpFb);return t.codecs.forEach(e=>{r.forEach(t=>{e.rtcpFeedback.find(e=>e.type===t.type&&e.parameter===t.parameter)||e.rtcpFeedback.push(t)})}),t},em.writeRtpDescription=function(e,t){let n="";n+="m="+e+" "+(t.codecs.length>0?"9":"0")+" "+(t.profile||"UDP/TLS/RTP/SAVPF")+" "+t.codecs.map(e=>void 0!==e.preferredPayloadType?e.preferredPayloadType:e.payloadType).join(" ")+"\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\n",t.codecs.forEach(e=>{n+=em.writeRtpMap(e)+em.writeFmtp(e)+em.writeRtcpFb(e)});let r=0;return t.codecs.forEach(e=>{e.maxptime>r&&(r=e.maxptime)}),r>0&&(n+="a=maxptime:"+r+"\r\n"),t.headerExtensions&&t.headerExtensions.forEach(e=>{n+=em.writeExtmap(e)}),n},em.parseRtpEncodingParameters=function(e){let t;let n=[],r=em.parseRtpParameters(e),i=-1!==r.fecMechanisms.indexOf("RED"),o=-1!==r.fecMechanisms.indexOf("ULPFEC"),s=em.matchPrefix(e,"a=ssrc:").map(e=>em.parseSsrcMedia(e)).filter(e=>"cname"===e.attribute),a=s.length>0&&s[0].ssrc,c=em.matchPrefix(e,"a=ssrc-group:FID").map(e=>e.substring(17).split(" ").map(e=>parseInt(e,10)));c.length>0&&c[0].length>1&&c[0][0]===a&&(t=c[0][1]),r.codecs.forEach(e=>{if("RTX"===e.name.toUpperCase()&&e.parameters.apt){let r={ssrc:a,codecPayloadType:parseInt(e.parameters.apt,10)};a&&t&&(r.rtx={ssrc:t}),n.push(r),i&&((r=JSON.parse(JSON.stringify(r))).fec={ssrc:a,mechanism:o?"red+ulpfec":"red"},n.push(r))}}),0===n.length&&a&&n.push({ssrc:a});let l=em.matchPrefix(e,"b=");return l.length&&(l=0===l[0].indexOf("b=TIAS:")?parseInt(l[0].substring(7),10):0===l[0].indexOf("b=AS:")?950*parseInt(l[0].substring(5),10)-16e3:void 0,n.forEach(e=>{e.maxBitrate=l})),n},em.parseRtcpParameters=function(e){let t={},n=em.matchPrefix(e,"a=ssrc:").map(e=>em.parseSsrcMedia(e)).filter(e=>"cname"===e.attribute)[0];n&&(t.cname=n.value,t.ssrc=n.ssrc);let r=em.matchPrefix(e,"a=rtcp-rsize");t.reducedSize=r.length>0,t.compound=0===r.length;let i=em.matchPrefix(e,"a=rtcp-mux");return t.mux=i.length>0,t},em.writeRtcpParameters=function(e){let t="";return e.reducedSize&&(t+="a=rtcp-rsize\r\n"),e.mux&&(t+="a=rtcp-mux\r\n"),void 0!==e.ssrc&&e.cname&&(t+="a=ssrc:"+e.ssrc+" cname:"+e.cname+"\r\n"),t},em.parseMsid=function(e){let t;let n=em.matchPrefix(e,"a=msid:");if(1===n.length)return{stream:(t=n[0].substring(7).split(" "))[0],track:t[1]};let r=em.matchPrefix(e,"a=ssrc:").map(e=>em.parseSsrcMedia(e)).filter(e=>"msid"===e.attribute);if(r.length>0)return{stream:(t=r[0].value.split(" "))[0],track:t[1]}},em.parseSctpDescription=function(e){let t;let n=em.parseMLine(e),r=em.matchPrefix(e,"a=max-message-size:");r.length>0&&(t=parseInt(r[0].substring(19),10)),isNaN(t)&&(t=65536);let i=em.matchPrefix(e,"a=sctp-port:");if(i.length>0)return{port:parseInt(i[0].substring(12),10),protocol:n.fmt,maxMessageSize:t};let o=em.matchPrefix(e,"a=sctpmap:");if(o.length>0){let e=o[0].substring(10).split(" ");return{port:parseInt(e[0],10),protocol:e[1],maxMessageSize:t}}},em.writeSctpDescription=function(e,t){let n=[];return n="DTLS/SCTP"!==e.protocol?["m="+e.kind+" 9 "+e.protocol+" "+t.protocol+"\r\n","c=IN IP4 0.0.0.0\r\n","a=sctp-port:"+t.port+"\r\n"]:["m="+e.kind+" 9 "+e.protocol+" "+t.port+"\r\n","c=IN IP4 0.0.0.0\r\n","a=sctpmap:"+t.port+" "+t.protocol+" 65535\r\n"],void 0!==t.maxMessageSize&&n.push("a=max-message-size:"+t.maxMessageSize+"\r\n"),n.join("")},em.generateSessionId=function(){return Math.random().toString().substr(2,22)},em.writeSessionBoilerplate=function(e,t,n){return"v=0\r\no="+(n||"thisisadapterortc")+" "+(e||em.generateSessionId())+" "+(void 0!==t?t:2)+" IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n"},em.getDirection=function(e,t){let n=em.splitLines(e);for(let e=0;e<n.length;e++)switch(n[e]){case"a=sendrecv":case"a=sendonly":case"a=recvonly":case"a=inactive":return n[e].substring(2)}return t?em.getDirection(t):"sendrecv"},em.getKind=function(e){return em.splitLines(e)[0].split(" ")[0].substring(2)},em.isRejected=function(e){return"0"===e.split(" ",2)[1]},em.parseMLine=function(e){let t=em.splitLines(e)[0].substring(2).split(" ");return{kind:t[0],port:parseInt(t[1],10),protocol:t[2],fmt:t.slice(3).join(" ")}},em.parseOLine=function(e){let t=em.matchPrefix(e,"o=")[0].substring(2).split(" ");return{username:t[0],sessionId:t[1],sessionVersion:parseInt(t[2],10),netType:t[3],addressType:t[4],address:t[5]}},em.isValidSDP=function(e){if("string"!=typeof e||0===e.length)return!1;let t=em.splitLines(e);for(let e=0;e<t.length;e++)if(t[e].length<2||"="!==t[e].charAt(1))return!1;return!0},ef=em;let eS=function({window:e}={},t={shimChrome:!0,shimFirefox:!0,shimSafari:!0}){let n=function(e){let t={browser:null,version:null};if(void 0===e||!e.navigator||!e.navigator.userAgent)return t.browser="Not a browser.",t;let{navigator:n}=e;if(n.userAgentData&&n.userAgentData.brands){let e=n.userAgentData.brands.find(e=>"Chromium"===e.brand);if(e)return{browser:"chrome",version:parseInt(e.version,10)}}return n.mozGetUserMedia?(t.browser="firefox",t.version=p(n.userAgent,/Firefox\/(\d+)\./,1)):n.webkitGetUserMedia||!1===e.isSecureContext&&e.webkitRTCPeerConnection?(t.browser="chrome",t.version=p(n.userAgent,/Chrom(e|ium)\/(\d+)\./,2)):e.RTCPeerConnection&&n.userAgent.match(/AppleWebKit\/(\d+)\./)?(t.browser="safari",t.version=p(n.userAgent,/AppleWebKit\/(\d+)\./,1),t.supportsUnifiedPlan=e.RTCRtpTransceiver&&"currentDirection"in e.RTCRtpTransceiver.prototype):t.browser="Not a supported browser.",t}(e),r={browserDetails:n,commonShim:eu,extractVersion:p,disableLog:h,disableWarnings:u,sdp:ef};switch(n.browser){case"chrome":if(!j||!j.shimPeerConnection||!t.shimChrome){f("Chrome shim is not included in this adapter release.");break}if(null===n.version){f("Chrome shim can not determine version, not shimming.");break}f("adapter.js shimming chrome."),r.browserShim=j,ek(e,n),eT(e,n),j.shimGetUserMedia(e,n),j.shimMediaStream(e,n),j.shimPeerConnection(e,n),j.shimOnTrack(e,n),j.shimAddTrackRemoveTrack(e,n),j.shimGetSendersWithDtmf(e,n),j.shimSenderReceiverGetStats(e,n),j.fixNegotiationNeeded(e,n),eg(e,n),ey(e,n),eb(e,n),e_(e,n),eC(e,n),ev(e,n);break;case"firefox":if(!V||!V.shimPeerConnection||!t.shimFirefox){f("Firefox shim is not included in this adapter release.");break}f("adapter.js shimming firefox."),r.browserShim=V,ek(e,n),eT(e,n),V.shimGetUserMedia(e,n),V.shimPeerConnection(e,n),V.shimOnTrack(e,n),V.shimRemoveStream(e,n),V.shimSenderGetStats(e,n),V.shimReceiverGetStats(e,n),V.shimRTCDataChannel(e,n),V.shimAddTransceiver(e,n),V.shimGetParameters(e,n),V.shimCreateOffer(e,n),V.shimCreateAnswer(e,n),eg(e,n),eb(e,n),e_(e,n),eC(e,n);break;case"safari":if(!er||!t.shimSafari){f("Safari shim is not included in this adapter release.");break}f("adapter.js shimming safari."),r.browserShim=er,ek(e,n),eT(e,n),er.shimRTCIceServerUrls(e,n),er.shimCreateOfferLegacy(e,n),er.shimCallbacksAPI(e,n),er.shimLocalStreamsAPI(e,n),er.shimRemoteStreamsAPI(e,n),er.shimTrackEventTransceiver(e,n),er.shimGetUserMedia(e,n),er.shimAudioContext(e,n),eg(e,n),ey(e,n),e_(e,n),eC(e,n),ev(e,n);break;default:f("Unsupported browser!")}return r}({window:"undefined"==typeof window?void 0:window}),eR=eS.default||eS,eP=new class{isWebRTCSupported(){return"undefined"!=typeof RTCPeerConnection}isBrowserSupported(){let e=this.getBrowser(),t=this.getVersion();return!!this.supportedBrowsers.includes(e)&&("chrome"===e?t>=this.minChromeVersion:"firefox"===e?t>=this.minFirefoxVersion:"safari"===e&&!this.isIOS&&t>=this.minSafariVersion)}getBrowser(){return eR.browserDetails.browser}getVersion(){return eR.browserDetails.version||0}isUnifiedPlanSupported(){let e;let t=this.getBrowser(),n=eR.browserDetails.version||0;if("chrome"===t&&n<this.minChromeVersion)return!1;if("firefox"===t&&n>=this.minFirefoxVersion)return!0;if(!window.RTCRtpTransceiver||!("currentDirection"in RTCRtpTransceiver.prototype))return!1;let r=!1;try{(e=new RTCPeerConnection).addTransceiver("audio"),r=!0}catch(e){}finally{e&&e.close()}return r}toString(){return`Supports:
+    browser:${this.getBrowser()}
+    version:${this.getVersion()}
+    isIOS:${this.isIOS}
+    isWebRTCSupported:${this.isWebRTCSupported()}
+    isBrowserSupported:${this.isBrowserSupported()}
+    isUnifiedPlanSupported:${this.isUnifiedPlanSupported()}`}constructor(){this.isIOS="undefined"!=typeof navigator&&["iPad","iPhone","iPod"].includes(navigator.platform),this.supportedBrowsers=["firefox","chrome","safari"],this.minFirefoxVersion=59,this.minChromeVersion=72,this.minSafariVersion=605}},ew=e=>!e||/^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/.test(e),eE=()=>Math.random().toString(36).slice(2),eD={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:["turn:eu-0.turn.peerjs.com:3478","turn:us-0.turn.peerjs.com:3478"],username:"peerjs",credential:"peerjsp"}],sdpSemantics:"unified-plan"},ex=new class extends n{noop(){}blobToArrayBuffer(e,t){let n=new FileReader;return n.onload=function(e){e.target&&t(e.target.result)},n.readAsArrayBuffer(e),n}binaryStringToArrayBuffer(e){let t=new Uint8Array(e.length);for(let n=0;n<e.length;n++)t[n]=255&e.charCodeAt(n);return t.buffer}isSecure(){return"https:"===location.protocol}constructor(...e){super(...e),this.CLOUD_HOST="0.peerjs.com",this.CLOUD_PORT=443,this.chunkedBrowsers={Chrome:1,chrome:1},this.defaultConfig=eD,this.browser=eP.getBrowser(),this.browserVersion=eP.getVersion(),this.pack=o,this.unpack=i,this.supports=function(){let e;let t={browser:eP.isBrowserSupported(),webRTC:eP.isWebRTCSupported(),audioVideo:!1,data:!1,binaryBlob:!1,reliable:!1};if(!t.webRTC)return t;try{let n;e=new RTCPeerConnection(eD),t.audioVideo=!0;try{n=e.createDataChannel("_PEERJSTEST",{ordered:!0}),t.data=!0,t.reliable=!!n.ordered;try{n.binaryType="blob",t.binaryBlob=!eP.isIOS}catch(e){}}catch(e){}finally{n&&n.close()}}catch(e){}finally{e&&e.close()}return t}(),this.validateId=ew,this.randomToken=eE}};(_=P||(P={}))[_.Disabled=0]="Disabled",_[_.Errors=1]="Errors",_[_.Warnings=2]="Warnings",_[_.All=3]="All";var eI=new class{get logLevel(){return this._logLevel}set logLevel(e){this._logLevel=e}log(...e){this._logLevel>=3&&this._print(3,...e)}warn(...e){this._logLevel>=2&&this._print(2,...e)}error(...e){this._logLevel>=1&&this._print(1,...e)}setLogFunction(e){this._print=e}_print(e,...t){let n=["PeerJS: ",...t];for(let e in n)n[e]instanceof Error&&(n[e]="("+n[e].name+") "+n[e].message);e>=3?console.log(...n):e>=2?console.warn("WARNING",...n):e>=1&&console.error("ERROR",...n)}constructor(){this._logLevel=0}},eM={},eO=Object.prototype.hasOwnProperty,ej="~";function eL(){}function eA(e,t,n){this.fn=e,this.context=t,this.once=n||!1}function eB(e,t,n,r,i){if("function"!=typeof n)throw TypeError("The listener must be a function");var o=new eA(n,r||e,i),s=ej?ej+t:t;return e._events[s]?e._events[s].fn?e._events[s]=[e._events[s],o]:e._events[s].push(o):(e._events[s]=o,e._eventsCount++),e}function eF(e,t){0==--e._eventsCount?e._events=new eL:delete e._events[t]}function eU(){this._events=new eL,this._eventsCount=0}Object.create&&(eL.prototype=Object.create(null),new eL().__proto__||(ej=!1)),eU.prototype.eventNames=function(){var e,t,n=[];if(0===this._eventsCount)return n;for(t in e=this._events)eO.call(e,t)&&n.push(ej?t.slice(1):t);return Object.getOwnPropertySymbols?n.concat(Object.getOwnPropertySymbols(e)):n},eU.prototype.listeners=function(e){var t=ej?ej+e:e,n=this._events[t];if(!n)return[];if(n.fn)return[n.fn];for(var r=0,i=n.length,o=Array(i);r<i;r++)o[r]=n[r].fn;return o},eU.prototype.listenerCount=function(e){var t=ej?ej+e:e,n=this._events[t];return n?n.fn?1:n.length:0},eU.prototype.emit=function(e,t,n,r,i,o){var s=ej?ej+e:e;if(!this._events[s])return!1;var a,c,l=this._events[s],p=arguments.length;if(l.fn){switch(l.once&&this.removeListener(e,l.fn,void 0,!0),p){case 1:return l.fn.call(l.context),!0;case 2:return l.fn.call(l.context,t),!0;case 3:return l.fn.call(l.context,t,n),!0;case 4:return l.fn.call(l.context,t,n,r),!0;case 5:return l.fn.call(l.context,t,n,r,i),!0;case 6:return l.fn.call(l.context,t,n,r,i,o),!0}for(c=1,a=Array(p-1);c<p;c++)a[c-1]=arguments[c];l.fn.apply(l.context,a)}else{var d,h=l.length;for(c=0;c<h;c++)switch(l[c].once&&this.removeListener(e,l[c].fn,void 0,!0),p){case 1:l[c].fn.call(l[c].context);break;case 2:l[c].fn.call(l[c].context,t);break;case 3:l[c].fn.call(l[c].context,t,n);break;case 4:l[c].fn.call(l[c].context,t,n,r);break;default:if(!a)for(d=1,a=Array(p-1);d<p;d++)a[d-1]=arguments[d];l[c].fn.apply(l[c].context,a)}}return!0},eU.prototype.on=function(e,t,n){return eB(this,e,t,n,!1)},eU.prototype.once=function(e,t,n){return eB(this,e,t,n,!0)},eU.prototype.removeListener=function(e,t,n,r){var i=ej?ej+e:e;if(!this._events[i])return this;if(!t)return eF(this,i),this;var o=this._events[i];if(o.fn)o.fn!==t||r&&!o.once||n&&o.context!==n||eF(this,i);else{for(var s=0,a=[],c=o.length;s<c;s++)(o[s].fn!==t||r&&!o[s].once||n&&o[s].context!==n)&&a.push(o[s]);a.length?this._events[i]=1===a.length?a[0]:a:eF(this,i)}return this},eU.prototype.removeAllListeners=function(e){var t;return e?(t=ej?ej+e:e,this._events[t]&&eF(this,t)):(this._events=new eL,this._eventsCount=0),this},eU.prototype.off=eU.prototype.removeListener,eU.prototype.addListener=eU.prototype.on,eU.prefixed=ej,eU.EventEmitter=eU,eM=eU,(C=w||(w={})).Data="data",C.Media="media",(b=E||(E={})).BrowserIncompatible="browser-incompatible",b.Disconnected="disconnected",b.InvalidID="invalid-id",b.InvalidKey="invalid-key",b.Network="network",b.PeerUnavailable="peer-unavailable",b.SslUnavailable="ssl-unavailable",b.ServerError="server-error",b.SocketError="socket-error",b.SocketClosed="socket-closed",b.UnavailableID="unavailable-id",b.WebRTC="webrtc",(v=D||(D={})).NegotiationFailed="negotiation-failed",v.ConnectionClosed="connection-closed",(k=x||(x={})).NotOpenYet="not-open-yet",k.MessageToBig="message-too-big",(T=I||(I={})).Binary="binary",T.BinaryUTF8="binary-utf8",T.JSON="json",T.None="raw",(S=M||(M={})).Message="message",S.Disconnected="disconnected",S.Error="error",S.Close="close",(R=O||(O={})).Heartbeat="HEARTBEAT",R.Candidate="CANDIDATE",R.Offer="OFFER",R.Answer="ANSWER",R.Open="OPEN",R.Error="ERROR",R.IdTaken="ID-TAKEN",R.InvalidKey="INVALID-KEY",R.Leave="LEAVE",R.Expire="EXPIRE";var ez={};ez=JSON.parse('{"name":"peerjs","version":"1.5.4","keywords":["peerjs","webrtc","p2p","rtc"],"description":"PeerJS client","homepage":"https://peerjs.com","bugs":{"url":"https://github.com/peers/peerjs/issues"},"repository":{"type":"git","url":"https://github.com/peers/peerjs"},"license":"MIT","contributors":["Michelle Bu <michelle@michellebu.com>","afrokick <devbyru@gmail.com>","ericz <really.ez@gmail.com>","Jairo <kidandcat@gmail.com>","Jonas Gloning <34194370+jonasgloning@users.noreply.github.com>","Jairo Caro-Accino Viciana <jairo@galax.be>","Carlos Caballero <carlos.caballero.gonzalez@gmail.com>","hc <hheennrryy@gmail.com>","Muhammad Asif <capripio@gmail.com>","PrashoonB <prashoonbhattacharjee@gmail.com>","Harsh Bardhan Mishra <47351025+HarshCasper@users.noreply.github.com>","akotynski <aleksanderkotbury@gmail.com>","lmb <i@lmb.io>","Jairooo <jairocaro@msn.com>","Moritz Stückler <moritz.stueckler@gmail.com>","Simon <crydotsnakegithub@gmail.com>","Denis Lukov <denismassters@gmail.com>","Philipp Hancke <fippo@andyet.net>","Hans Oksendahl <hansoksendahl@gmail.com>","Jess <jessachandler@gmail.com>","khankuan <khankuan@gmail.com>","DUODVK <kurmanov.work@gmail.com>","XiZhao <kwang1imsa@gmail.com>","Matthias Lohr <matthias@lohr.me>","=frank tree <=frnktrb@googlemail.com>","Andre Eckardt <aeckardt@outlook.com>","Chris Cowan <agentme49@gmail.com>","Alex Chuev <alex@chuev.com>","alxnull <alxnull@e.mail.de>","Yemel Jardi <angel.jardi@gmail.com>","Ben Parnell <benjaminparnell.94@gmail.com>","Benny Lichtner <bennlich@gmail.com>","fresheneesz <bitetrudpublic@gmail.com>","bob.barstead@exaptive.com <bob.barstead@exaptive.com>","chandika <chandika@gmail.com>","emersion <contact@emersion.fr>","Christopher Van <cvan@users.noreply.github.com>","eddieherm <edhermoso@gmail.com>","Eduardo Pinho <enet4mikeenet@gmail.com>","Evandro Zanatta <ezanatta@tray.net.br>","Gardner Bickford <gardner@users.noreply.github.com>","Gian Luca <gianluca.cecchi@cynny.com>","PatrickJS <github@gdi2290.com>","jonnyf <github@jonathanfoss.co.uk>","Hizkia Felix <hizkifw@gmail.com>","Hristo Oskov <hristo.oskov@gmail.com>","Isaac Madwed <i.madwed@gmail.com>","Ilya Konanykhin <ilya.konanykhin@gmail.com>","jasonbarry <jasbarry@me.com>","Jonathan Burke <jonathan.burke.1311@googlemail.com>","Josh Hamit <josh.hamit@gmail.com>","Jordan Austin <jrax86@gmail.com>","Joel Wetzell <jwetzell@yahoo.com>","xizhao <kevin.wang@cloudera.com>","Alberto Torres <kungfoobar@gmail.com>","Jonathan Mayol <mayoljonathan@gmail.com>","Jefferson Felix <me@jsfelix.dev>","Rolf Erik Lekang <me@rolflekang.com>","Kevin Mai-Husan Chia <mhchia@users.noreply.github.com>","Pepijn de Vos <pepijndevos@gmail.com>","JooYoung <qkdlql@naver.com>","Tobias Speicher <rootcommander@gmail.com>","Steve Blaurock <sblaurock@gmail.com>","Kyrylo Shegeda <shegeda@ualberta.ca>","Diwank Singh Tomer <singh@diwank.name>","Sören Balko <Soeren.Balko@gmail.com>","Arpit Solanki <solankiarpit1997@gmail.com>","Yuki Ito <yuki@gnnk.net>","Artur Zayats <zag2art@gmail.com>"],"funding":{"type":"opencollective","url":"https://opencollective.com/peer"},"collective":{"type":"opencollective","url":"https://opencollective.com/peer"},"files":["dist/*"],"sideEffects":["lib/global.ts","lib/supports.ts"],"main":"dist/bundler.cjs","module":"dist/bundler.mjs","browser-minified":"dist/peerjs.min.js","browser-unminified":"dist/peerjs.js","browser-minified-msgpack":"dist/serializer.msgpack.mjs","types":"dist/types.d.ts","engines":{"node":">= 14"},"targets":{"types":{"source":"lib/exports.ts"},"main":{"source":"lib/exports.ts","sourceMap":{"inlineSources":true}},"module":{"source":"lib/exports.ts","includeNodeModules":["eventemitter3"],"sourceMap":{"inlineSources":true}},"browser-minified":{"context":"browser","outputFormat":"global","optimize":true,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 80, safari >= 15"},"source":"lib/global.ts"},"browser-unminified":{"context":"browser","outputFormat":"global","optimize":false,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 80, safari >= 15"},"source":"lib/global.ts"},"browser-minified-msgpack":{"context":"browser","outputFormat":"esmodule","isLibrary":true,"optimize":true,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 102, safari >= 15"},"source":"lib/dataconnection/StreamConnection/MsgPack.ts"}},"scripts":{"contributors":"git-authors-cli --print=false && prettier --write package.json && git add package.json package-lock.json && git commit -m \\"chore(contributors): update and sort contributors list\\"","check":"tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit","watch":"parcel watch","build":"rm -rf dist && parcel build","prepublishOnly":"npm run build","test":"jest","test:watch":"jest --watch","coverage":"jest --coverage --collectCoverageFrom=\\"./lib/**\\"","format":"prettier --write .","format:check":"prettier --check .","semantic-release":"semantic-release","e2e":"wdio run e2e/wdio.local.conf.ts","e2e:bstack":"wdio run e2e/wdio.bstack.conf.ts"},"devDependencies":{"@parcel/config-default":"^2.9.3","@parcel/packager-ts":"^2.9.3","@parcel/transformer-typescript-tsc":"^2.9.3","@parcel/transformer-typescript-types":"^2.9.3","@semantic-release/changelog":"^6.0.1","@semantic-release/git":"^10.0.1","@swc/core":"^1.3.27","@swc/jest":"^0.2.24","@types/jasmine":"^4.3.4","@wdio/browserstack-service":"^8.11.2","@wdio/cli":"^8.11.2","@wdio/globals":"^8.11.2","@wdio/jasmine-framework":"^8.11.2","@wdio/local-runner":"^8.11.2","@wdio/spec-reporter":"^8.11.2","@wdio/types":"^8.10.4","http-server":"^14.1.1","jest":"^29.3.1","jest-environment-jsdom":"^29.3.1","mock-socket":"^9.0.0","parcel":"^2.9.3","prettier":"^3.0.0","semantic-release":"^21.0.0","ts-node":"^10.9.1","typescript":"^5.0.0","wdio-geckodriver-service":"^5.0.1"},"dependencies":{"@msgpack/msgpack":"^2.8.0","eventemitter3":"^4.0.7","peerjs-js-binarypack":"^2.1.0","webrtc-adapter":"^9.0.0"},"alias":{"process":false,"buffer":false}}');class eN extends eM.EventEmitter{start(e,t){this._id=e;let n=`${this._baseUrl}&id=${e}&token=${t}`;!this._socket&&this._disconnected&&(this._socket=new WebSocket(n+"&version="+ez.version),this._disconnected=!1,this._socket.onmessage=e=>{let t;try{t=JSON.parse(e.data),eI.log("Server message received:",t)}catch(t){eI.log("Invalid server message",e.data);return}this.emit(M.Message,t)},this._socket.onclose=e=>{this._disconnected||(eI.log("Socket closed.",e),this._cleanup(),this._disconnected=!0,this.emit(M.Disconnected))},this._socket.onopen=()=>{this._disconnected||(this._sendQueuedMessages(),eI.log("Socket open"),this._scheduleHeartbeat())})}_scheduleHeartbeat(){this._wsPingTimer=setTimeout(()=>{this._sendHeartbeat()},this.pingInterval)}_sendHeartbeat(){if(!this._wsOpen()){eI.log("Cannot send heartbeat, because socket closed");return}let e=JSON.stringify({type:O.Heartbeat});this._socket.send(e),this._scheduleHeartbeat()}_wsOpen(){return!!this._socket&&1===this._socket.readyState}_sendQueuedMessages(){let e=[...this._messagesQueue];for(let t of(this._messagesQueue=[],e))this.send(t)}send(e){if(this._disconnected)return;if(!this._id){this._messagesQueue.push(e);return}if(!e.type){this.emit(M.Error,"Invalid message");return}if(!this._wsOpen())return;let t=JSON.stringify(e);this._socket.send(t)}close(){this._disconnected||(this._cleanup(),this._disconnected=!0)}_cleanup(){this._socket&&(this._socket.onopen=this._socket.onmessage=this._socket.onclose=null,this._socket.close(),this._socket=void 0),clearTimeout(this._wsPingTimer)}constructor(e,t,n,r,i,o=5e3){super(),this.pingInterval=o,this._disconnected=!0,this._messagesQueue=[],this._baseUrl=(e?"wss://":"ws://")+t+":"+n+r+"peerjs?key="+i}}class e${startConnection(e){let t=this._startPeerConnection();if(this.connection.peerConnection=t,this.connection.type===w.Media&&e._stream&&this._addTracksToConnection(e._stream,t),e.originator){let n=this.connection,r={ordered:!!e.reliable},i=t.createDataChannel(n.label,r);n._initializeDataChannel(i),this._makeOffer()}else this.handleSDP("OFFER",e.sdp)}_startPeerConnection(){eI.log("Creating RTCPeerConnection.");let e=new RTCPeerConnection(this.connection.provider.options.config);return this._setupListeners(e),e}_setupListeners(e){let t=this.connection.peer,n=this.connection.connectionId,r=this.connection.type,i=this.connection.provider;eI.log("Listening for ICE candidates."),e.onicecandidate=e=>{e.candidate&&e.candidate.candidate&&(eI.log(`Received ICE candidates for ${t}:`,e.candidate),i.socket.send({type:O.Candidate,payload:{candidate:e.candidate,type:r,connectionId:n},dst:t}))},e.oniceconnectionstatechange=()=>{switch(e.iceConnectionState){case"failed":eI.log("iceConnectionState is failed, closing connections to "+t),this.connection.emitError(D.NegotiationFailed,"Negotiation of connection to "+t+" failed."),this.connection.close();break;case"closed":eI.log("iceConnectionState is closed, closing connections to "+t),this.connection.emitError(D.ConnectionClosed,"Connection to "+t+" closed."),this.connection.close();break;case"disconnected":eI.log("iceConnectionState changed to disconnected on the connection with "+t);break;case"completed":e.onicecandidate=()=>{}}this.connection.emit("iceStateChanged",e.iceConnectionState)},eI.log("Listening for data channel"),e.ondatachannel=e=>{eI.log("Received data channel");let r=e.channel;i.getConnection(t,n)._initializeDataChannel(r)},eI.log("Listening for remote stream"),e.ontrack=e=>{eI.log("Received remote stream");let r=e.streams[0],o=i.getConnection(t,n);o.type===w.Media&&this._addStreamToMediaConnection(r,o)}}cleanup(){eI.log("Cleaning up PeerConnection to "+this.connection.peer);let e=this.connection.peerConnection;if(!e)return;this.connection.peerConnection=null,e.onicecandidate=e.oniceconnectionstatechange=e.ondatachannel=e.ontrack=()=>{};let t="closed"!==e.signalingState,n=!1,r=this.connection.dataChannel;r&&(n=!!r.readyState&&"closed"!==r.readyState),(t||n)&&e.close()}async _makeOffer(){let e=this.connection.peerConnection,t=this.connection.provider;try{let n=await e.createOffer(this.connection.options.constraints);eI.log("Created offer."),this.connection.options.sdpTransform&&"function"==typeof this.connection.options.sdpTransform&&(n.sdp=this.connection.options.sdpTransform(n.sdp)||n.sdp);try{await e.setLocalDescription(n),eI.log("Set localDescription:",n,`for:${this.connection.peer}`);let r={sdp:n,type:this.connection.type,connectionId:this.connection.connectionId,metadata:this.connection.metadata};if(this.connection.type===w.Data){let e=this.connection;r={...r,label:e.label,reliable:e.reliable,serialization:e.serialization}}t.socket.send({type:O.Offer,payload:r,dst:this.connection.peer})}catch(e){"OperationError: Failed to set local offer sdp: Called in wrong state: kHaveRemoteOffer"!=e&&(t.emitError(E.WebRTC,e),eI.log("Failed to setLocalDescription, ",e))}}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to createOffer, ",e)}}async _makeAnswer(){let e=this.connection.peerConnection,t=this.connection.provider;try{let n=await e.createAnswer();eI.log("Created answer."),this.connection.options.sdpTransform&&"function"==typeof this.connection.options.sdpTransform&&(n.sdp=this.connection.options.sdpTransform(n.sdp)||n.sdp);try{await e.setLocalDescription(n),eI.log("Set localDescription:",n,`for:${this.connection.peer}`),t.socket.send({type:O.Answer,payload:{sdp:n,type:this.connection.type,connectionId:this.connection.connectionId},dst:this.connection.peer})}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to setLocalDescription, ",e)}}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to create answer, ",e)}}async handleSDP(e,t){t=new RTCSessionDescription(t);let n=this.connection.peerConnection,r=this.connection.provider;eI.log("Setting remote description",t);try{await n.setRemoteDescription(t),eI.log(`Set remoteDescription:${e} for:${this.connection.peer}`),"OFFER"===e&&await this._makeAnswer()}catch(e){r.emitError(E.WebRTC,e),eI.log("Failed to setRemoteDescription, ",e)}}async handleCandidate(e){eI.log("handleCandidate:",e);try{await this.connection.peerConnection.addIceCandidate(e),eI.log(`Added ICE candidate for:${this.connection.peer}`)}catch(e){this.connection.provider.emitError(E.WebRTC,e),eI.log("Failed to handleCandidate, ",e)}}_addTracksToConnection(e,t){if(eI.log(`add tracks from stream ${e.id} to peer connection`),!t.addTrack)return eI.error("Your browser does't support RTCPeerConnection#addTrack. Ignored.");e.getTracks().forEach(n=>{t.addTrack(n,e)})}_addStreamToMediaConnection(e,t){eI.log(`add stream ${e.id} to media connection ${t.connectionId}`),t.addStream(e)}constructor(e){this.connection=e}}class eJ extends eM.EventEmitter{emitError(e,t){eI.error("Error:",t),this.emit("error",new eV(`${e}`,t))}}class eV extends Error{constructor(e,t){"string"==typeof t?super(t):(super(),Object.assign(this,t)),this.type=e}}class eG extends eJ{get open(){return this._open}constructor(e,t,n){super(),this.peer=e,this.provider=t,this.options=n,this._open=!1,this.metadata=n.metadata}}class eW extends eG{get type(){return w.Media}get localStream(){return this._localStream}get remoteStream(){return this._remoteStream}_initializeDataChannel(e){this.dataChannel=e,this.dataChannel.onopen=()=>{eI.log(`DC#${this.connectionId} dc connection success`),this.emit("willCloseOnRemote")},this.dataChannel.onclose=()=>{eI.log(`DC#${this.connectionId} dc closed for:`,this.peer),this.close()}}addStream(e){eI.log("Receiving stream",e),this._remoteStream=e,super.emit("stream",e)}handleMessage(e){let t=e.type,n=e.payload;switch(e.type){case O.Answer:this._negotiator.handleSDP(t,n.sdp),this._open=!0;break;case O.Candidate:this._negotiator.handleCandidate(n.candidate);break;default:eI.warn(`Unrecognized message type:${t} from peer:${this.peer}`)}}answer(e,t={}){if(this._localStream){eI.warn("Local stream already exists on this MediaConnection. Are you answering a call twice?");return}for(let n of(this._localStream=e,t&&t.sdpTransform&&(this.options.sdpTransform=t.sdpTransform),this._negotiator.startConnection({...this.options._payload,_stream:e}),this.provider._getMessages(this.connectionId)))this.handleMessage(n);this._open=!0}close(){this._negotiator&&(this._negotiator.cleanup(),this._negotiator=null),this._localStream=null,this._remoteStream=null,this.provider&&(this.provider._removeConnection(this),this.provider=null),this.options&&this.options._stream&&(this.options._stream=null),this.open&&(this._open=!1,super.emit("close"))}constructor(e,t,n){super(e,t,n),this._localStream=this.options._stream,this.connectionId=this.options.connectionId||eW.ID_PREFIX+ex.randomToken(),this._negotiator=new e$(this),this._localStream&&this._negotiator.startConnection({_stream:this._localStream,originator:!0})}}eW.ID_PREFIX="mc_";class eH{_buildRequest(e){let t=this._options.secure?"https":"http",{host:n,port:r,path:i,key:o}=this._options,s=new URL(`${t}://${n}:${r}${i}${o}/${e}`);return s.searchParams.set("ts",`${Date.now()}${Math.random()}`),s.searchParams.set("version",ez.version),fetch(s.href,{referrerPolicy:this._options.referrerPolicy})}async retrieveId(){try{let e=await this._buildRequest("id");if(200!==e.status)throw Error(`Error. Status:${e.status}`);return e.text()}catch(t){eI.error("Error retrieving ID",t);let e="";throw"/"===this._options.path&&this._options.host!==ex.CLOUD_HOST&&(e=" If you passed in a `path` to your self-hosted PeerServer, you'll also need to pass in that same path when creating a new Peer."),Error("Could not get an ID from the server."+e)}}async listAllPeers(){try{let e=await this._buildRequest("peers");if(200!==e.status){if(401===e.status){let e="";throw e=this._options.host===ex.CLOUD_HOST?"It looks like you're using the cloud server. You can email team@peerjs.com to enable peer listing for your API key.":"You need to enable `allow_discovery` on your self-hosted PeerServer to use this feature.",Error("It doesn't look like you have permission to list peers IDs. "+e)}throw Error(`Error. Status:${e.status}`)}return e.json()}catch(e){throw eI.error("Error retrieving list peers",e),Error("Could not get list peers from the server."+e)}}constructor(e){this._options=e}}class eY extends eG{get type(){return w.Data}_initializeDataChannel(e){this.dataChannel=e,this.dataChannel.onopen=()=>{eI.log(`DC#${this.connectionId} dc connection success`),this._open=!0,this.emit("open")},this.dataChannel.onmessage=e=>{eI.log(`DC#${this.connectionId} dc onmessage:`,e.data)},this.dataChannel.onclose=()=>{eI.log(`DC#${this.connectionId} dc closed for:`,this.peer),this.close()}}close(e){if(e?.flush){this.send({__peerData:{type:"close"}});return}this._negotiator&&(this._negotiator.cleanup(),this._negotiator=null),this.provider&&(this.provider._removeConnection(this),this.provider=null),this.dataChannel&&(this.dataChannel.onopen=null,this.dataChannel.onmessage=null,this.dataChannel.onclose=null,this.dataChannel=null),this.open&&(this._open=!1,super.emit("close"))}send(e,t=!1){if(!this.open){this.emitError(x.NotOpenYet,"Connection is not open. You should listen for the `open` event before sending messages.");return}return this._send(e,t)}async handleMessage(e){let t=e.payload;switch(e.type){case O.Answer:await this._negotiator.handleSDP(e.type,t.sdp);break;case O.Candidate:await this._negotiator.handleCandidate(t.candidate);break;default:eI.warn("Unrecognized message type:",e.type,"from peer:",this.peer)}}constructor(e,t,n){super(e,t,n),this.connectionId=this.options.connectionId||eY.ID_PREFIX+eE(),this.label=this.options.label||this.connectionId,this.reliable=!!this.options.reliable,this._negotiator=new e$(this),this._negotiator.startConnection(this.options._payload||{originator:!0,reliable:this.reliable})}}eY.ID_PREFIX="dc_",eY.MAX_BUFFERED_AMOUNT=8388608;class eK extends eY{get bufferSize(){return this._bufferSize}_initializeDataChannel(e){super._initializeDataChannel(e),this.dataChannel.binaryType="arraybuffer",this.dataChannel.addEventListener("message",e=>this._handleDataMessage(e))}_bufferedSend(e){(this._buffering||!this._trySend(e))&&(this._buffer.push(e),this._bufferSize=this._buffer.length)}_trySend(e){if(!this.open)return!1;if(this.dataChannel.bufferedAmount>eY.MAX_BUFFERED_AMOUNT)return this._buffering=!0,setTimeout(()=>{this._buffering=!1,this._tryBuffer()},50),!1;try{this.dataChannel.send(e)}catch(e){return eI.error(`DC#:${this.connectionId} Error when sending:`,e),this._buffering=!0,this.close(),!1}return!0}_tryBuffer(){if(!this.open||0===this._buffer.length)return;let e=this._buffer[0];this._trySend(e)&&(this._buffer.shift(),this._bufferSize=this._buffer.length,this._tryBuffer())}close(e){if(e?.flush){this.send({__peerData:{type:"close"}});return}this._buffer=[],this._bufferSize=0,super.close()}constructor(...e){super(...e),this._buffer=[],this._bufferSize=0,this._buffering=!1}}class eX extends eK{close(e){super.close(e),this._chunkedData={}}_handleDataMessage({data:e}){let t=i(e),n=t.__peerData;if(n){if("close"===n.type){this.close();return}this._handleChunk(t);return}this.emit("data",t)}_handleChunk(e){let t=e.__peerData,n=this._chunkedData[t]||{data:[],count:0,total:e.total};if(n.data[e.n]=new Uint8Array(e.data),n.count++,this._chunkedData[t]=n,n.total===n.count){delete this._chunkedData[t];let e=function(e){let t=0;for(let n of e)t+=n.byteLength;let n=new Uint8Array(t),r=0;for(let t of e)n.set(t,r),r+=t.byteLength;return n}(n.data);this._handleDataMessage({data:e})}}_send(e,t){let n=o(e);if(n instanceof Promise)return this._send_blob(n);if(!t&&n.byteLength>this.chunker.chunkedMTU){this._sendChunks(n);return}this._bufferedSend(n)}async _send_blob(e){let t=await e;if(t.byteLength>this.chunker.chunkedMTU){this._sendChunks(t);return}this._bufferedSend(t)}_sendChunks(e){let t=this.chunker.chunk(e);for(let e of(eI.log(`DC#${this.connectionId} Try to send ${t.length} chunks...`),t))this.send(e,!0)}constructor(e,t,r){super(e,t,r),this.chunker=new n,this.serialization=I.Binary,this._chunkedData={}}}class eq extends eK{_handleDataMessage({data:e}){super.emit("data",e)}_send(e,t){this._bufferedSend(e)}constructor(...e){super(...e),this.serialization=I.None}}class eQ extends eK{_handleDataMessage({data:e}){let t=this.parse(this.decoder.decode(e)),n=t.__peerData;if(n&&"close"===n.type){this.close();return}this.emit("data",t)}_send(e,t){let n=this.encoder.encode(this.stringify(e));if(n.byteLength>=ex.chunkedMTU){this.emitError(x.MessageToBig,"Message too big for JSON channel");return}this._bufferedSend(n)}constructor(...e){super(...e),this.serialization=I.JSON,this.encoder=new TextEncoder,this.decoder=new TextDecoder,this.stringify=JSON.stringify,this.parse=JSON.parse}}class eZ extends eJ{get id(){return this._id}get options(){return this._options}get open(){return this._open}get socket(){return this._socket}get connections(){let e=Object.create(null);for(let[t,n]of this._connections)e[t]=n;return e}get destroyed(){return this._destroyed}get disconnected(){return this._disconnected}_createServerConnection(){let e=new eN(this._options.secure,this._options.host,this._options.port,this._options.path,this._options.key,this._options.pingInterval);return e.on(M.Message,e=>{this._handleMessage(e)}),e.on(M.Error,e=>{this._abort(E.SocketError,e)}),e.on(M.Disconnected,()=>{this.disconnected||(this.emitError(E.Network,"Lost connection to server."),this.disconnect())}),e.on(M.Close,()=>{this.disconnected||this._abort(E.SocketClosed,"Underlying socket is already closed.")}),e}_initialize(e){this._id=e,this.socket.start(e,this._options.token)}_handleMessage(e){let t=e.type,n=e.payload,r=e.src;switch(t){case O.Open:this._lastServerId=this.id,this._open=!0,this.emit("open",this.id);break;case O.Error:this._abort(E.ServerError,n.msg);break;case O.IdTaken:this._abort(E.UnavailableID,`ID "${this.id}" is taken`);break;case O.InvalidKey:this._abort(E.InvalidKey,`API KEY "${this._options.key}" is invalid`);break;case O.Leave:eI.log(`Received leave message from ${r}`),this._cleanupPeer(r),this._connections.delete(r);break;case O.Expire:this.emitError(E.PeerUnavailable,`Could not connect to peer ${r}`);break;case O.Offer:{let e=n.connectionId,t=this.getConnection(r,e);if(t&&(t.close(),eI.warn(`Offer received for existing Connection ID:${e}`)),n.type===w.Media){let i=new eW(r,this,{connectionId:e,_payload:n,metadata:n.metadata});t=i,this._addConnection(r,t),this.emit("call",i)}else if(n.type===w.Data){let i=new this._serializers[n.serialization](r,this,{connectionId:e,_payload:n,metadata:n.metadata,label:n.label,serialization:n.serialization,reliable:n.reliable});t=i,this._addConnection(r,t),this.emit("connection",i)}else{eI.warn(`Received malformed connection type:${n.type}`);return}for(let n of this._getMessages(e))t.handleMessage(n);break}default:{if(!n){eI.warn(`You received a malformed message from ${r} of type ${t}`);return}let i=n.connectionId,o=this.getConnection(r,i);o&&o.peerConnection?o.handleMessage(e):i?this._storeMessage(i,e):eI.warn("You received an unrecognized message:",e)}}}_storeMessage(e,t){this._lostMessages.has(e)||this._lostMessages.set(e,[]),this._lostMessages.get(e).push(t)}_getMessages(e){let t=this._lostMessages.get(e);return t?(this._lostMessages.delete(e),t):[]}connect(e,t={}){if(t={serialization:"default",...t},this.disconnected){eI.warn("You cannot connect to a new Peer because you called .disconnect() on this Peer and ended your connection with the server. You can create a new Peer to reconnect, or call reconnect on this peer if you believe its ID to still be available."),this.emitError(E.Disconnected,"Cannot connect to new Peer after disconnecting from server.");return}let n=new this._serializers[t.serialization](e,this,t);return this._addConnection(e,n),n}call(e,t,n={}){if(this.disconnected){eI.warn("You cannot connect to a new Peer because you called .disconnect() on this Peer and ended your connection with the server. You can create a new Peer to reconnect."),this.emitError(E.Disconnected,"Cannot connect to new Peer after disconnecting from server.");return}if(!t){eI.error("To call a peer, you must provide a stream from your browser's `getUserMedia`.");return}let r=new eW(e,this,{...n,_stream:t});return this._addConnection(e,r),r}_addConnection(e,t){eI.log(`add connection ${t.type}:${t.connectionId} to peerId:${e}`),this._connections.has(e)||this._connections.set(e,[]),this._connections.get(e).push(t)}_removeConnection(e){let t=this._connections.get(e.peer);if(t){let n=t.indexOf(e);-1!==n&&t.splice(n,1)}this._lostMessages.delete(e.connectionId)}getConnection(e,t){let n=this._connections.get(e);if(!n)return null;for(let e of n)if(e.connectionId===t)return e;return null}_delayedAbort(e,t){setTimeout(()=>{this._abort(e,t)},0)}_abort(e,t){eI.error("Aborting!"),this.emitError(e,t),this._lastServerId?this.disconnect():this.destroy()}destroy(){this.destroyed||(eI.log(`Destroy peer with ID:${this.id}`),this.disconnect(),this._cleanup(),this._destroyed=!0,this.emit("close"))}_cleanup(){for(let e of this._connections.keys())this._cleanupPeer(e),this._connections.delete(e);this.socket.removeAllListeners()}_cleanupPeer(e){let t=this._connections.get(e);if(t)for(let e of t)e.close()}disconnect(){if(this.disconnected)return;let e=this.id;eI.log(`Disconnect peer with ID:${e}`),this._disconnected=!0,this._open=!1,this.socket.close(),this._lastServerId=e,this._id=null,this.emit("disconnected",e)}reconnect(){if(this.disconnected&&!this.destroyed)eI.log(`Attempting reconnection to server with ID ${this._lastServerId}`),this._disconnected=!1,this._initialize(this._lastServerId);else if(this.destroyed)throw Error("This peer cannot reconnect to the server. It has already been destroyed.");else if(this.disconnected||this.open)throw Error(`Peer ${this.id} cannot reconnect because it is not disconnected from the server!`);else eI.error("In a hurry? We're still trying to make the initial connection!")}listAllPeers(e=e=>{}){this._api.listAllPeers().then(t=>e(t)).catch(e=>this._abort(E.ServerError,e))}constructor(e,t){let n;if(super(),this._serializers={raw:eq,json:eQ,binary:eX,"binary-utf8":eX,default:eX},this._id=null,this._lastServerId=null,this._destroyed=!1,this._disconnected=!1,this._open=!1,this._connections=new Map,this._lostMessages=new Map,e&&e.constructor==Object?t=e:e&&(n=e.toString()),t={debug:0,host:ex.CLOUD_HOST,port:ex.CLOUD_PORT,path:"/",key:eZ.DEFAULT_KEY,token:ex.randomToken(),config:ex.defaultConfig,referrerPolicy:"strict-origin-when-cross-origin",serializers:{},...t},this._options=t,this._serializers={...this._serializers,...this.options.serializers},"/"===this._options.host&&(this._options.host=window.location.hostname),this._options.path&&("/"!==this._options.path[0]&&(this._options.path="/"+this._options.path),"/"!==this._options.path[this._options.path.length-1]&&(this._options.path+="/")),void 0===this._options.secure&&this._options.host!==ex.CLOUD_HOST?this._options.secure=ex.isSecure():this._options.host==ex.CLOUD_HOST&&(this._options.secure=!0),this._options.logFunction&&eI.setLogFunction(this._options.logFunction),eI.logLevel=this._options.debug||0,this._api=new eH(t),this._socket=this._createServerConnection(),!ex.supports.audioVideo&&!ex.supports.data){this._delayedAbort(E.BrowserIncompatible,"The current browser does not support WebRTC");return}if(n&&!ex.validateId(n)){this._delayedAbort(E.InvalidID,`ID "${n}" is invalid`);return}n?this._initialize(n):this._api.retrieveId().then(e=>this._initialize(e)).catch(e=>this._abort(E.ServerError,e))}}eZ.DEFAULT_KEY="peerjs",window.peerjs={Peer:eZ,util:ex},window.Peer=eZ})();
+//# sourceMappingURL=peerjs.min.js.map
+
+</script><script>window.KCR_PEER=true</script></head><body>
+<title>キッチンカー・ラン</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap">
+<style>
+/* layout: one game screen. title + HUD strip above the canvas, stock strip and controls below. Single dark look on purpose (night road). */
+:root{
+  --bg:#17252c;
+  --panel:#21343c;
+  --line:#33505a;
+  --ink:#f4eedf;
+  --muted:#9db3b4;
+  --truck:#f3b73a;
+  --accent:#ff7a59;
+  --good:#7fd893;
+  --bad:#ff6d6d;
+  --scrim:rgba(13,22,26,.78);
+  --display:"Dela Gothic One","M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif;
+  --body:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px}
+#app{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);margin:0;color:var(--truck);letter-spacing:.03em}
+#hud{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-variant-numeric:tabular-nums;font-weight:700;min-width:0}
+#hud .k{color:var(--muted);font-weight:400;margin-right:4px}
+#info{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:22px;line-height:1.6;font-variant-numeric:tabular-nums}
+#info .ok{color:var(--good)} #info .ng{color:var(--bad)} #info .dim{color:var(--muted)}
+.stage{position:relative;border-radius:14px;overflow:hidden;background:#0d1519;border:1px solid var(--line)}
+canvas{display:block;width:100%;height:auto;aspect-ratio:18/12}
+#ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--scrim);padding:16px;overflow:auto}
+#ov[hidden]{display:none}
+#readyBtn{position:absolute;top:9%;right:12px;z-index:5;background:var(--truck);color:#1b1206;border-color:#1b1206}
+#readyBtn[hidden]{display:none}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
+.box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
+.box p{margin:0;line-height:1.7;color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.ovbtn{font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
+.ovbtn.sel,.ovbtn:focus-visible{border-color:var(--truck);outline:none;background:#36545f}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.town{text-align:left;display:flex;flex-direction:column;gap:6px;line-height:1.5}
+.town .tn{font-family:var(--display);font-weight:400;font-size:18px}
+.town .menu{font-size:15px}
+.town .needs{font-size:13px;display:flex;flex-direction:column;gap:2px;font-weight:400}
+.town .ok{color:var(--good)} .town .ng{color:var(--bad)} .town .sub{color:var(--muted)}
+.town .pay{color:var(--truck)}
+.ovbtn.dim{opacity:.45} .ovbtn.rare{border-color:#ffd84a}
+.box .mut{color:var(--muted)} .box .good{color:var(--good)}
+.netrow{align-items:center} .netrow .lab{min-width:9em}
+.codein{font:inherit;font-weight:800;font-size:18px;letter-spacing:.2em;text-transform:uppercase;width:7em;padding:8px 10px;border-radius:10px;border:2px solid var(--line);background:#132026;color:var(--ink)}
+.box .ng{color:var(--bad)}
+#stock{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;align-items:center}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.seed{border-style:dashed}
+.lbl{color:var(--muted);font-size:12px;letter-spacing:.06em;margin-right:4px}
+.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;color:var(--muted);line-height:1.7;font-size:13px}
+.help b{color:var(--ink)}
+kbd{font-family:var(--body);background:#2c4650;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;color:var(--ink);font-size:12px}
+table.ctl{border-collapse:collapse;font-size:13px;width:100%}
+table.ctl td,table.ctl th{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.ctl th{color:var(--muted);font-weight:400}
+.narrow{display:none;color:var(--muted)}
+@media (max-width:640px){.narrow{display:block}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* touch controls */
+#touch{display:none}
+body.touch{touch-action:manipulation}
+body.touch #touch{display:block}
+body.touch.ovopen #touch{display:none}
+body.touch .narrow{display:none}
+.tc{position:fixed;z-index:20;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#joy{left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));width:128px;height:128px;border-radius:50%;
+  background:rgba(33,52,60,.55);border:2px solid rgba(157,179,180,.5)}
+#knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(243,183,58,.85);pointer-events:none}
+#btns{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:auto auto;gap:10px;align-items:end}
+.tb{font:inherit;font-weight:800;color:var(--ink);border:2px solid rgba(157,179,180,.55);border-radius:50%;background:rgba(33,52,60,.6);display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
+.tb.on{background:rgba(243,183,58,.7);color:#1b1206}
+#bPick{width:76px;height:76px;font-size:15px}
+#bAct{width:76px;height:76px;font-size:15px}
+#bSw{width:56px;height:56px;font-size:13px;justify-self:end}
+#bPause{width:44px;height:44px;font-size:14px;justify-self:end}
+@media (pointer:coarse) and (orientation:landscape){
+  body.touch header,body.touch .help{display:none}
+  body.touch{padding-block:4px}
+  body.touch #app{gap:4px}
+  body.touch #info{font-size:11px;padding:3px 8px;line-height:1.4}
+  body.touch .stage{width:100%;max-width:calc((100dvh - 64px) * 1.5);margin:0 auto}
+  body.touch #stock{font-size:11px;gap:4px;min-height:0}
+}
+</style>
+
+<div id="app">
+  <header>
+    <h1>キッチンカー・ラン</h1>
+    <div id="hud"></div>
+  </header>
+  <div id="info">　</div>
+  <div class="stage">
+    <canvas id="cv" width="864" height="576" aria-label="ゲーム画面"></canvas>
+    <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（R）</button>
+    <div id="ov"></div>
+  </div>
+  <div id="stock"></div>
+  <p class="narrow">キーボードかゲームパッドで遊ぶ試作版です。PCでの操作をおすすめします。</p>
+  <div id="touch">
+    <div id="joy" class="tc" aria-label="移動スティック"><div id="knob"></div></div>
+    <div id="btns" class="tc">
+      <button id="bPause" class="tb" type="button" aria-label="一時停止">⏸</button>
+      <button id="bSw" class="tb" type="button">切替</button>
+      <button id="bAct" class="tb" type="button">作業</button>
+      <button id="bPick" class="tb" type="button">持つ</button>
+    </div>
+  </div>
+  <div class="help">
+    <div><b>1回の流れ</b><br>次の町を選ぶ → 走行中に窓口でお店から買う → 町で準備（15秒）→ 営業（2分）。これを4回くり返します。評判の♥が0になると終わりです。</div>
+    <div><b>料理の作り方</b><br>冷蔵庫から食材を出す → 切る／焼く／ミキサー → 皿に乗せる → 受取口で客に渡す。焼きすぎると焦げます。</div>
+    <div><b>食材の集め方</b><br>窓口で買う（店は通り過ぎたら戻りません）。種は走行中の「種屋」か町の市場で買い、種箱から出して菜園に植えます。植えたらじょうろで1回水をあげると育ちます（じょうろは3回で空になるので、シンクで作業ボタン長押しで汲み直す）。評判の♥が多いほどチップが増えます。採集場所で採る（タダ。カゴを持って行き、採った物は冷蔵庫で「持つ」を押してしまう）。</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ---------- constants ----------
+const T=48, GW=18, GH=12;
+const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=3;
+const WATER_DUR=45, FILL=1.0;
+const DRIVE=65, PREP=15, SERVICE=120, SPEED=0.45, STOPS=4, WMARGIN=0.6;
+const PCOL=['#ff7a59','#4fb3ff','#6fd18a','#f0cf4a'];
+const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+const FNT='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif';
+
+const ING={
+  bread:{n:'パン',e:'🍞',steps:[],price:9},
+  rice:{n:'米',e:'🍚',steps:['cook'],price:9},
+  meat:{n:'肉',e:'🥩',steps:['chop','cook'],price:12},
+  egg:{n:'卵',e:'🥚',steps:['cook'],price:9},
+  cheese:{n:'チーズ',e:'🧀',steps:['chop'],price:12},
+  milk:{n:'牛乳',e:'🥛',steps:[],price:10},
+  lettuce:{n:'レタス',e:'🥬',steps:['chop'],price:6,grow:45,seed:4},
+  tomato:{n:'トマト',e:'🍅',steps:['chop'],price:6,grow:60,seed:4},
+  potato:{n:'じゃがいも',e:'🥔',steps:['chop','cook'],price:6,grow:75,seed:5},
+  strawberry:{n:'いちご',e:'🍓',steps:['blend'],price:8,grow:90,seed:6},
+  fish:{n:'魚',e:'🐟',steps:['chop','cook'],price:14},
+  shrimp:{n:'エビ',e:'🦐',steps:['cook'],price:14},
+  mushroom:{n:'キノコ',e:'🍄',steps:['chop','cook'],price:12},
+  apple:{n:'りんご',e:'🍎',steps:['blend'],price:8},
+};
+const STEPN={chop:'切る',cook:'焼く',blend:'ミキサー'};
+const RECIPES={
+  sandwich:{n:'サンドイッチ',e:'🥪',ings:['bread','lettuce','tomato'],price:18},
+  burger:{n:'ハンバーガー',e:'🍔',ings:['bread','meat','lettuce'],price:24},
+  fries:{n:'フライドポテト',e:'🍟',ings:['potato'],price:12},
+  fishset:{n:'焼き魚定食',e:'🍱',ings:['fish','rice'],price:26},
+  soup:{n:'海鮮スープ',e:'🍲',ings:['shrimp','tomato'],price:24},
+  risotto:{n:'キノコリゾット',e:'🥘',ings:['rice','mushroom','cheese'],price:30},
+  applejuice:{n:'りんごジュース',e:'🧃',ings:['apple'],price:12},
+  omelet:{n:'オムレツ',e:'🍳',ings:['egg','cheese'],price:20},
+  smilk:{n:'いちごミルク',e:'🥤',ings:['strawberry','milk'],price:16},
+};
+const TOWNS={
+  port:{n:'港町',e:'⚓',menu:['fishset','soup'],gather:['fish','shrimp'],rate:1,pay:1.1,ground:'#cdb886',deco:'#4f97b8'},
+  forest:{n:'森の町',e:'🌲',menu:['risotto','applejuice'],gather:['mushroom','apple'],rate:1,pay:1.1,ground:'#6e9450',deco:'#3f6b35'},
+  ranch:{n:'牧場の町',e:'🐄',menu:['omelet','smilk'],gather:['milk','cheese'],rate:1,pay:1.0,ground:'#9db866',deco:'#d9e6b0'},
+  busy:{n:'駅前の町',e:'🚉',menu:['burger','fries'],gather:[],rate:1.35,pay:1.3,ground:'#aaa59a',deco:'#6d6a63'},
+  farm:{n:'畑の町',e:'🌾',menu:['sandwich','fries'],gather:['lettuce','tomato'],rate:1,pay:0.95,ground:'#c39f68',deco:'#8a6a3c'},
+};
+const pack=id=>({type:'pack',id,qty:3,price:Math.max(3,ING[id].price+rnd(4)-2)});
+const seedItem=id=>({type:'seed',id,qty:2,price:ING[id].seed+rnd(2)});
+const SHOPTYPES=[
+  {n:'八百屋',e:'🥕',c:'#4f9a4c',w:3,gen:()=>pickN(['lettuce','tomato','potato','strawberry','apple'],2+rnd(2)).map(pack)},
+  {n:'パンと米の店',e:'🥖',c:'#c98d3e',w:3,gen:()=>pickN(['bread','rice','egg'],2+rnd(2)).map(pack)},
+  {n:'肉とチーズの店',e:'🍖',c:'#b9484a',w:2,gen:()=>pickN(['meat','cheese','milk'],2).map(pack)},
+  {n:'魚屋',e:'🐠',c:'#3a7fae',w:1,gen:()=>['fish','shrimp'].map(pack)},
+  {n:'種屋',e:'🌱',c:'#6f8f2f',w:3,gen:()=>pickN(['lettuce','tomato','potato','strawberry'],2+rnd(2)).map(seedItem)},
+  {n:'あやしい露店',e:'🎲',c:'#6d4f9e',w:1,gen:()=>[{type:'mystery',price:9},{type:'mystery',price:9}]},
+  {n:'道具屋',e:'🧰',c:'#5a6470',w:2,gen:()=>pickN(Object.keys(EQUIP),2).map(id=>equipOffer(id,0.7,0.1))},
+];
+// kitchen equipment that can be bought: same function as the default ones.
+// A rare "pro" version (★) exists for some of them.
+const EQUIP={
+  board:{n:'まな板',e:'🔪',price:20,pro:{n:'よく切れるまな板',d:'切る時間 -40%'}},
+  stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
+  blender:{n:'ミキサー',e:'🌀',price:25,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
+  plates:{n:'皿置き場',e:'🍽️',price:15},
+  sink:{n:'シンク',e:'🚰',price:20,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
+  trash:{n:'ゴミ箱',e:'🗑️',price:10},
+  can:{n:'じょうろ',e:'💧',price:12,tool:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
+  basket:{n:'カゴ',e:'🧺',price:12,tool:true,pro:{n:'大きなカゴ',d:'入る数 +2'}},
+};
+const PRO_MUL={board:0.6,stove:0.6,blender:0.5,sink:0.4};
+const DAY_LAYOUT_TIME=30;
+function equipOffer(id,priceMul,proChance){
+  const pro=!!EQUIP[id].pro&&Math.random()<proChance;
+  return {type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*priceMul*(pro?1.8:1))};
+}
+const equipName=(id,pro)=>pro?'★'+EQUIP[id].pro.n:EQUIP[id].n;
+function makeEquip(id,pro){
+  if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
+  if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
+  return {kind:'station',st:id,pro:!!pro};
+}
+const canCap=it=>S.up.canCap+(it.bonus||0);
+const basketCap=it=>S.up.basketCap+(it.bonus||0);
+const proMul=c=>c.pro?(PRO_MUL[c.t]||1):1;
+
+// ---------- helpers ----------
+function rnd(n){return Math.floor(Math.random()*n)}
+function pickN(a,n){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=rnd(i+1);[b[i],b[j]]=[b[j],b[i]]}return b.slice(0,n)}
+function weighted(list){let s=0;for(const x of list)s+=x.w;let r=Math.random()*s;for(const x of list){r-=x.w;if(r<=0)return x}return list[0]}
+const newIng=id=>({kind:'ing',id,step:0,burnt:false});
+const nextStep=it=>it.kind==='ing'&&!it.burnt?ING[it.id].steps[it.step]:undefined;
+const isDone=it=>it.kind==='ing'&&it.step>=ING[it.id].steps.length;
+const fmtT=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
+function townNeeds(town){const s=new Set();for(const r of town.menu)for(const i of RECIPES[r].ings)s.add(i);return [...s]}
+
+// ---------- canvas ----------
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+function fitCanvas(){const d=Math.min(2,window.devicePixelRatio||1);cv.width=GW*T*d;cv.height=GH*T*d;ctx.setTransform(d,0,0,d,0,0)}
+fitCanvas(); addEventListener('resize',fitCanvas);
+
+// ---------- map ----------
+function buildMap(){
+  const m=[];
+  for(let y=0;y<GH;y++){const r=[];for(let x=0;x<GW;x++)r.push({t:'out'});m.push(r)}
+  const set=(x,y,t,ex)=>{m[y][x]=Object.assign({t,item:null,prog:0,burn:0},ex||{})};
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)set(x,y,'ground');
+  for(let x=1;x<=16;x++)set(x,1,'wall');
+  for(let y=1;y<=6;y++){set(1,y,'wall');set(16,y,'wall')}
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++)set(x,y,'floor');
+  const top=['counter','fridge','seedbox','sink','board','board','counter','stove','stove','blender','counter','plates','trash','counter'];
+  top.forEach((t,i)=>set(2+i,2,t));
+  for(let y=3;y<=5;y++){set(2,y,'planter',{plant:null});set(15,y,'counter')}
+  for(let x=7;x<=9;x++)set(x,4,'counter');
+  const bot=['counter','window','counter','counter','door','counter','serve','serve','counter','counter','counter','window','counter','counter'];
+  bot.forEach((t,i)=>set(2+i,6,t));
+  m[6][3].win='後'; m[6][13].win='前';
+  set(3,10,'market'); set(16,8,'gather',{gi:0}); set(16,10,'gather',{gi:1});
+  for(let x=8;x<=13;x++)set(x,8,'queue',{slot:x-8});
+  return m;
+}
+
+// ---------- state ----------
+let S=null;
+const START_POS=[[4.5,3.5],[11.5,3.5],[4.5,5.5],[11.5,5.5]];
+function newRun(np,mode){
+  S={np,money:40,hearts:5,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
+    phase:'choose',view:'road',town:null,next:null,timer:0,sub:'',shops:[],cust:[],spawnT:0,
+    earned:0,served:0,missed:0,totalEarned:0,totalServed:0,floats:[],map:buildMap(),players:[],
+    roadOff:0,gatherLeft:[0,0],market:[],paused:false,t:0,
+    up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
+    upCount:{},offers:[],rerollCost:8};
+  S.map[6][4].item={kind:'can',water:3};
+  S.map[6][5].item={kind:'basket',items:[]};
+  for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0})}
+  rebuildStations();
+  S.bonus=0;S.pendingEquip=[];S.stored=[];
+  if(mode==='layout')setupLayout();else showChoose();
+}
+function rebuildStations(){
+  S.stations=[];
+  S.map.forEach(r=>r.forEach(c=>{if(['stove','blender','planter'].includes(c.t))S.stations.push(c)}));
+}
+// ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
+const MOVABLE=['fridge','seedbox','sink','board','stove','blender','plates','trash'];
+const LAYOUT_TIME=90;
+const inTruck=(x,y)=>x>=2&&x<=15&&y>=2&&y<=6;
+// door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
+// only tools (watering can, basket) and food go on top of a counter.
+const FIXED=new Set(['door','window','serve']);
+const FURN=['counter','planter',...MOVABLE];
+const PILE=['counter','planter'];          // these come stacked in one pile outside
+const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_FRONT=[6,5];
+const emptyT=y=>y===6?'gap':'floor';
+const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
+const GROUND_SPOTS=[[1,9],[3,9],[5,9],[7,9],[9,9],[11,9],[13,9],[15,9],[5,10],[7,10],[9,10],[11,10],[13,10],[15,10],[1,10],[3,8],[5,8],[1,8],[7,8],[15,8]];
+const storable=it=>!!it&&['station','can','basket'].includes(it.kind);
+// put objects on free spots outside; same-kind counters/planters join one pile
+function putOutside(objs){
+  for(const o of objs){
+    if(o.kind==='station'&&PILE.includes(o.st)&&!o.plant){
+      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant);
+      if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
+    }
+    const s=GROUND_SPOTS.find(([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item);
+    if(s)S.map[s[1]][s[0]].item=o;
+  }
+}
+// whatever was left outside is not taken along, but kept for the next layout
+function stashOutside(){
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];
+    if(c.t==='ground'&&c.item){if(storable(c.item))S.stored.push(c.item);c.item=null}}
+}
+function setupLayout(){
+  const objs=[{kind:'station',st:'counter',n:COUNTERS_GIVEN},{kind:'station',st:'planter',n:PLANTERS_GIVEN}];
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
+    const c=S.map[y][x];
+    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:!!c.pro});
+    if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))objs.push(c.item);
+    if(!FIXED.has(c.t))S.map[y][x]=blankTile(y);
+  }
+  putOutside(objs);
+  rebuildStations();
+  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;
+  hideOv();
+}
+function finishLayout(){
+  if(!S||S.phase!=='layout')return;
+  if(S.players.some(holdsFurn)){S.toast={text:'手に持っている器具を置いてから',t:0,life:2.5};return}
+  if(S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor'){S.toast={text:'ドアの前はあけておく',t:0,life:2.5};return}
+  const bad=unreachable();
+  if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};return}
+  const left=layoutLeft();
+  stashOutside();
+  if(left)S.toast={text:'外に置いた'+left+'個は置いていきます（次の配置でまた出てきます）',t:0,life:3};
+  S.bonus=Math.max(0,Math.ceil(S.timer));
+  bringInside();
+  if(S.stop===0)showChoose();   // first layout of the run → pick the first town
+  else startDrive();             // between towns the town was already chosen
+}
+// ---------- equipment shop (between towns) → short layout ----------
+function showEquipShop(){
+  S.phase='equip';
+  // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
+  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP),3).map(id=>equipOffer(id,1,0.15));
+  const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
+    const desc=o.pro?E.pro.d:(E.tool?'道具（台の上に置く）':'器具（床に置く）');
+    return `<button class="ovbtn town${done&&S.eqBought!==i?' dim':''}${o.pro?' rare':''}" data-act="eqbuy" data-v="${i}">
+      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span>
+      <span class="needs"><span class="${o.pro?'pay':'sub'}">${o.pro?'レア　':''}${desc}</span></span></button>`}).join('');
+  showOv(`<div class="box"><h2>器具屋</h2>
+    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>です。買った物は、このあとの配置の時間にトラックに置きます。所持金 <b>${S.money}G</b></p>
+    <div class="cards">${cards}</div>
+    <div class="row"><button class="ovbtn" data-act="eqdone">${S.eqBought!=null?'配置へ進む':'買わずに配置へ進む'}（${DAY_LAYOUT_TIME}秒）</button></div></div>`);
+}
+function startDayLayout(){
+  const objs=S.stored.concat(S.pendingEquip.map(o=>makeEquip(o.id,o.pro)));
+  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;
+  putOutside(objs);
+  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
+  hideOv();
+}
+function layoutLeft(){
+  return S.map.flat().reduce((n,c)=>n+(c.t==='ground'&&c.item?(c.item.n||1):0),0);
+}
+// equipment that no free floor reachable from the door touches (a plain counter may sit in a corner)
+const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+function reachFloor(){
+  const ok=new Set(),q=[],walk=(x,y)=>inTruck(x,y)&&S.map[y][x].t==='floor';
+  const [dx0,dy0]=DOOR_FRONT;
+  if(walk(dx0,dy0)){q.push([dx0,dy0]);ok.add(dx0+','+dy0)}
+  while(q.length){const [x,y]=q.shift();for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy,k=nx+','+ny;if(!ok.has(k)&&walk(nx,ny)){ok.add(k);q.push([nx,ny])}}}
+  return ok;
+}
+const touchesFloor=(ok,x,y)=>DIRS.some(([dx,dy])=>ok.has((x+dx)+','+(y+dy)));
+function unreachable(){
+  const ok=reachFloor(),bad=[];
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
+    const c=S.map[y][x];
+    if(c.t==='floor'||c.t==='gap'||c.t==='counter')continue;
+    if(!touchesFloor(ok,x,y))bad.push([x,y]);
+  }
+  return bad;
+}
+const holdsFurn=p=>!!p.hold&&p.hold.kind==='station'&&FURN.includes(p.hold.st);
+// returns true when the press was handled as moving furniture / equipment
+function furnPick(p,c,tx,ty){
+  const h=p.hold,lay=S.phase==='layout';
+  // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
+  if(holdsFurn(p)&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
+    if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
+    if(S.players.some(q=>Math.abs(q.x-(tx+.5))<0.8&&Math.abs(q.y-(ty+.5))<0.8)){say(p,'人がいて置けない');return true}
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:!!h.pro};p.hold=null;rebuildStations();return true;
+  }
+  // layout: pick up furniture from the truck (a counter only when nothing is on it; a planter takes its crop along)
+  if(lay&&!h&&FURN.includes(c.t)&&inTruck(tx,ty)){
+    if(c.item){if(c.t==='counter')return false;say(p,'上の物をどけてから');return true}
+    p.hold={kind:'station',st:c.t,pro:!!c.pro,plant:c.plant||null};
+    S.map[ty][tx]=blankTile(ty);rebuildStations();return true;
+  }
+  // outside (layout, or the town stop): equipment and tools can be set down and picked up
+  if(c.t==='ground'&&(lay||S.phase==='stop')){
+    const it=c.item;
+    if(!h&&it){
+      if(it.n>1){it.n--;p.hold={kind:'station',st:it.st}}  // take one from the pile
+      else{p.hold=it;c.item=null;delete it.n}
+      return true}
+    if(h&&!it){if(!storable(h)){say(p,'外には置けない');return true}c.item=h;p.hold=null;return true}
+    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant){it.n=(it.n||1)+1;p.hold=null;return true}
+  }
+  if(holdsFurn(p)){say(p,'トラックの床に置く');return true}
+  return false;
+}
+
+// ---------- input ----------
+const held=new Set(), pressed=new Set();
+const KB=[
+  {up:['KeyW'],down:['KeyS'],left:['KeyA'],right:['KeyD'],pick:['Space','KeyE'],act:['KeyF'],sw:['KeyQ']},
+  {up:['ArrowUp'],down:['ArrowDown'],left:['ArrowLeft'],right:['ArrowRight'],pick:['Slash','Enter'],act:['Period','ShiftRight'],sw:['Comma']},
+];
+const GAMEKEYS=new Set(KB.flatMap(k=>Object.values(k).flat()).concat(['Escape','KeyP']));
+addEventListener('keydown',e=>{
+  if(e.target&&e.target.tagName==='INPUT')return; // typing a room code
+  if(GAMEKEYS.has(e.code)||/^Digit[1-4]$/.test(e.code))e.preventDefault();
+  if(!e.repeat)pressed.add(e.code); held.add(e.code);
+});
+addEventListener('keyup',e=>held.delete(e.code));
+addEventListener('blur',()=>held.clear());
+let pads=[], padPrev=[];
+function pollPads(){
+  const gps=navigator.getGamepads?navigator.getGamepads():[];
+  pads=[];
+  for(let i=0;i<4;i++){
+    const gp=gps[i]; if(!gp){pads[i]=null;continue}
+    const b=k=>!!(gp.buttons[k]&&gp.buttons[k].pressed);
+    const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(5)||b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
+    const prev=padPrev[i]||{};
+    pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0};
+    padPrev[i]=now;
+  }
+}
+// touch (drives P1)
+const touch={mx:0,my:0,pick:false,act:false,sw:false,pause:false};
+const isTouch=('ontouchstart' in window)||(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
+if(isTouch)document.body.classList.add('touch');
+(function setupTouch(){
+  const joy=document.getElementById('joy'),knob=document.getElementById('knob');
+  let jid=null;
+  const upd=e=>{const r=joy.getBoundingClientRect(),R=r.width/2;let dx=e.clientX-(r.left+R),dy=e.clientY-(r.top+R);
+    const d=Math.hypot(dx,dy),max=R*0.75;if(d>max){dx*=max/d;dy*=max/d}
+    knob.style.transform=`translate(${dx}px,${dy}px)`;
+    const nx=dx/max,ny=dy/max;touch.mx=Math.abs(nx)>0.25?nx:0;touch.my=Math.abs(ny)>0.25?ny:0};
+  const end=e=>{if(e.pointerId!==jid)return;jid=null;touch.mx=0;touch.my=0;knob.style.transform=''};
+  joy.addEventListener('pointerdown',e=>{e.preventDefault();jid=e.pointerId;joy.setPointerCapture(jid);upd(e)});
+  joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)upd(e)});
+  joy.addEventListener('pointerup',end);joy.addEventListener('pointercancel',end);
+  const btn=(id,down,up)=>{const b=document.getElementById(id);
+    b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('on');down()});
+    const off=()=>{b.classList.remove('on');if(up)up()};
+    b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);
+    b.addEventListener('contextmenu',e=>e.preventDefault())};
+  btn('bPick',()=>touch.pick=true);
+  btn('bAct',()=>touch.act=true,()=>touch.act=false);
+  btn('bSw',()=>touch.sw=true);
+  btn('bPause',()=>touch.pause=true);
+})();
+// online: this device is one player, so both key sets drive it; remote players come from the room
+function readInput(i){
+  if(NET.role==='host')return i>0?remoteInput(i):deviceInput();
+  return baseInput(i);
+}
+function deviceInput(){
+  const a=baseInput(0),b=baseInput(1,true);
+  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw};
+}
+function baseInput(i,keysOnly){
+  let mx=0,my=0,pick=false,act=false,sw=false;
+  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw}
+  const k=KB[i];
+  if(k){
+    const h=a=>a.some(c=>held.has(c)), p=a=>a.some(c=>pressed.has(c));
+    if(h(k.up))my-=1; if(h(k.down))my+=1; if(h(k.left))mx-=1; if(h(k.right))mx+=1;
+    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw);
+  }
+  const ps=keysOnly?null:pads[i];
+  if(ps){
+    if(Math.abs(ps.ax)>0.3)mx+=ps.ax; if(Math.abs(ps.ay)>0.3)my+=ps.ay;
+    if(ps.now.l)mx-=1; if(ps.now.r)mx+=1; if(ps.now.u)my-=1; if(ps.now.d)my+=1;
+    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw');
+  }
+  return {mx,my,pick,act,sw};
+}
+
+// ---------- collision ----------
+function tile(x,y){return (y>=0&&y<GH&&x>=0&&x<GW)?S.map[y][x]:null}
+function solid(x,y){
+  const c=tile(x,y); if(!c)return true;
+  const lay=S.phase==='layout', out=S.phase==='stop'||lay;
+  switch(c.t){
+    case 'floor':return false;
+    case 'door':return !out;
+    case 'ground':return !out||y>=GH-1||x<=0||x>=GW-1||!!c.item;
+    case 'gather':if(!out)return true;if(lay)return false;return !!(S.town&&S.town.gather[c.gi]);
+    case 'market':return !lay;
+    case 'queue':if(!out)return true;if(lay)return false;return !!S.cust[c.slot]; // only the spot where a customer stands blocks
+    default:return true;
+  }
+}
+function hit(x,y){const r=0.3;return solid(Math.floor(x-r),Math.floor(y-r))||solid(Math.floor(x+r),Math.floor(y-r))||solid(Math.floor(x-r),Math.floor(y+r))||solid(Math.floor(x+r),Math.floor(y+r))}
+function bringInside(){
+  S.players.forEach((p,i)=>{p.menu=null;if(p.y>=5.99||hit(p.x,p.y)){
+    let [x,y]=START_POS[i];
+    if(hit(x,y)){for(let yy=5;yy>=2&&hit(x,y);yy--)for(let xx=3;xx<=14;xx++)if(!hit(xx+.5,yy+.5)){x=xx+.5;y=yy+.5;break}}
+    p.x=x;p.y=y}});
+}
+
+// ---------- feedback ----------
+function say(p,m){p.msg=m;p.msgT=1.6}
+function float(x,y,text,col){S.floats.push({x,y,text,col:col||'#fff',t:0})}
+
+// ---------- lists ----------
+const stockList=()=>Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
+const seedList=()=>Object.keys(ING).filter(k=>(S.seeds[k]||0)>0);
+const wrap=(i,n)=>((i%n)+n)%n;
+
+// ---------- interactions ----------
+function accepts(c,h){
+  if(c.t==='counter')return true;
+  if(h.kind!=='ing')return false;
+  if(c.t==='board')return nextStep(h)==='chop';
+  if(c.t==='stove')return nextStep(h)==='cook';
+  if(c.t==='blender')return nextStep(h)==='blend';
+  return false;
+}
+const canAdd=(pl,it)=>it.kind==='ing'&&isDone(it)&&!it.burnt&&pl.items.length<3;
+function placeOrTake(p,c){
+  const h=p.hold,it=c.item;
+  if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
+  if(h&&!it){
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0}
+    else if(c.t==='board')say(p,'切らなくていい');
+    else if(c.t==='stove')say(p,'焼く食材じゃない');
+    else if(c.t==='blender')say(p,'ミキサーに入れない');
+    return;
+  }
+  if(h&&it){
+    // Combining always leaves the result on the counter; the hand ends up empty.
+    if(['can','seed','basket'].includes(h.kind)||['can','seed','basket'].includes(it.kind)){say(p,'ここには置けない');return}
+    const items=x=>x.kind==='plate'?x.items:[x];
+    const ok=x=>x.kind==='plate'||(isDone(x)&&!x.burnt);
+    if(c.t!=='counter'){
+      // a finished item on a board / stove / blender can be scooped up with a plate or a prepared ingredient in hand
+      if(!(it.kind==='ing'&&isDone(it))){say(p,'まだ調理中');return}
+      if(it.burnt){say(p,'焦げている');return}
+      if(!ok(h)){say(p,'先に'+STEPN[nextStep(h)]);return}
+      const all=items(h).concat([it]);
+      if(all.length>3){say(p,'のせきれない');return}
+      p.hold={kind:'plate',bare:!(h.kind==='plate'&&!h.bare),items:all};
+      c.item=null;c.prog=0;c.burn=0;return}
+    if(!ok(h)){say(p,h.burnt?'焦げている':'先に'+STEPN[nextStep(h)]);return}
+    if(!ok(it)){say(p,it.burnt?'焦げている':'まだ下ごしらえ中');return}
+    if(h.kind==='plate'&&it.kind==='plate'&&!h.bare&&!it.bare){say(p,'皿どうしは重ねられない');return}
+    const all=items(it).concat(items(h));
+    if(all.length>3){say(p,'のせきれない');return}
+    const onPlate=(h.kind==='plate'&&!h.bare)||(it.kind==='plate'&&!it.bare);
+    c.item={kind:'plate',bare:!onPlate,items:all};p.hold=null;
+  }
+}
+function doPick(p,c,tx,ty){
+  if(furnPick(p,c,tx,ty))return;
+  switch(c.t){
+    case 'fridge':{
+      if(!p.hold){if(!stockList().length){say(p,'在庫がない');return}
+        p.menu={kind:'fridge',sel:Math.max(0,stockList().indexOf(p.lastF))};p.menuLast='0,0';p.menuRep=0}
+      else if(p.hold.kind==='ing'&&p.hold.step===0&&!p.hold.burnt){S.stock[p.hold.id]=(S.stock[p.hold.id]||0)+1;p.hold=null}
+      else if(p.hold.kind==='basket'){
+        const b=p.hold.items;if(!b.length){say(p,'カゴは空');return}
+        for(const id of b)S.stock[id]=(S.stock[id]||0)+1;
+        float(tx+.5,ty+1,'冷蔵庫へ '+b.map(id=>ING[id].e).join(''),'#bff2c6');p.hold.items=[]}
+      return}
+    case 'seedbox':{
+      if(!p.hold){if(!seedList().length){say(p,'種がない');return}
+        p.menu={kind:'seedbox',sel:Math.max(0,seedList().indexOf(p.lastS))};p.menuLast='0,0';p.menuRep=0}
+      else if(p.hold.kind==='seed'){S.seeds[p.hold.id]=(S.seeds[p.hold.id]||0)+1;p.hold=null}
+      return}
+    case 'plates':
+      if(!p.hold)p.hold={kind:'plate',items:[]};
+      else if(p.hold.kind==='plate'&&!p.hold.bare&&!p.hold.items.length)p.hold=null;
+      // holding a finished stack or a prepared ingredient: take a plate with it on
+      else if(p.hold.kind==='plate'&&p.hold.bare)p.hold.bare=false;
+      else if(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)p.hold={kind:'plate',items:[p.hold]};
+      else if(p.hold.kind==='ing')say(p,p.hold.burnt?'焦げている':'先に'+STEPN[nextStep(p.hold)]);
+      else say(p,'皿には乗せられない');
+      return;
+    case 'trash':
+      if(p.hold){if(p.hold.kind==='can')say(p,'じょうろは捨てられない');else if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
+      return;
+    case 'sink':
+      if(p.hold&&p.hold.kind==='can')say(p,'作業ボタン長押しで水を汲む');
+      return;
+    case 'planter':
+      if(c.plant){
+        if(p.hold&&p.hold.kind==='can'){waterPlant(p,c,tx,ty);return}
+        if(c.plant.t>=ING[c.plant.id].grow)harvest(c,tx,ty);
+        else say(p,c.plant.watered?'まだ育っていない':'水が必要（じょうろ）');
+      }
+      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false};p.hold=null;say(p,'じょうろで水をあげる')}
+      else if(p.hold&&p.hold.kind==='can')say(p,'先に種を植える');
+      else say(p,'種を持ってくる');
+      return;
+    case 'serve':
+      if(p.hold&&p.hold.kind==='plate')serve(p,tx,ty);
+      else if(p.hold&&p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt){const tmp=p.hold;p.hold={kind:'plate',bare:true,items:[tmp]};serve(p,tx,ty);if(p.hold&&p.hold.bare&&p.hold.items.length===1)p.hold=tmp}
+      return;
+    case 'counter':case 'board':case 'stove':case 'blender':
+      placeOrTake(p,c);return;
+    case 'window':
+      if(S.phase==='drive')say(p,shopAtWindow(tx)?'作業ボタン長押しで買う':'お店が来たら買える');
+      return;
+    case 'market':
+      if(S.phase==='stop')say(p,'作業ボタン長押しで買う');
+      return;
+    case 'gather':
+      say(p,p.hold&&p.hold.kind==='basket'?'作業ボタン長押しで採る':'カゴを持ってくる');return;
+  }
+}
+function waterPlant(p,c,tx,ty){
+  const can=p.hold;
+  if(c.plant.t>=ING[c.plant.id].grow){say(p,'もう実っている');return}
+  if(c.plant.watered){say(p,'もう水をあげた');return}
+  if(can.water<=0){say(p,'じょうろが空。シンクで汲む');return}
+  can.water--;c.plant.watered=true;float(tx+.5,ty,'💧','#9fd8ff');
+}
+function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus;S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6')}
+function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
+function buy(list,p,shop,tx,ty){
+  if(!list||!list.length)return;
+  const it=list[wrap(p.cur,list.length)];
+  if(it.sold){say(p,'売り切れ');return}
+  if(S.money<it.price){say(p,'お金が足りない');return}
+  if(it.type==='equip'&&p.hold){say(p,'手を空けて受け取る');return}
+  S.money-=it.price;
+  if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
+  if(it.type==='pack'){S.stock[it.id]=(S.stock[it.id]||0)+it.qty;float(tx+.5,ty,'+'+it.qty+' '+ING[it.id].e)}
+  else if(it.type==='seed'){S.seeds[it.id]=(S.seeds[it.id]||0)+it.qty;float(tx+.5,ty,'種+'+it.qty+' '+ING[it.id].e)}
+  else{const ids=pickN(Object.keys(ING),2);for(const id of ids)S.stock[id]=(S.stock[id]||0)+2;
+    S.toast={text:'🎁 袋の中身：'+ids.map(id=>ING[id].e+ING[id].n+'×2').join('　'),t:0,life:4}}
+  if(shop)it.sold=true;
+}
+function doAct(p,c,tx,ty,dt){
+  const key=tx+','+ty;
+  if(p.actKey!==key){p.actKey=key;p.actT=0}
+  if(p.lock)return;
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt;if(c.prog>=CHOP*S.up.chop*proMul(c)){c.item.step++;c.prog=0}return}
+  if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
+  if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
+    if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
+    p.actT+=dt;if(p.actT>=FILL*proMul(c)){p.actT=0;p.lock=true;p.hold.water=canCap(p.hold);float(tx+.5,ty,'💧満タン','#9fd8ff')}
+    return}
+  if(c.t==='window'&&S.phase==='drive'){
+    const sh=shopAtWindow(tx); if(!sh)return;
+    p.actT+=dt; if(p.actT>=BUY){p.actT=0;p.lock=true;buy(sh.items,p,sh,tx,ty)} return}
+  if(c.t==='market'&&S.phase==='stop'){p.actT+=dt;if(p.actT>=BUY){p.actT=0;p.lock=true;buy(S.market,p,null,tx,ty)}return}
+  if(c.t==='gather'&&S.phase==='stop'){
+    const id=S.town.gather[c.gi]; if(!id)return;
+    if(!p.hold||p.hold.kind!=='basket'){say(p,'カゴを持ってくる');p.lock=true;return}
+    if(p.hold.items.length>=basketCap(p.hold)){say(p,'カゴがいっぱい。冷蔵庫へ');p.lock=true;return}
+    if(S.gatherLeft[c.gi]<=0){say(p,'もう採れない');return}
+    p.actT+=dt; if(p.actT>=GATHER/S.up.gatherSpd){p.actT=0;S.gatherLeft[c.gi]--;p.hold.items.push(id);float(tx+.5,ty,'+1 '+ING[id].e,'#bff2c6')}
+  }
+}
+function matchRecipe(items){
+  const a=items.map(i=>i.id).sort().join(',');
+  return Object.keys(RECIPES).find(k=>RECIPES[k].ings.slice().sort().join(',')===a);
+}
+// reputation sets the tip: ♥5 ×1.5, ♥4 ×1.25, ♥3 ×1.0, ♥2 ×0.75, ♥1 ×0.5
+function tipRate(){return 0.25+0.25*Math.max(0,Math.min(5,S.hearts))}
+function serve(p,tx,ty){
+  if(S.phase!=='stop'||S.sub!=='service'){say(p,'まだ営業前');return}
+  const rid=matchRecipe(p.hold.items);
+  if(!rid){say(p,'料理になっていない');return}
+  const ci=S.cust.findIndex(c=>c.order===rid);
+  if(ci<0){say(p,'その注文の客がいない');return}
+  const c=S.cust[ci],R=RECIPES[rid];
+  const pay=Math.round(R.price*S.town.pay*S.up.pay), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate());
+  S.money+=pay+tip;S.earned+=pay+tip;S.served++;S.cust.splice(ci,1);p.hold=null;
+  float(tx+.5,ty+1,'+'+(pay+tip)+'G','#ffe08a');
+}
+
+// ---------- phases ----------
+function startDrive(){
+  S.phase='drive';S.view='road';S.timer=DRIVE+S.up.drive;
+  const n=3+rnd(2),sp=(n===3?6:4.5)+S.up.drive*SPEED/n;
+  S.shops=[];for(let k=0;k<n;k++){const ty=weighted(SHOPTYPES);S.shops.push({x:16+k*sp,type:ty,items:genShopItems(ty)})}
+  bringInside();hideOv();
+}
+function genShopItems(ty){
+  const items=ty.gen();
+  for(let k=0;k<S.up.shopExtra;k++){
+    const add=ty.gen().find(m=>m.type==='mystery'||!items.some(i=>i.type===m.type&&i.id===m.id));
+    if(add)items.push(add);
+  }
+  items.forEach(i=>i.price=Math.max(2,Math.round(i.price*S.up.shopDisc)));
+  return items;
+}
+function genMarket(town){
+  const out=[],needs=townNeeds(town);
+  for(const id of needs){
+    if(town.gather.includes(id)||ING[id].grow)continue;
+    out.push({type:'pack',id,qty:2,price:Math.round(ING[id].price*1.5)});
+  }
+  // the market always sells every seed (needed ones first)
+  const seeds=Object.keys(ING).filter(id=>ING[id].grow).sort((a,b)=>needs.includes(b)-needs.includes(a));
+  for(const id of seeds)out.push({type:'seed',id,qty:2,price:Math.round(ING[id].seed*1.5)});
+  return out;
+}
+function arrive(){
+  S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];
+  S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
+}
+function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
+function spawnCust(){
+  if(S.cust.length>=6)return;
+  const order=S.town.menu[rnd(S.town.menu.length)],max=(S.np===1?85:70)*S.up.pat;
+  S.cust.push({order,pat:max,max,hue:rnd(360)});
+}
+function clearKitchen(){
+  // leftovers from this town are thrown away (planters keep growing)
+  // tools (watering can, basket) are kept; whatever is still in the basket is lost
+  const TOOL={can:1,basket:1};
+  let lost=0;
+  for(const r of S.map)for(const c of r){
+    if(!c.item)continue;
+    if(TOOL[c.item.kind]){if(c.item.kind==='basket'){lost+=c.item.items.length;c.item.items=[]}continue}
+    if(c.item.kind==='station')continue; // bought equipment not installed yet is kept
+    lost++;c.item=null;c.prog=0;c.burn=0}
+  for(const p of S.players){
+    if(!p.hold||p.hold.kind==='station')continue;
+    if(TOOL[p.hold.kind]){
+      if(p.hold.kind==='basket'){lost+=p.hold.items.length;p.hold.items=[]}
+      // an empty counter someone can reach from the floor
+      const ok=reachFloor(),spots=[];
+      for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];if(c.t==='counter'&&!c.item&&touchesFloor(ok,x,y))spots.push(c)}
+      const spot=spots[0];
+      if(spot)spot.item=p.hold;else S.stored.push(p.hold); // no free counter: it waits outside for the next layout
+      p.hold=null;
+      continue}
+    lost++;p.hold=null}
+  return lost;
+}
+function endStop(){
+  S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
+  bringInside();
+  stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
+  const lost=clearKitchen();
+  const last=S.stop>=STOPS;
+  showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
+    <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b></p>
+    <p>所持金 ${S.money}G ／ 評判 ${'♥'.repeat(S.hearts)}</p>
+    ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
+    <div class="row"><button class="ovbtn" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}</button></div></div>`);
+}
+// ---------- upgrades (pick 1 of 3 after each town, free; reroll costs money) ----------
+const UPS=[
+  {id:'cook',e:'🔥',n:'強火コンロ',d:'焼く時間 -25%',max:3,apply:u=>u.cook*=0.75},
+  {id:'chop',e:'🔪',n:'よく切れる包丁',d:'切る時間 -30%',max:3,apply:u=>u.chop*=0.7},
+  {id:'blend',e:'🌀',n:'高速ミキサー',d:'ミキサー時間 -40%',max:2,apply:u=>u.blend*=0.6},
+  {id:'burn',e:'🍳',n:'厚手のフライパン',d:'焦げるまで +6秒',max:3,apply:u=>u.burn+=6},
+  {id:'pat',e:'🪑',n:'座り心地のいい椅子',d:'客の待ち時間 +20%',max:3,apply:u=>u.pat*=1.2},
+  {id:'tip',e:'😊',n:'笑顔の接客',d:'チップ 1.5倍',max:2,apply:u=>u.tip*=1.5},
+  {id:'pay',e:'📈',n:'看板メニュー',d:'料理の値段 +10%',max:3,apply:u=>u.pay*=1.1},
+  {id:'plot',e:'🪴',n:'菜園を広げる',d:'菜園 +1マス（次の配置で置く）',max:3,apply:()=>addPlanter()},
+  {id:'grow',e:'🌿',n:'肥料',d:'作物が 1.3倍速で育つ',max:2,apply:u=>u.grow*=1.3},
+  {id:'can',e:'💧',n:'大きなじょうろ',d:'じょうろの水 +2回分',max:2,apply:u=>u.canCap+=2},
+  {id:'yield',e:'🧺',n:'豊作',d:'収穫 +1個',max:2,apply:u=>u.yieldPlus++},
+  {id:'shopx',e:'🛒',n:'顔なじみの店',d:'窓口の品数 +1',max:2,apply:u=>u.shopExtra++},
+  {id:'disc',e:'🏷️',n:'値切り上手',d:'窓口の値段 -15%',max:2,apply:u=>u.shopDisc*=0.85},
+  {id:'shoes',e:'👟',n:'軽い靴',d:'移動速度 +15%',max:2,apply:u=>u.speed*=1.15},
+  {id:'gather',e:'🎣',n:'採集の道具',d:'採集が速くなり、量 +3',max:2,apply:u=>{u.gatherSpd*=1.4;u.gatherPlus+=3}},
+  {id:'basket',e:'🧺',n:'大きなカゴ',d:'カゴに入る数 +2',max:2,apply:u=>u.basketCap+=2},
+  {id:'drive',e:'🛣️',n:'遠回りルート',d:'走行時間 +10秒（仕込みの時間が増える）',max:2,apply:u=>u.drive+=10},
+  {id:'heart',e:'❤️',n:'いい口コミ',d:'評判 ♥ を1つ回復',max:9,cond:()=>S.hearts<5,apply:()=>{S.hearts++}},
+];
+// the new planter is handed over outside and placed in the next layout time
+function addPlanter(){S.pendingEquip.push({id:'planter',pro:false})}
+function showUpgrade(){
+  S.phase='upgrade';
+  const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
+  S.offers=pickN(pool,3);
+  const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
+  const cards=S.offers.map((u,i)=>`<button class="ovbtn town" data-act="up" data-v="${i}">
+      <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
+      <span class="needs"><span class="sub">${S.upCount[u.id]?'持っている数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
+  showOv(`<div class="box"><h2>強化を1つ選ぶ</h2>
+    <p>無料で1つもらえます。所持金 ${S.money}G</p>
+    <div class="cards">${cards}</div>
+    <div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G）</button></div>
+    ${owned?`<p class="mut">持っている強化：${owned}</p>`:''}</div>`);
+}
+function takeUpgrade(i){
+  const u=S.offers[i]; if(!u)return;
+  u.apply(S.up); S.upCount[u.id]=(S.upCount[u.id]||0)+1; S.rerollCost=8;
+  showChoose();
+}
+function gameOver(){
+  S.phase='over';
+  showOv(`<div class="box"><h2>評判がなくなった…</h2><p>${S.stop+1}つ目の町でお店をたたむことになりました。<br>合計の売上 ${S.totalEarned+S.earned}G</p>
+    <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
+}
+function showEnd(){
+  S.phase='end';
+  showOv(`<div class="box"><h2>旅の終わり</h2><p>${STOPS}つの町を回りきりました。</p>
+    <p>合計の売上 <b>${S.totalEarned}G</b> ／ 提供 <b>${S.totalServed}皿</b> ／ 残った評判 ${'♥'.repeat(S.hearts)}</p>
+    <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
+}
+
+// ---------- overlays ----------
+const ov=document.getElementById('ov');
+let ovSel=0, chooseOpts=[];
+function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
+function paintOv(html){ov.innerHTML=html;ov.hidden=false;ovSel=0;markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
+function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
+function ovButtons(){return [...ov.querySelectorAll('.ovbtn')]}
+function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel))}
+ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b)doOv(b.dataset.act,b.dataset.v)});
+ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
+// a guest's choices on the host's (mirrored) screens go to the host
+function doOv(a,v){
+  if(NET.role==='guest'&&a!=='title'&&(NET.mirror||a==='ready'||a==='pause')){guestSend(a,v);return}
+  ovAction(a,v);
+}
+function ovAction(a,v){
+  if(netAction(a,v))return;
+  if(a==='np'){const [n,m]=String(v).split('|');newRun(+n,m||'preset')}
+  else if(a==='town'){S.next=chooseOpts[+v];if(S.stop===0)startDrive();else showEquipShop()}
+  else if(a==='eqbuy'){
+    if(S.eqBought!=null)return;
+    const o=S.eqOffers[+v];if(!o)return;
+    if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
+    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});S.eqBought=+v;showEquipShop();
+  }
+  else if(a==='eqdone')startDayLayout();
+  else if(a==='next')showChoose();
+  else if(a==='upg')showUpgrade();
+  else if(a==='up')takeUpgrade(+v);
+  else if(a==='reroll'){
+    if(S.money<S.rerollCost){const b=ov.querySelector('[data-act=reroll]');if(b)b.textContent='お金が足りない（'+S.rerollCost+'G）';return}
+    S.money-=S.rerollCost;S.rerollCost+=4;showUpgrade();
+  }
+  else if(a==='end')showEnd();
+  else if(a==='title')showTitle();
+  else if(a==='resume'){if(S)S.paused=false;hideOv()}
+  else if(a==='ready')finishLayout();
+  else if(a==='pause')pauseGame();
+}
+function pauseGame(){
+  if(!S||!ov.hidden||!['drive','stop','layout'].includes(S.phase))return;
+  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><div class="row"><button class="ovbtn" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'タイトルへ':'部屋を出てタイトルへ'}</button></div></div>`);
+}
+function showTitle(){
+  if(NET.role!=='off')leaveOnline();
+  S=null;
+  showOv(`<div class="box"><h2>キッチンカー・ラン</h2>
+    <p>キッチンカーで町から町へ。走っている間は窓口で通りすがりのお店から仕入れ、町に着いたら料理を出して稼ぎます。4つの町を回りきれば完走です。</p>
+    <table class="ctl"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th></tr>
+    <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td></tr>
+    <tr><td>P2</td><td>矢印キー</td><td><kbd>/</kbd> か <kbd>Enter</kbd></td><td><kbd>.</kbd></td><td><kbd>,</kbd></td></tr>
+    <tr><td>パッド</td><td>スティック</td><td>A</td><td>X</td><td>LB / RB</td></tr></table>
+    <p class="sub" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>で一時停止。</p>
+    <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
+    <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
+    <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
+    <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
+    <div id="netTitle">${netTitleHtml()}</div></div>`);
+}
+const MOOD={'-10':'静か','0':'落ち着いた','10':'ほどよい人通り','20':'にぎやか','30':'活気あり','40':'大にぎわい','50':'お祭り'};
+function payLabel(p){const d=Math.round((p-1)*100);return (MOOD[d]||'')+'（売値'+(d===0?'±0':(d>0?'＋':'−')+Math.abs(d))+'％）'}
+function needLine(id,town){
+  const st=S.stock[id]||0, sd=S.seeds[id]||0, I=ING[id];
+  const src=[];
+  if(town.gather.includes(id))src.push('町で採れる');
+  else if(I.grow)src.push('市場で種');
+  else src.push('市場で買える');
+  const cls=st>0?'ok':(town.gather.includes(id)||sd>0?'sub':'ng');
+  return `<span class="${cls}">${I.e} ${I.n} 在庫${st}${sd?`・種${sd}`:''}</span> <span class="sub">(${src.join('・')})</span>`;
+}
+function showChoose(){
+  S.phase='choose';
+  const ids=Object.keys(TOWNS).filter(k=>!S.town||k!==S.town.id);
+  const n=Math.random()<0.5?2:3;
+  // sell-price rate is rolled each time a town is offered: 0.9 – 1.5
+  chooseOpts=pickN(ids,n).map(k=>Object.assign({},TOWNS[k],{id:k,pay:[0.9,1,1,1.1,1.1,1.2,1.2,1.3,1.4,1.5][rnd(10)]}));
+  const cards=chooseOpts.map((t,i)=>`<button class="ovbtn town" data-act="town" data-v="${i}">
+      <span class="tn">${t.e} ${t.n}</span>
+      <span class="menu">${t.menu.map(r=>RECIPES[r].e+' '+RECIPES[r].n).join('<br>')}</span>
+      <span class="needs">${townNeeds(t).map(id=>needLine(id,t)).join('')}</span>
+      <span class="pay">${payLabel(t.pay)}${t.rate>1?'　客が多い':''}</span></button>`).join('');
+  showOv(`<div class="box"><h2>${S.stop+1}つ目の町を選ぶ（全${STOPS}町）</h2>
+    <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。所持金 ${S.money}G</p>
+    ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
+    ${S.stop>0?`<p class="mut">町を選んだら、器具屋 → 配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
+    <div class="cards">${cards}</div>
+    <p class="mut">キー <kbd>1</kbd>〜<kbd>${n}</kbd> かクリックで選択</p></div>`);
+}
+function overlayInput(){
+  const b=ovButtons(); if(!b.length)return;
+  if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
+  const p0=pads[0];
+  let mv=0,ok=false;
+  if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r')))mv=1;
+  if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l')))mv=-1;
+  if(pressed.has('Space')||pressed.has('Enter')||(p0&&p0.edge('a')))ok=true;
+  for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;ok=true}
+  if(mv){ovSel=wrap(ovSel+mv,b.length);markSel()}
+  if(ok){const x=b[ovSel];if(x)doOv(x.dataset.act,x.dataset.v)}
+}
+
+// ---------- fridge / seed box menu ----------
+const MENU={
+  fridge:{title:'冷蔵庫',cols:5,list:()=>stockList(),count:id=>S.stock[id]||0,key:'lastF'},
+  seedbox:{title:'種箱',cols:4,list:()=>seedList(),count:id=>S.seeds[id]||0,key:'lastS'},
+};
+function menuInput(p,inp,dt){
+  const M=MENU[p.menu.kind],list=M.list(),n=list.length,cols=M.cols;
+  if(!n){p.menu=null;return}
+  p.menu.sel=Math.min(p.menu.sel,n-1);
+  const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0, dy=inp.my>0.5?1:inp.my<-0.5?-1:0;
+  const key=dx+','+dy;
+  let move=false;
+  if(key!=='0,0'){
+    if(key!==p.menuLast){move=true;p.menuRep=0.32}
+    else{p.menuRep-=dt;if(p.menuRep<=0){move=true;p.menuRep=0.11}}
+  }
+  p.menuLast=key;
+  if(move){
+    let s=p.menu.sel,c=s%cols,r=Math.floor(s/cols);const rows=Math.ceil(n/cols);
+    if(dx){c=wrap(c+dx,cols);if(r*cols+c>=n)c=dx>0?0:(n-1)%cols}
+    else if(dy){r=wrap(r+dy,rows);if(r*cols+c>=n)r=dy>0?0:r-1}
+    p.menu.sel=Math.min(n-1,r*cols+c);
+  }
+  const actEdge=inp.act&&!p.prevAct;
+  if(inp.pick){
+    const id=list[p.menu.sel];
+    if(M.count(id)<=0){say(p,ING[id].n+(p.menu.kind==='seedbox'?'の種':'')+'がない');return}
+    if(p.menu.kind==='fridge'){S.stock[id]--;p.hold=newIng(id)}
+    else{S.seeds[id]--;p.hold={kind:'seed',id}}
+    p[M.key]=id;
+    p.menu=null;
+  } else if(inp.sw||actEdge){p.menu=null}
+}
+
+// ---------- update ----------
+function update(dt){
+  S.t+=dt;
+  // stations
+  for(const c of S.stations){
+    if(c.t==='planter'){
+      // a plant grows once it has been watered (one watering per seed)
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*S.up.grow;
+      continue}
+    const it=c.item; if(!it||it.kind!=='ing'||it.burnt)continue;
+    if(c.t==='stove'){
+      if(nextStep(it)==='cook'){c.prog+=dt;if(c.prog>=COOK*S.up.cook*proMul(c)){it.step++;c.prog=0;c.burn=0}}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=BURN+S.up.burn)it.burnt=true}
+    } else if(c.t==='blender'&&nextStep(it)==='blend'){c.prog+=dt;if(c.prog>=BLEND*S.up.blend*proMul(c)){it.step++;c.prog=0}}
+  }
+  // players
+  S.players.forEach((p,i)=>{
+    const inp=readInput(i);
+    if(p.menu){menuInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
+    p.prevAct=inp.act;
+    const len=Math.hypot(inp.mx,inp.my);
+    if(len>0.1){
+      const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*dt,vy=inp.my/k*4.2*S.up.speed*dt;
+      const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
+      if(stuck||!hit(p.x+vx,p.y))p.x+=vx; if(stuck||!hit(p.x,p.y+vy))p.y+=vy;
+      if(Math.abs(inp.mx)>Math.abs(inp.my)){p.dx=Math.sign(inp.mx);p.dy=0}else{p.dx=0;p.dy=Math.sign(inp.my)}
+    }
+    const tx=Math.floor(p.x)+p.dx, ty=Math.floor(p.y)+p.dy, c=tile(tx,ty);
+    p.tx=tx;p.ty=ty;
+    if(inp.sw)p.cur++;
+    if(!inp.act){p.lock=false;p.actT=0}
+    if(c){
+      if(inp.pick)doPick(p,c,tx,ty);
+      if(inp.act)doAct(p,c,tx,ty,dt);
+    }
+    if(p.msgT>0)p.msgT-=dt;
+  });
+  // phase
+  if(S.phase==='layout'){S.timer=Math.max(0,S.timer-dt)}
+  else if(S.phase==='drive'){
+    S.timer-=dt;S.roadOff+=SPEED*dt;
+    for(const s of S.shops){
+      s.x-=SPEED*dt;
+      // once a shop has passed the back window it can't be bought from: fade it out quickly
+      if(s.x+2+WMARGIN<3.5)s.fade=(s.fade||0)+dt;
+    }
+    S.shops=S.shops.filter(s=>!(s.fade>0.3));
+    if(S.timer<=0)arrive();
+  } else if(S.phase==='stop'){
+    S.timer-=dt;
+    if(S.sub==='prep'){if(S.timer<=0){
+      S.sub='service';S.timer=SERVICE+(S.bonus||0);S.spawnT=1.5;
+      if(S.bonus){S.toast={text:'レイアウトボーナス：営業時間 +'+S.bonus+'秒',t:0,life:3};S.bonus=0}}}
+    else{
+      S.spawnT-=dt;
+      if(S.spawnT<=0){if(S.cust.length<6)spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
+      for(let k=S.cust.length-1;k>=0;k--){
+        const c=S.cust[k];c.pat-=dt;
+        if(c.pat<=0){S.cust.splice(k,1);S.hearts--;S.missed++;float(8.5+k,7.2,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
+      }
+      if(S.timer<=0)endStop();
+    }
+  }
+  if(S.toast){S.toast.t+=dt;if(S.toast.t>S.toast.life)S.toast=null}
+  for(const f of S.floats)f.t+=dt;
+  S.floats=S.floats.filter(f=>f.t<1.4);
+}
+
+// ---------- draw ----------
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
+function emoji(e,x,y,s){ctx.font=`${s}px ${EMO}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(e,x,y)}
+function text(t,x,y,s,col,w,align){ctx.font=`${w||700} ${s}px ${FNT}`;ctx.fillStyle=col;ctx.textAlign=align||'center';ctx.textBaseline='middle';ctx.fillText(t,x,y)}
+function bar(x,y,w,f,col){ctx.fillStyle='rgba(0,0,0,.55)';rr(x,y,w,6,3);ctx.fill();ctx.fillStyle=col;rr(x,y,Math.max(2,w*Math.min(1,f)),6,3);ctx.fill()}
+function drawItem(it,cx,cy,s){
+  if(it.kind==='plate'){
+    if(!it.bare){ctx.fillStyle='#f7f4ec';ctx.beginPath();ctx.arc(cx,cy,s*0.5,0,7);ctx.fill();
+    ctx.strokeStyle='#cfc6b3';ctx.lineWidth=2;ctx.stroke()}
+    const n=it.items.length;
+    it.items.forEach((x,i)=>{const a=n===1?0:(i/n)*Math.PI*2-Math.PI/2,r=n===1?0:s*0.2;emoji(ING[x.id].e,cx+Math.cos(a)*r,cy+Math.sin(a)*r,s*(n===1?0.55:0.4))});
+    const rid=n?matchRecipe(it.items):null;
+    if(rid)emoji(RECIPES[rid].e,cx+s*0.42,cy-s*0.42,s*0.38);
+    return;
+  }
+  if(it.kind==='station'){
+    ctx.save();ctx.translate(cx-s/2,cy-s/2);ctx.scale(s/T,s/T);
+    drawTile({t:it.st,pro:it.pro,item:null,prog:0,burn:0,plant:it.plant||null},0,0);
+    ctx.restore();
+    if(it.st==='counter'&&s>=T*0.8)text('台',cx,cy,13,'#8a7550',800);
+    if(it.n>1){ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.65)';ctx.textAlign='center';ctx.strokeText('×'+it.n,cx+s*0.28,cy+s*0.36);text('×'+it.n,cx+s*0.28,cy+s*0.36,14,'#fff',800)}
+    return;
+  }
+  if(it.kind==='basket'){
+    ctx.fillStyle='#b07a3e';rr(cx-s*0.36,cy-s*0.08,s*0.72,s*0.4,6);ctx.fill();
+    ctx.strokeStyle='#8a5a28';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy-s*0.08,s*0.28,Math.PI,0);ctx.stroke();
+    it.items.slice(0,4).forEach((id,k)=>emoji(ING[id].e,cx-s*0.24+k*s*0.16,cy-s*0.06,s*0.26));
+    text(it.items.length+'/'+basketCap(it),cx,cy+s*0.14,10,'#fff',800);
+    if(it.bonus)text('★',cx+s*0.36,cy-s*0.3,12,'#ffd84a',800);
+    return;
+  }
+  if(it.kind==='can'){
+    ctx.fillStyle='#4f8fa8';rr(cx-s*0.3,cy-s*0.22,s*0.48,s*0.44,6);ctx.fill();
+    ctx.strokeStyle='#4f8fa8';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(cx+s*0.16,cy);ctx.lineTo(cx+s*0.42,cy-s*0.22);ctx.stroke();
+    ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx-s*0.06,cy-s*0.22,s*0.14,Math.PI,0);ctx.stroke();
+    const cap=canCap(it);
+    if(it.bonus)text('★',cx+s*0.36,cy-s*0.34,12,'#ffd84a',800);
+    for(let k=0;k<cap;k++){ctx.fillStyle=k<it.water?'#9fd8ff':'rgba(0,0,0,.45)';ctx.beginPath();ctx.arc(cx-s*0.06-(cap-1)*4+k*8,cy+s*0.36,3.2,0,7);ctx.fill()}
+    return;
+  }
+  if(it.kind==='seed'){
+    ctx.fillStyle='#8a6a3c';rr(cx-s*0.32,cy-s*0.3,s*0.64,s*0.62,6);ctx.fill();
+    emoji(ING[it.id].e,cx,cy-s*0.02,s*0.36);text('種',cx,cy+s*0.2,s*0.2,'#fff');return;
+  }
+  const I=ING[it.id];
+  if(it.burnt){ctx.fillStyle='#222';ctx.beginPath();ctx.arc(cx,cy,s*0.36,0,7);ctx.fill();emoji('💨',cx,cy,s*0.42);return}
+  emoji(I.e,cx,cy,s*0.62);
+  const st=I.steps;
+  st.forEach((k,i)=>{const px=cx-(st.length-1)*5+i*10,py=cy+s*0.38;ctx.fillStyle=i<it.step?'#7fd893':'rgba(0,0,0,.55)';ctx.beginPath();ctx.arc(px,py,4,0,7);ctx.fill()});
+  if(it.step>0){const k=st[it.step-1];text(k==='chop'?'切':k==='cook'?'焼':'混',cx+s*0.34,cy-s*0.32,11,'#fff',800)}
+}
+const TCOL={sink:'#cfd8dc',counter:'#e6dcc4',board:'#e6dcc4',stove:'#5b5f66',blender:'#e6dcc4',fridge:'#cfe5ef',seedbox:'#c9a777',plates:'#e6dcc4',trash:'#8d969c',serve:'#f6d36a',window:'#9fd2e8',planter:'#7a5434'};
+function drawTile(c,x,y){
+  const X=x*T,Y=y*T;
+  const lay=S&&S.phase==='layout'&&inTruck(x,y);
+  if(c.t==='floor'){ctx.fillStyle=(x+y)%2?'#f6efe0':'#ece3cf';ctx.fillRect(X,Y,T,T);
+    if(lay&&S.players.some(holdsFurn)&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])){ctx.strokeStyle='rgba(60,120,140,.4)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
+    return}
+  if(c.t==='gap'){ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#d99a22';ctx.fillRect(X+4,Y+T-12,T-8,6);
+    if(lay){ctx.strokeStyle='rgba(90,60,10,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
+    return}
+  if(c.t==='wall'){ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);return}
+  if(c.t==='door'){
+    if(S.phase==='stop'||S.phase==='layout'){ctx.fillStyle='#ece3cf';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#bfa77a';ctx.fillRect(X,Y+T-6,T,6)}
+    else{ctx.fillStyle='#c8862a';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#f6d36a';ctx.beginPath();ctx.arc(X+T*0.78,Y+T*0.5,3,0,7);ctx.fill()}
+    text('ドア',X+T/2,Y+T*0.5,11,(S.phase==='stop'||S.phase==='layout')?'#8a7550':'#fff3d6');return}
+  const col=TCOL[c.t]; if(!col)return;
+  ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);
+  ctx.fillStyle=col;rr(X+2,Y+2,T-4,T-4,6);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.12)';ctx.lineWidth=1;ctx.stroke();
+  if(lay&&c.t==='counter'&&!c.item){
+    ctx.strokeStyle='rgba(60,120,140,.55)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+6,Y+6,T-12,T-12,5);ctx.stroke();ctx.setLineDash([])}
+  switch(c.t){
+    case 'board':ctx.fillStyle='#b98a56';rr(X+8,Y+10,T-16,T-20,4);ctx.fill();if(!c.item)emoji('🔪',X+T/2,Y+T/2,18);break;
+    case 'stove':ctx.strokeStyle='#2b2d31';ctx.lineWidth=3;ctx.beginPath();ctx.arc(X+T/2,Y+T/2,14,0,7);ctx.stroke();
+      if(c.item&&nextStep(c.item)==='cook'){ctx.fillStyle='rgba(255,120,40,.5)';ctx.beginPath();ctx.arc(X+T/2,Y+T/2,16,0,7);ctx.fill()}
+      if(!c.item)emoji('🔥',X+T/2,Y+T/2,16);break;
+    case 'blender':ctx.fillStyle='#a8d8e8';rr(X+13,Y+8,T-26,T-18,5);ctx.fill();if(!c.item)text('ミキサー',X+T/2,Y+T-9,9,'#335');break;
+    case 'fridge':emoji('❄️',X+T/2,Y+T*0.38,16);text('冷蔵庫',X+T/2,Y+T*0.78,10,'#245');break;
+    case 'seedbox':emoji('🌱',X+T/2,Y+T*0.38,16);text('種箱',X+T/2,Y+T*0.78,10,'#fff');break;
+    case 'plates':for(let k=0;k<3;k++){ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(X+T/2,Y+T*0.62-k*5,14,6,0,0,7);ctx.fill();ctx.strokeStyle='#cfc6b3';ctx.stroke()}text('皿',X+T/2,Y+T*0.22,10,'#665');break;
+    case 'trash':emoji('🗑️',X+T/2,Y+T/2,20);break;
+    case 'sink':ctx.fillStyle='#7fb7d1';rr(X+8,Y+12,T-16,T-22,6);ctx.fill();ctx.fillStyle='#8c959b';ctx.fillRect(X+T/2-2,Y+5,4,9);text('シンク',X+T/2,Y+T-7,9,'#335',800);
+      for(const p of S.players)if(p.tx===x&&p.ty===y&&p.actT>0&&p.hold&&p.hold.kind==='can')bar(X+6,Y+3,T-12,p.actT/(FILL*proMul(c)),'#4fb3ff');
+      break;
+    case 'serve':emoji('🛎️',X+T/2,Y+T*0.4,16);text('受取口',X+T/2,Y+T*0.8,10,'#6b4b00');break;
+    case 'window':ctx.fillStyle='rgba(255,255,255,.45)';ctx.fillRect(X+8,Y+8,6,T-16);text('窓口',X+T/2,Y+T*0.4,11,'#134');text(c.win,X+T/2,Y+T*0.72,11,'#134');break;
+    case 'planter':{
+      ctx.fillStyle='#5a3b22';rr(X+6,Y+6,T-12,T-12,4);ctx.fill();
+      if(c.plant){const g=ING[c.plant.id].grow,f=c.plant.t/g;
+        if(f>=1){emoji(ING[c.plant.id].e,X+T/2,Y+T/2,24);const a=0.5+0.5*Math.sin(S.t*6);ctx.strokeStyle=`rgba(255,240,140,${a})`;ctx.lineWidth=3;rr(X+3,Y+3,T-6,T-6,6);ctx.stroke()}
+        else{
+          const wet=c.plant.watered;
+          emoji(f<0.5?'🌱':'🌿',X+T/2,Y+T/2-2,f<0.5?16:22);bar(X+7,Y+T-11,T-14,f,wet?'#7fd893':'#8a9497');
+          if(!wet&&Math.sin(S.t*6)>-0.3)emoji('💧',X+T-10,Y+11,14);
+        }}
+      else text('菜園',X+T/2,Y+T/2,10,'#d9c3a3');
+      break}
+  }
+  if(c.pro){ctx.strokeStyle='#ffd84a';ctx.lineWidth=2.5;rr(X+3,Y+3,T-6,T-6,6);ctx.stroke();text('★',X+T-9,Y+9,12,'#e0a800',800)}
+  if(c.item){
+    drawItem(c.item,X+T/2,Y+T/2,T*0.8);
+    if((c.t==='board'||c.t==='blender'||c.t==='stove')&&c.prog>0){
+      const tot=(c.t==='board'?CHOP*S.up.chop:c.t==='stove'?COOK*S.up.cook:BLEND*S.up.blend)*proMul(c);bar(X+6,Y+T-10,T-12,c.prog/tot,'#ffd25a')}
+    if(c.t==='stove'&&c.burn>0&&!c.item.burnt){
+      const bt=BURN+S.up.burn;
+      bar(X+6,Y+3,T-12,c.burn/bt,'#ff6d6d');
+      if(c.burn>bt*0.45&&Math.sin(S.t*14)>0)emoji('⚠️',X+T-8,Y+10,14);
+    }
+  }
+}
+function drawTruckShell(){
+  // cab
+  ctx.fillStyle='#e9a92c';rr(16*T,2*T,T*1.75,5*T-4,[4,18,10,4]);ctx.fill();
+  ctx.fillStyle='#bfe4f2';rr(16*T+8,2*T+10,T*1.15,T*1.4,[4,12,4,4]);ctx.fill();
+  ctx.fillStyle='#d48f1c';ctx.fillRect(16*T,5*T,T*1.75,6);
+  // stripe + wheels
+  ctx.fillStyle='#d4561c';ctx.fillRect(T,7*T-10,16.75*T,6);
+  for(const wx of [3.2,13.2,16.9]){ctx.fillStyle='#22272b';ctx.beginPath();ctx.arc(wx*T,7*T-2,15,0,7);ctx.fill();ctx.fillStyle='#8c959b';ctx.beginPath();ctx.arc(wx*T,7*T-2,6,0,7);ctx.fill()}
+}
+function drawRoad(){
+  ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,7*T);
+  // road band behind truck bottom
+  ctx.fillStyle='#3a4248';ctx.fillRect(0,6.6*T,GW*T,0.6*T);
+  ctx.fillStyle='#7c8a82';ctx.fillRect(0,7.2*T,GW*T,1.9*T); // roadside
+  ctx.fillStyle='#4f7044';ctx.fillRect(0,9.1*T,GW*T,2.9*T);
+  ctx.fillStyle='#e8e2c8';
+  const off=(S?S.roadOff:0)%2;
+  for(let x=-2;x<GW+2;x+=2)ctx.fillRect((x-off)*T,6.85*T,T*0.9,4);
+  // scrolling trees
+  for(let k=0;k<12;k++){const x=((k*3.7-(S?S.roadOff:0)*1.0)%(GW+4)+GW+4)%(GW+4)-2;emoji(k%3?'🌳':'🌲',x*T,11.3*T,26)}
+}
+function drawShops(){
+  for(const s of S.shops){
+    const X=s.x*T,Y=7.25*T,W=2*T;
+    if(X>GW*T+4||X+W<-4)continue;
+    ctx.save();ctx.globalAlpha=s.fade?Math.max(0,1-s.fade/0.3):1;
+    const near=[3,13].some(w=>w+0.5>=s.x-WMARGIN&&w+0.5<=s.x+2+WMARGIN);
+    ctx.fillStyle=s.type.c;rr(X,Y,W,1.75*T,8);ctx.fill();
+    for(let k=0;k<6;k++){ctx.fillStyle=k%2?'#fff':s.type.c;ctx.fillRect(X+k*W/6,Y,W/6,10)}
+    if(near){ctx.strokeStyle='#ffe27a';ctx.lineWidth=3;rr(X-2,Y-2,W+4,1.75*T+4,10);ctx.stroke()}
+    emoji(s.type.e,X+W/2,Y+0.75*T,26);
+    text(s.type.n,X+W/2,Y+1.45*T,11,'#fff',800);
+    if(!s.fade)drawOffer(s.items,X+W/2,9.25*T,s);
+    ctx.restore();
+  }
+}
+function drawOffer(items,cx,y,shop){
+  if(!items||!items.length)return;
+  const n=items.length,w=0.95*T,tot=n*w;let x0=cx-tot/2;
+  // the market's list is kept on screen; a road shop's list moves with the shop
+  if(!shop)x0=Math.max(4,Math.min(GW*T-tot-4,x0));
+  else x0=shop.x*T+4; // left-aligned with the stall, so both enter the frame together
+  ctx.fillStyle='rgba(16,26,30,.82)';rr(x0-4,y-4,tot+8,T*1.25,8);ctx.fill();
+  items.forEach((it,i)=>{
+    const X=x0+i*w,cxx=X+w/2;
+    ctx.globalAlpha=it.sold?0.35:1;
+    if(it.type==='mystery'){emoji('🎁',cxx,y+16,20);text('?',cxx+12,y+6,11,'#e2c9ff',800)}
+    else if(it.type==='equip'){drawItem(makeEquip(it.id,it.pro),cxx,y+16,30)}
+    else{emoji(ING[it.id].e,cxx,y+16,20);if(it.type==='seed')text('種',cxx+13,y+6,10,'#bff2c6',800)}
+    text(it.type==='mystery'?'×?':'×'+it.qty,cxx,y+34,10,'#cfe',700);
+    text(it.price+'G',cxx,y+48,11,S.money>=it.price?'#ffe08a':'#ff9c9c',800);
+    if(it.sold)text('売切',cxx,y+20,12,'#fff',800);
+    ctx.globalAlpha=1;
+  });
+  // player cursors
+  for(const p of S.players){
+    let on=false;
+    const c=tile(p.tx,p.ty);
+    if(!c)continue;
+    if(shop&&c.t==='window'&&shopAtWindow(p.tx)===shop)on=true;
+    if(!shop&&c.t==='market')on=true;
+    if(!on)continue;
+    const k=wrap(p.cur,n),X=x0+k*w;
+    ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=3;rr(X+2,y-1,w-4,T*1.15,6);ctx.stroke();
+    if(p.actT>0)bar(X+4,y+T*1.18-8,w-8,p.actT/BUY,PCOL[p.i]);
+  }
+}
+function drawTown(){
+  const t=S.town;
+  ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,7*T);
+  ctx.fillStyle=t.ground;ctx.fillRect(0,6.6*T,GW*T,5.4*T);
+  ctx.fillStyle=t.deco;ctx.fillRect(0,11*T,GW*T,T);
+  // market
+  const mx=3*T,my=10*T;
+  ctx.fillStyle='#8f5a3a';rr(mx+2,my+2,T-4,T-4,6);ctx.fill();
+  for(let k=0;k<4;k++){ctx.fillStyle=k%2?'#fff':'#d4561c';ctx.fillRect(mx+2+k*(T-4)/4,my+2,(T-4)/4,9)}
+  emoji('🏪',mx+T/2,my+T*0.58,22);
+  text('市場（種もある）',mx+T*1.6,my+T*0.5,11,'#2a2018',800,'left');
+  drawGroundItems();
+  drawOffer(S.market,4*T,8.05*T,null);
+  // gather spots
+  [[16,8],[16,10]].forEach(([gx,gy],gi)=>{
+    const id=t.gather[gi]; if(!id)return;
+    const X=gx*T,Y=gy*T;
+    ctx.fillStyle=id==='fish'||id==='shrimp'?'#3d8ab3':'#5c7a3a';rr(X+2,Y+2,T-4,T-4,10);ctx.fill();
+    emoji(ING[id].e,X+T/2,Y+T*0.45,22);
+    text('残り'+S.gatherLeft[gi],X+T/2,Y+T*0.84,10,'#fff',800);
+    text('採集',X-4,Y+T/2,11,'#2a2018',800,'right');
+    for(const p of S.players)if(p.tx===gx&&p.ty===gy&&p.actT>0)bar(X+3,Y-9,T-6,p.actT/(GATHER/S.up.gatherSpd),PCOL[p.i]);
+  });
+  // customers
+  S.cust.forEach((c,k)=>{
+    // order bubble: just the dish
+    const R=RECIPES[c.order],X=(8+k)*T+T/2,top=7.3*T,bh=38;
+    ctx.fillStyle='#fff';rr(X-21,top,42,bh,9);ctx.fill();
+    ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
+    emoji(R.e,X,top+bh/2,26);
+    const Y=top+bh+24;
+    ctx.fillStyle=`hsl(${c.hue} 45% 62%)`;ctx.beginPath();ctx.arc(X,Y,13,0,7);ctx.fill();
+    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(X-5,Y-3,2,0,7);ctx.arc(X+5,Y-3,2,0,7);ctx.fill();
+    const f=c.pat/c.max;bar(X-17,Y+15,34,f,f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d');
+  });
+  if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,10.95*T+T/2,13,'#1d2a20',800);
+}
+function drawLayoutGround(){
+  ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,7*T);
+  ctx.fillStyle='#a7b77f';ctx.fillRect(0,6.6*T,GW*T,5.4*T);
+  ctx.fillStyle='#7f9460';ctx.fillRect(0,11*T,GW*T,T);
+  drawGroundItems();
+  text(S.timer>0?'器具・台・菜園は床に、じょうろとカゴは台の上に。いらない物は外に置いておける':'時間切れ。置き終わったら準備完了',GW*T/2,11.5*T,13,'#1d2a20',800);
+}
+function drawGroundItems(){
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){
+    const c=S.map[y][x];
+    if(c.t==='ground'&&c.item){
+      ctx.fillStyle='rgba(0,0,0,.15)';ctx.beginPath();ctx.ellipse(x*T+T/2,y*T+T-6,T*0.4,6,0,0,7);ctx.fill();
+      drawItem(c.item,x*T+T/2,y*T+T/2,T*0.86);
+    }
+  }
+}
+function drawPlayers(){
+  for(const p of S.players){
+    const X=p.x*T,Y=p.y*T;
+    // facing target highlight
+    const c=tile(p.tx,p.ty);
+    const furnSpot=c&&(c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&inTruck(p.tx,p.ty);
+    if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
+    ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(X,Y+13,14,5,0,0,7);ctx.fill();
+    ctx.fillStyle=PCOL[p.i];ctx.beginPath();ctx.arc(X,Y,16,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X+p.dx*7,Y+p.dy*7-2,5,0,7);ctx.fill();
+    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(X+p.dx*9,Y+p.dy*9-2,2.4,0,7);ctx.fill();
+    const me=NET.role!=='off'&&NET.mySlot===p.i;
+    text('P'+(p.i+1)+(me?' あなた':''),X,Y-24,10,me?'#ffe08a':'#fff',800);
+    if(p.hold)drawItem(p.hold,X+p.dx*16,Y+p.dy*16-6,T*0.62);
+    if(p.msgT>0){ctx.globalAlpha=Math.min(1,p.msgT*2);ctx.fillStyle='rgba(16,26,30,.9)';ctx.font=`700 12px ${FNT}`;const w=ctx.measureText(p.msg).width+14;rr(X-w/2,Y-52,w,20,6);ctx.fill();text(p.msg,X,Y-42,12,'#fff');ctx.globalAlpha=1}
+  }
+}
+// money / reputation / timer drawn on the canvas itself so it is visible on phones too
+function drawTopBar(){
+  const y=T*0.48;
+  ctx.fillStyle='rgba(16,26,30,.85)';rr(8,6,GW*T-16,T*0.8,10);ctx.fill();
+  emoji('🪙',30,y,20);text(S.money+'G',48,y,20,'#ffe08a',800,'left');
+  let hx=150;for(let k=0;k<5;k++)text('♥',hx+k*20,y,18,k<S.hearts?'#ff6d6d':'#3b5059',800);
+  text('チップ×'+tipRate().toFixed(2).replace(/0$/,''),252,y,12,'#ffcfcf',800,'left');
+  text('町 '+Math.min(S.stop+1,STOPS)+'/'+STOPS,345,y,15,'#f4eedf',800,'left');
+  let ph='';
+  if(S.phase==='layout')ph=S.timer>0?'レイアウト '+fmtT(S.timer):'時間切れ';
+  else if(S.phase==='drive')ph='走行中 '+fmtT(S.timer);
+  else if(S.phase==='stop')ph=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
+  else if(S.phase==='choose')ph='町を選ぶ';
+  const tw=S.phase==='drive'?S.next:S.town;
+  if(tw&&(S.phase==='drive'||S.phase==='stop'))text((S.phase==='drive'?'→ ':'')+tw.e+' '+tw.n+'　'+payLabel(tw.pay),412,y,14,'#f4eedf',800,'left');
+  text(ph,GW*T-22,y,18,S.phase==='stop'&&S.sub==='service'&&S.timer<20?'#ff9c9c':'#f4eedf',800,'right');
+}
+function drawMenus(){
+  for(const p of S.players){
+    if(!p.menu)continue;
+    const M=MENU[p.menu.kind],list=M.list(),cols=Math.max(1,Math.min(M.cols,list.length)),rows=Math.ceil(list.length/cols),cw=44;
+    if(!list.length)continue;
+    const w=cols*cw+16,h=rows*cw+40;
+    let x=p.x*T-w/2,y=p.y*T+24;
+    x=Math.max(4,Math.min(GW*T-w-4,x)); if(y+h>GH*T-4)y=p.y*T-24-h;
+    ctx.fillStyle='rgba(16,26,30,.94)';rr(x,y,w,h,10);ctx.fill();
+    ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.stroke();
+    text(M.title,x+10,y+14,12,'#fff',800,'left');
+    text('持つ：取る　切替：閉じる',x+w-10,y+14,10,'#9db3b4',700,'right');
+    list.forEach((id,k)=>{
+      const cx=x+8+(k%cols)*cw+cw/2,cy=y+30+Math.floor(k/cols)*cw+cw/2,n=M.count(id);
+      ctx.globalAlpha=n>0?1:0.3;
+      emoji(ING[id].e,cx,cy-4,22);
+      text(String(n),cx+13,cy+13,11,n>0?'#ffe08a':'#9db3b4',800);
+      ctx.globalAlpha=1;
+      if(k===p.menu.sel){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=3;rr(cx-cw/2+2,cy-cw/2+2,cw-4,cw-4,8);ctx.stroke();
+        text(ING[id].n,cx,cy-cw/2-1,10,'#fff',800)}
+    });
+  }
+}
+function draw(){
+  ctx.clearRect(0,0,GW*T,GH*T);
+  if(!S){drawRoadIdle();return}
+  if(S.view==='layout')drawLayoutGround();
+  else if(S.view==='town'&&S.town)drawTown();else drawRoad();
+  drawTruckShell();
+  for(let y=1;y<=6;y++)for(let x=1;x<=16;x++)drawTile(S.map[y][x],x,y);
+  if(S.phase==='layout'){
+    // equipment nobody can reach from the door gets a red frame
+    ctx.strokeStyle='#ff4d4d';ctx.lineWidth=3;
+    for(const [x,y] of unreachable()){rr(x*T+2,y*T+2,T-4,T-4,6);ctx.stroke()}
+  }
+  if(S.view==='road')drawShops();
+  drawPlayers();
+  drawMenus();
+  drawTopBar();
+  if(S.toast){
+    const a=Math.min(1,(S.toast.life-S.toast.t)*2);ctx.globalAlpha=a;
+    ctx.font=`800 18px ${FNT}`;const w=ctx.measureText(S.toast.text).width+40;
+    ctx.fillStyle='rgba(60,36,96,.95)';rr(GW*T/2-w/2,T*1.05,w,40,12);ctx.fill();
+    ctx.strokeStyle='#e2c9ff';ctx.lineWidth=2;ctx.stroke();
+    text(S.toast.text,GW*T/2,T*1.05+20,18,'#fff',800);ctx.globalAlpha=1;
+  }
+  for(const f of S.floats){ctx.globalAlpha=1-f.t/1.4;ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.textAlign='center';const fy=(f.y-f.t*0.8)*T;ctx.strokeText(f.text,f.x*T,fy);ctx.fillStyle=f.col;ctx.fillText(f.text,f.x*T,fy);ctx.globalAlpha=1}
+}
+let idleOff=0;
+function drawRoadIdle(){
+  ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,GH*T);
+  ctx.fillStyle='#3a4248';ctx.fillRect(0,6.6*T,GW*T,0.6*T);
+  ctx.fillStyle='#4f7044';ctx.fillRect(0,7.2*T,GW*T,4.8*T);
+  ctx.fillStyle='#e8e2c8';const off=idleOff%2;for(let x=-2;x<GW+2;x+=2)ctx.fillRect((x-off)*T,6.85*T,T*0.9,4);
+  ctx.fillStyle='#e9a92c';rr(T,T,15*T,6*T-10,12);ctx.fill();
+  drawTruckShell();
+  text('キッチンカー・ラン',8.5*T,4*T,40,'#2a1d05',400);
+}
+
+// ---------- DOM HUD ----------
+const readyBtn=document.getElementById('readyBtn');
+readyBtn.addEventListener('click',()=>doOv('ready'));
+const hudEl=document.getElementById('hud'),infoEl=document.getElementById('info'),stockEl=document.getElementById('stock');
+let hudT=0;
+function renderHud(){
+  if(!S){hudEl.innerHTML='';infoEl.innerHTML='人数を選んでスタート';stockEl.innerHTML='';readyBtn.hidden=true;return}
+  let phase='';
+  if(S.phase==='layout')phase=S.timer>0?`レイアウト ${fmtT(S.timer)}`:'時間切れ';
+  else if(S.phase==='drive')phase=`走行中 ${fmtT(S.timer)}`;
+  else if(S.phase==='stop')phase=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
+  else if(S.phase==='choose')phase='町を選ぶ';
+  else phase='—';
+  hudEl.innerHTML=`<span><span class="k">町</span>${Math.min(S.stop+1,STOPS)}/${STOPS}</span><span><span class="k">所持金</span>${S.money}G</span><span><span class="k">評判</span><span style="color:var(--bad)">${'♥'.repeat(Math.max(0,S.hearts))}</span><span style="color:var(--line)">${'♥'.repeat(Math.max(0,5-S.hearts))}</span></span><span>${phase}</span>${S.paused?'<span>一時停止中</span>':''}`;
+  const tw=S.phase==='drive'?S.next:S.town;
+  let info='';
+  if(tw&&(S.phase==='drive'||S.phase==='stop')){
+    const SHORT={chop:'切',cook:'焼',blend:'混'};
+    const stepTxt=i=>ING[i].e+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
+    info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>RECIPES[r].e+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
+    info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${ING[id].e}${n}</span>`}).join(' ');
+    if(S.phase==='stop'&&S.cust.length)info+='　<b>注文：</b>'+S.cust.map(c=>RECIPES[c.order].e).join(' ');
+    if(S.phase==='drive'){
+      const ahead=S.shops.filter(s=>s.x+2+WMARGIN>3.5);
+      info+=`　<span class="dim">｜この先のお店 あと${ahead.length}軒</span>`;
+    }
+  }
+  if(S.phase==='layout'){
+    const left=layoutLeft(), bad=unreachable().length, door=S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor';
+    info=`<b>キッチンのレイアウト</b>　調理器具・台（カウンター）・菜園はトラックの床に、じょうろとカゴは台の上に置きます。置いた物も持ち直せます。<br>`+
+      (door?`<span class="ng">ドアの前はあけておく</span>`:bad?`<span class="ng">手が届かない器具 ${bad}個（赤い枠）</span>`:`<span class="ok">「準備完了」で出発できます</span>`)+
+      (left?`　<span class="dim">外に置いたままの ${left}個は持って行かず、次の配置のときにまた外に出ます</span>`:'')+
+      `　<span class="dim">｜残り時間は次の町の営業時間にプラス（0になっても続けられます）</span>`;
+  }
+  readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
+  infoEl.innerHTML=info||'　';
+  const ch=Object.keys(ING).filter(k=>(S.stock[k]||0)>0).map(k=>`<span class="chip">${ING[k].e} ${ING[k].n} ${S.stock[k]}</span>`).join('');
+  const sd=Object.keys(ING).filter(k=>(S.seeds[k]||0)>0).map(k=>`<span class="chip seed">🌱${ING[k].n}の種 ${S.seeds[k]}</span>`).join('');
+  stockEl.innerHTML=`<span class="lbl">在庫</span>${ch||'<span class="chip">なし</span>'}${sd?'<span class="lbl" style="margin-left:8px">種</span>'+sd:''}`;
+}
+
+// ---------- online (artifact room): the host runs the game; guests send their controls and draw the host's state ----------
+const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:{},inputs:[],lastPk:[],lastSw:[],lastOc:{},
+  mySlot:0,seq:0,ovId:0,ovHtml:'',ovSentAt:0,snapT:0,mirror:false,hostPeer:null,wantOv:0,ovParts:{},shownOv:-1,
+  pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
+const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
+const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve'];
+const OFFER_K=['pack','seed','mystery','equip'];
+const r2=v=>Math.round(v*100)/100;
+(async function initNet(){
+  // the file version (sent to friends) connects through PeerJS instead of claude.ai
+  if(window.KCR_PEER){if(window.Peer){NET.lobby=peerLobby();NET.peer=true}refreshNetTitle();return}
+  for(let k=0;k<40&&!(window.claude&&window.claude.use);k++)await new Promise(r=>setTimeout(r,100));
+  if(!(window.claude&&window.claude.use))return;
+  try{
+    const lobby=await window.claude.use('room'); if(!lobby)return;
+    NET.lobby=lobby;
+    lobby.onPeers(ch=>{NET.lobbyPeers=ch.peers;refreshNetTitle()},()=>{});
+    refreshNetTitle();
+  }catch(e){}
+})();
+function netTitleHtml(){
+  const err=NET.err?`<p class="ng">${NET.err}</p>`:'';
+  if(window.KCR_PEER&&!NET.lobby)return `<p class="ng">通信の部品を読み込めませんでした。インターネットにつながっているか確認して、開き直してください。</p>`;
+  if(NET.peer)return `<div class="row netrow"><span class="lab">オンライン</span><button class="ovbtn" data-act="host">部屋を作る</button>
+    <input id="joinCode" class="codein" maxlength="4" placeholder="コード" autocomplete="off" spellcheck="false" aria-label="部屋コード"><button class="ovbtn" data-act="pjoin">参加</button></div>${err}
+    <p class="mut">ホストが「部屋を作る」と4文字のコードが出ます。フレンドは同じファイルを開き、そのコードを入れて「参加」を押します。</p>`;
+  if(!NET.lobby)return `<p class="mut">オンライン（試験版）は、claude.ai でこのページを開いたときに使えます。</p>`;
+  const rooms=NET.lobbyPeers.filter(p=>!p.sameTab&&p.presence&&p.presence.host&&p.presence.host.open);
+  const btns=rooms.map(p=>{const h=p.presence.host,code=String(h.code||'').replace(/[^A-Z0-9]/g,'').slice(0,6);
+    return code?`<button class="ovbtn" data-act="join" data-v="${code}">部屋 ${code} に参加（今${Math.max(1,Math.min(4,+h.n||1))}人）</button>`:''}).join('');
+  return `<div class="row netrow"><span class="lab">オンライン（試験版）</span><button class="ovbtn" data-act="host">部屋を作る</button>${btns}</div>
+    ${btns?'':'<p class="mut">だれかが部屋を作ると、ここに「参加」ボタンが出ます。</p>'}`;
+}
+function refreshNetTitle(){const el=document.getElementById('netTitle');if(el&&!S&&NET.role==='off'){el.innerHTML=netTitleHtml();markSel()}}
+function netAction(a,v){
+  if(a==='host'){startHosting();return true}
+  if(a==='join'){joinRoom(String(v||''));return true}
+  if(a==='pjoin'){const el=document.getElementById('joinCode');joinRoom(String(el?el.value:'').toUpperCase());return true}
+  if(a==='hstart'){hostStart(v);return true}
+  if(a==='hcancel'){showTitle();return true}
+  return false;
+}
+function leaveOnline(){
+  const r=NET.room;NET.room=null;
+  if(r)r.leave().catch(()=>{});
+  if(NET.lobby&&NET.role==='host')NET.lobby.presence({host:null}).catch(()=>{});
+  Object.assign(NET,{role:'off',mirror:false,localOv:null,slots:{},mySlot:0,inputs:[],hostPeer:null});
+}
+// ----- host -----
+async function startHosting(){
+  if(!NET.lobby)return;
+  const code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rnd(32)]).join('');
+  Object.assign(NET,{role:'host',code,order:[],slots:{},inputs:[],lastPk:[],lastSw:[],lastOc:{},mySlot:0,ovId:0,ovHtml:'',err:''});
+  if(NET.peer)paintOv(`<div class="box"><h2>部屋を作っています…</h2></div>`);
+  try{
+    NET.room=await NET.lobby.join('kcr-'+code,'host');
+    if(NET.role!=='host'){NET.room.leave().catch(()=>{});NET.room=null;return}
+    NET.room.onPeers(ch=>{
+      for(const p of ch.joined)if(!p.sameTab&&p.kind==='viewer'&&!NET.order.includes(p.peer))NET.order.push(p.peer);
+      if(!S)showHostLobby()},()=>{});
+    showHostLobby();
+  }catch(e){leaveOnline();NET.err='部屋を作れませんでした。もう一度試してください。';showTitle()}
+}
+function hostGuests(){
+  if(!NET.room)return [];
+  const ps=NET.room.peers().filter(p=>!p.sameTab&&p.kind==='viewer'&&p.presence&&p.presence.g===1);
+  return ps.sort((a,b)=>NET.order.indexOf(a.peer)-NET.order.indexOf(b.peer));
+}
+function showHostLobby(){
+  if(NET.role!=='host'||S)return;
+  const g=hostGuests();
+  NET.lobby.presence({host:{code:NET.code,n:1+Math.min(3,g.length),open:true}}).catch(()=>{});
+  paintOv(`<div class="box"><h2>部屋 ${NET.code}</h2>
+    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,3).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大4人）</p>
+    <p class="mut">${NET.peer?`フレンドに部屋コード <b>${NET.code}</b> を伝えてください。フレンドは同じファイルを開き、コードを入れて「参加」を押します。`:`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
+    <div class="row"><button class="ovbtn" data-act="hstart" data-v="layout">キッチンを自分で並べて開始</button><button class="ovbtn" data-act="hstart" data-v="preset">初期配置済みで開始</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
+}
+function hostStart(mode){
+  const g=hostGuests().slice(0,3);
+  NET.slots={};
+  g.forEach((p,i)=>{const pr=p.presence,k=i+1;NET.slots[p.peer]=k;
+    NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0});
+  NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:false}}).catch(()=>{});
+  newRun(1+g.length,mode==='layout'?'layout':'preset');
+}
+function remoteInput(i){
+  const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false};
+  const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i];
+  NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];
+  const cl=v=>Math.max(-1,Math.min(1,+v||0));
+  return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw};
+}
+const GUEST_OK=new Set(['town','eqbuy','eqdone','upg','up','reroll','end','resume','next']);
+function guestAction(a,v){
+  if(a==='ready'){if(ov.hidden)finishLayout();return}
+  if(a==='pause'){pauseGame();return}
+  if(!GUEST_OK.has(a)||ov.hidden)return;
+  // only a button that is on the host's screen right now counts
+  const vs=v==null?'':String(v);
+  if(ovButtons().some(b=>b.dataset.act===a&&(b.dataset.v||'')===vs))ovAction(a,v==null?undefined:vs);
+}
+function hostFrame(dt){
+  if(!NET.room)return;
+  for(const p of NET.room.peers()){
+    const i=NET.slots[p.peer]; if(!i)continue;
+    const pr=p.presence||{};
+    if(Array.isArray(pr.in))NET.inputs[i]=pr.in;
+    if(Array.isArray(pr.oc)&&pr.oc[0]!==NET.lastOc[p.peer]){NET.lastOc[p.peer]=pr.oc[0];guestAction(String(pr.oc[1]),pr.oc[2])}
+  }
+  // presses made while a screen was up are dropped
+  if(!ov.hidden||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4]}});
+  if(!S)return;
+  NET.snapT-=dt; if(NET.snapT<=0){NET.snapT=1/15;sendSnap()}
+  if(!ov.hidden&&performance.now()-NET.ovSentAt>2500)emitOv();
+}
+function hostOvChanged(html){NET.ovId++;NET.ovHtml=html;if(html)emitOv()}
+function emitOv(){
+  if(!NET.room)return;NET.ovSentAt=performance.now();
+  const id=NET.ovId,h=NET.ovHtml,parts=[];for(let i=0;i<h.length;i+=700)parts.push(h.slice(i,i+700));
+  parts.forEach((s,k)=>NET.room.emit('ov',{id,k,n:parts.length,s}).catch(()=>{}));
+}
+const encPlant=pl=>pl?[ING_K.indexOf(pl.id),Math.round(pl.t*10),pl.watered?1:0]:0;
+function encItem(it){
+  if(!it)return 0;
+  switch(it.kind){
+    case 'ing':return [0,ING_K.indexOf(it.id),it.step,it.burnt?1:0];
+    case 'plate':return [1,it.bare?1:0,it.items.map(x=>[ING_K.indexOf(x.id),x.step,x.burnt?1:0])];
+    case 'can':return [2,it.water,it.bonus||0];
+    case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id))];
+    case 'seed':return [4,ING_K.indexOf(it.id)];
+    case 'station':return [5,TILE_K.indexOf(it.st),it.pro?1:0,it.n||0,encPlant(it.plant)];
+  }
+  return 0;
+}
+const encOffer=o=>[OFFER_K.indexOf(o.type),o.type==='equip'?EQ_K.indexOf(o.id):o.id?ING_K.indexOf(o.id):-1,o.qty||0,o.price,o.sold?1:0,o.pro?1:0];
+function sendSnap(){
+  const tiles=[];
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
+    const c=S.map[y][x],t=TILE_K.indexOf(c.t);
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro?1:0];
+    while(a.length>1&&!a[a.length-1])a.pop();
+    tiles.push(a.length===1?t:a);
+  }
+  const ground=[];
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&c.item)ground.push([x,y,encItem(c.item)])}
+  const mk=k=>k==='fridge'?1:k==='seedbox'?2:0;
+  const d={q:++NET.seq,ph:S.phase,v:S.view,sb:S.sub,tm:Math.round(S.timer*10),m:S.money,h:S.hearts,st:S.stop,np:S.np,
+    ro:Math.round(S.roadOff*100),bn:S.bonus||0,pa:S.paused?1:0,o:ov.hidden?0:NET.ovId,
+    tw:S.town?[S.town.id,Math.round(S.town.pay*100)]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100)]:0,
+    up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap].map(r2),
+    sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,
+    mp:tiles,gr:ground,
+    pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
+      p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur]),
+    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue]),
+    sh:S.shops.map(s=>[Math.round(s.x*100),SHOPTYPES.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
+    mk:S.phase==='stop'?S.market.map(encOffer):[],
+    fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
+    to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
+    sl:NET.slots};
+  let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
+  if(bytes>3800){d.fl=[];bytes=new TextEncoder().encode(JSON.stringify(d)).length}
+  NET.snapBytes=bytes;
+  NET.room.presence({s:d}).catch(()=>{});
+}
+// ----- guest -----
+async function joinRoom(code){
+  code=code.replace(/[^A-Z0-9]/g,'').slice(0,6);
+  if(!NET.lobby||!code)return;
+  Object.assign(NET,{role:'guest',code,pk:0,sw:0,ocSeq:0,seenSnap:-1,lastSnapAt:performance.now(),shownOv:-1,ovParts:{},hostPeer:null,wantOv:0,lastIn:''});
+  S=null;NET.err='';guestLocalOv(NET.peer?'conn':'wait');
+  try{
+    const room=await NET.lobby.join('kcr-'+code,'guest');
+    if(NET.role!=='guest'){room.leave().catch(()=>{});return}
+    NET.room=room;
+    room.on('ov',onOvMsg,()=>{});
+    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null]}).catch(()=>{});
+    if(NET.localOv==='conn')guestLocalOv('wait');
+  }catch(e){if(NET.role!=='guest')return;leaveOnline();NET.err='部屋 '+code+' が見つかりませんでした。コードを確かめてください。';showTitle()}
+}
+function guestLocalOv(kind){
+  NET.localOv=kind;NET.mirror=false;NET.shownOv=-1;
+  const body=kind==='conn'?`<p>部屋に接続しています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
+    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
+    :kind==='late'?`<p>このゲームはもう始まっています。次のゲームから参加してください。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`
+    :`<p>ホストが部屋を閉じたか、通信が途切れました。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`;
+  paintOv(`<div class="box"><h2>${kind==='lost'?'接続が切れました':'部屋 '+NET.code}</h2>${body}</div>`);
+}
+function guestSend(a,v){
+  if(!NET.room)return;
+  NET.ocSeq++;NET.room.presence({oc:[NET.ocSeq,a,v==null?null:String(v)]}).catch(()=>{});
+}
+function guestFrame(dt){
+  if(!NET.room){if(!ov.hidden)overlayInput();return}
+  const inp=deviceInput();
+  if(ov.hidden&&S){
+    if(inp.pick)NET.pk++; if(inp.sw)NET.sw++;
+    if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))guestSend('pause');
+    if(S.phase==='layout'&&(pressed.has('KeyR')||(pads[0]&&pads[0].edge('back'))))guestSend('ready');
+  } else if(!ov.hidden)overlayInput();
+  const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw]:[0,0,0,NET.pk,NET.sw];
+  const key=ins.join(',');
+  if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
+  // the host's state
+  const peers=NET.room.peers(),me=peers.find(p=>p.sameTab);
+  const host=peers.find(p=>!p.sameTab&&p.presence&&p.presence.s&&typeof p.presence.s==='object');
+  if(host){
+    NET.hostPeer=host.peer;const d=host.presence.s;
+    if(d.q!==NET.seenSnap){
+      NET.seenSnap=d.q;NET.lastSnapAt=performance.now();
+      const slot=me&&d.sl&&typeof d.sl==='object'?d.sl[me.peer]:undefined;
+      if(slot==null){if(NET.localOv!=='late')guestLocalOv('late');return}
+      NET.mySlot=+slot||0;
+      try{applySnap(d)}catch(e){}
+      NET.localOv=null;syncGuestOv(+d.o||0);
+    }
+  }
+  if(S&&NET.localOv!=='lost'&&performance.now()-NET.lastSnapAt>4000)guestLocalOv('lost');
+  if(S){
+    S.t+=dt;
+    for(const p of S.players){const k=Math.min(1,dt*18);p.x+=(p.nx-p.x)*k;p.y+=(p.ny-p.y)*k}
+    for(const f of S.floats)f.t+=dt;
+    if(S.toast)S.toast.t+=dt;
+  }
+}
+function syncGuestOv(o){
+  if(NET.localOv)return;
+  NET.wantOv=o;
+  if(!o){if(!ov.hidden){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen')}NET.mirror=false;NET.shownOv=0;return}
+  if(o===NET.shownOv)return;
+  const P=NET.ovParts[o];
+  if(P&&P.got===P.n){paintOv(sanitizeOv(P.parts.join('')));NET.mirror=true;NET.shownOv=o}
+}
+function onOvMsg(m){
+  if(NET.role!=='guest'||(NET.hostPeer&&m.peer!==NET.hostPeer))return;
+  const d=m.data||{},id=+d.id,k=+d.k,n=+d.n;
+  if(!(n>0&&n<40&&k>=0&&k<n)||typeof d.s!=='string')return;
+  let P=NET.ovParts[id]; if(!P||P.n!==n)P=NET.ovParts[id]={n,got:0,parts:[]};
+  if(P.parts[k]==null){P.parts[k]=d.s;P.got++}
+  for(const key in NET.ovParts)if(+key<id-5)delete NET.ovParts[key];
+  if(NET.wantOv===id)syncGuestOv(id);
+}
+// what the host sends is someone else's data: rebuild it with a few plain tags and attributes only
+const OV_TAGS=new Set(['DIV','H2','P','B','SPAN','BUTTON','BR','KBD','TABLE','TBODY','TR','TD','TH']);
+function sanitizeOv(html){
+  const doc=new DOMParser().parseFromString('<body>'+html+'</body>','text/html');
+  const out=document.createElement('div');
+  const walk=(src,dst)=>{for(const n of src.childNodes){
+    if(n.nodeType===3){dst.appendChild(document.createTextNode(n.textContent));continue}
+    if(n.nodeType!==1||n.tagName==='SCRIPT'||n.tagName==='STYLE')continue;
+    if(!OV_TAGS.has(n.tagName)){walk(n,dst);continue}
+    const e=document.createElement(n.tagName);
+    for(const a of ['class','data-act','data-v'])if(n.hasAttribute(a))e.setAttribute(a,n.getAttribute(a).slice(0,80));
+    if(e.tagName==='BUTTON')e.type='button';
+    walk(n,e);dst.appendChild(e)}};
+  walk(doc.body,out);
+  return out.innerHTML;
+}
+function applySnap(d){
+  if(!S||!S.guest)S={guest:true,map:buildMap(),players:[],cust:[],shops:[],market:[],floats:[],stock:{},seeds:{},up:{},t:0,toast:null,gatherLeft:[0,0],stations:[]};
+  const n=v=>+v||0;
+  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
+  S.roadOff=n(d.ro)/100;S.bonus=n(d.bn);S.paused=!!d.pa;
+  const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100}):null;
+  S.town=town(d.tw);S.next=town(d.nx);
+  const u=Array.isArray(d.up)?d.up:[];
+  S.up={cook:n(u[0])||1,chop:n(u[1])||1,blend:n(u[2])||1,burn:n(u[3]),gatherSpd:n(u[4])||1,canCap:n(u[5])||3,basketCap:n(u[6])||4};
+  ING_K.forEach((k,i)=>{S.stock[k]=n((d.sk||[])[i]);S.seeds[k]=n((d.sd||[])[i])});
+  S.gatherLeft=Array.isArray(d.gl)?d.gl.map(n):[0,0];
+  let k=0;
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
+    const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:!!e[5]};
+  }
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='ground')S.map[y][x].item=null;
+  for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
+  S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,4).map((a,i)=>{
+    const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
+    Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
+      menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10])});
+    if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
+    p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2])}));
+  S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:SHOPTYPES[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
+  S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
+  S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));
+  S.toast=Array.isArray(d.to)?{text:String(d.to[0]||''),t:n(d.to[1])/10,life:n(d.to[2])/10}:null;
+}
+const decPlant=a=>Array.isArray(a)&&ING_K[a[0]]?{id:ING_K[a[0]],t:(+a[1]||0)/10,watered:!!a[2]}:null;
+function decItem(a){
+  if(!Array.isArray(a))return null;
+  const ing=(i,s,b)=>({kind:'ing',id:ING_K[i]||'bread',step:+s||0,burnt:!!b});
+  switch(a[0]){
+    case 0:return ing(a[1],a[2],a[3]);
+    case 1:return {kind:'plate',bare:!!a[1],items:(Array.isArray(a[2])?a[2]:[]).slice(0,3).map(x=>ing(x[0],x[1],x[2]))};
+    case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0};
+    case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean)};
+    case 4:return {kind:'seed',id:ING_K[a[1]]||'lettuce'};
+    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:!!a[2],plant:decPlant(a[4])};if(a[3])o.n=+a[3];return o}
+  }
+  return null;
+}
+function decOffer(a){
+  const type=OFFER_K[a[0]]||'pack',id=type==='equip'?EQ_K[a[1]]:ING_K[a[1]];
+  if(type!=='mystery'&&!id)return {type:'mystery',price:+a[3]||0,sold:true};
+  return {type,id,qty:+a[2]||0,price:+a[3]||0,sold:!!a[4],pro:!!a[5]};
+}
+
+// ----- PeerJS transport (file version): same small API as the claude.ai room, host in the middle -----
+const PEER_PREFIX='kitchencarrun-v1-';
+function peerLobby(){return {presence:async()=>{},onPeers:()=>()=>{},join:(name,role)=>role==='host'?peerHost(name):peerGuest(name)}}
+function peerApi(st,build,send,leave){
+  return {
+    presence:async patch=>{const n=Object.assign({},st.mine);for(const k in patch){if(patch[k]===null)delete n[k];else n[k]=patch[k]}st.mine=n;build();send({t:'pres',p:n})},
+    on:(topic,f)=>{(st.L[topic]=st.L[topic]||[]).push(f);return()=>{}},
+    peers:()=>st.snap,
+    onPeers:f=>{st.PL.push(f);setTimeout(()=>{const p=build();f({peers:p,joined:p,left:[],updated:[]})},0);return()=>{}},
+    leave:async()=>leave(),
+  };
+}
+const peerEntry=(peer,me,presence)=>({peer,by:null,isMe:me,sameTab:me,kind:'viewer',guest:false,presence:presence||{},updatedAt:Date.now()});
+function peerHost(name){
+  return new Promise((res,rej)=>{
+    const pr=new Peer(PEER_PREFIX+name),conns=new Map(),st={L:{},PL:[],mine:{},snap:Object.freeze([])};
+    let opened=false;
+    const build=()=>{st.snap=Object.freeze([peerEntry(pr.id,true,st.mine),...[...conns].map(([id,v])=>peerEntry(id,false,v.presence))]);return st.snap};
+    const fire=(j,l)=>{const peers=build();st.PL.forEach(f=>f({peers,joined:j,left:l,updated:[]}))};
+    const send=m=>{for(const v of conns.values())if(v.conn.open)try{v.conn.send(m)}catch(e){}};
+    const api=peerApi(st,build,send,()=>{try{pr.destroy()}catch(e){}});
+    api.emit=async(topic,data)=>send({t:'emit',topic,data});
+    pr.on('open',()=>{opened=true;res(api)});
+    pr.on('error',e=>{if(!opened){try{pr.destroy()}catch(_){}rej(e)}});
+    pr.on('connection',conn=>{
+      conn.on('open',()=>{conns.set(conn.peer,{conn,presence:{}});try{conn.send({t:'pres',p:st.mine})}catch(e){}
+        const peers=build();fire(peers.filter(p=>p.peer===conn.peer),[])});
+      conn.on('data',m=>{const v=conns.get(conn.peer);if(!v||!m||m.t!=='pres'||!m.p||typeof m.p!=='object')return;
+        const had=v.presence.g;v.presence=Object.freeze(m.p);if(had!==v.presence.g)fire([],[]);else build()});
+      conn.on('close',()=>{if(conns.delete(conn.peer))fire([],[{peer:conn.peer}])});
+    });
+  });
+}
+function peerGuest(name){
+  return new Promise((res,rej)=>{
+    const pr=new Peer(),st={L:{},PL:[],mine:{},snap:Object.freeze([]),host:null};
+    let conn=null,done=false;
+    const fail=e=>{if(done)return;done=true;try{pr.destroy()}catch(_){}rej(e||new Error('fail'))};
+    const timer=setTimeout(()=>fail(new Error('timeout')),15000);
+    const build=()=>{const a=[peerEntry(pr.id,true,st.mine)];if(st.host&&conn)a.push(peerEntry(conn.peer,false,st.host));st.snap=Object.freeze(a);return st.snap};
+    const send=m=>{if(conn&&conn.open)try{conn.send(m)}catch(e){}};
+    const api=peerApi(st,build,send,()=>{try{pr.destroy()}catch(e){}});
+    api.emit=async()=>{};
+    pr.on('error',e=>fail(e));
+    pr.on('open',()=>{
+      conn=pr.connect(PEER_PREFIX+name,{reliable:true});
+      conn.on('open',()=>{if(done)return;done=true;clearTimeout(timer);send({t:'pres',p:st.mine});res(api)});
+      conn.on('data',m=>{if(!m)return;
+        if(m.t==='pres'&&m.p&&typeof m.p==='object'){st.host=m.p;build()}
+        else if(m.t==='emit'&&typeof m.topic==='string')(st.L[m.topic]||[]).forEach(f=>f(Object.assign(peerEntry(conn.peer,false),{topic:m.topic,data:m.data})))});
+      conn.on('close',()=>{st.host=null;build()});
+    });
+  });
+}
+
+// ---------- loop ----------
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  pollPads();
+  if(NET.role==='guest'){guestFrame(dt)}
+  else if(!ov.hidden){overlayInput()}
+  else if(S&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout')){
+    // layout: R (or the gamepad Back/Select button) finishes; finishing opens the town choice
+    if(S.phase==='layout'&&(pressed.has('KeyR')||(pads[0]&&pads[0].edge('back'))))finishLayout();
+    if(!ov.hidden){}
+    else if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))pauseGame();
+    else update(dt);
+  }
+  if(NET.role==='host')hostFrame(dt);
+  if(!S)idleOff+=dt*1.2;
+  draw();
+  hudT-=dt;if(hudT<=0){renderHud();hudT=0.1}
+  pressed.clear();touch.pick=false;touch.sw=false;touch.pause=false;
+  requestAnimationFrame(frame);
+}
+showTitle();
+requestAnimationFrame(frame);
+</script>
+
+</body></html>

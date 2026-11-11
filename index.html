@@ -60,7 +60,8 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:18/12}
 .town .needs{font-size:13px;display:flex;flex-direction:column;gap:2px;font-weight:400}
 .town .ok{color:var(--good)} .town .ng{color:var(--bad)} .town .sub{color:var(--muted)}
 .town .pay{color:var(--truck)}
-.ovbtn.dim{opacity:.45} .ovbtn.rare{border-color:#ffd84a}
+.ovbtn.dim{opacity:.45}
+.rarebadge{display:inline-block;align-self:flex-start;background:linear-gradient(90deg,#ff4fa3,#9b5cff);color:#fff;font-weight:800;font-size:15px;letter-spacing:.12em;padding:3px 12px;border-radius:999px;box-shadow:0 0 0 2px #fff3,0 0 14px #ff4fa388}
 .box .mut{color:var(--muted)} .box .good{color:var(--good)}
 .netrow{align-items:center} .netrow .lab{min-width:9em}
 .codein{font:inherit;font-weight:800;font-size:18px;letter-spacing:.2em;text-transform:uppercase;width:7em;padding:8px 10px;border-radius:10px;border:2px solid var(--line);background:#132026;color:var(--ink)}
@@ -141,7 +142,7 @@ const T=48, GW=18, GH=12;
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=3;
 const WATER_DUR=45, FILL=1.0;
 const DRIVE=65, PREP=15, SERVICE=120, SPEED=0.45, STOPS=4, WMARGIN=0.6;
-const PCOL=['#ff7a59','#4fb3ff','#6fd18a','#f0cf4a'];
+const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
 const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FNT='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif';
 
@@ -202,18 +203,22 @@ const EQUIP={
   trash:{n:'ゴミ箱',e:'🗑️',price:10},
   can:{n:'じょうろ',e:'💧',price:12,tool:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
   basket:{n:'カゴ',e:'🧺',price:12,tool:true,pro:{n:'大きなカゴ',d:'入る数 +2'}},
+  planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
 };
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,sink:0.4};
 const DAY_LAYOUT_TIME=30;
 function equipOffer(id,priceMul,proChance){
-  const pro=!!EQUIP[id].pro&&Math.random()<proChance;
+  const L=proList(id),pro=L.length&&Math.random()<proChance?1+rnd(L.length):0;
   return {type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*priceMul*(pro?1.8:1))};
 }
-const equipName=(id,pro)=>pro?'★'+EQUIP[id].pro.n:EQUIP[id].n;
+// a rare version is stored as a number: 1 = first variant, 2 = second (the planter has two)
+const proList=id=>EQUIP[id]?(EQUIP[id].pros||(EQUIP[id].pro?[EQUIP[id].pro]:[])):[];
+const proInfo=(id,pro)=>proList(id)[(pro||1)-1]||{n:'',d:''};
+const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n;
 function makeEquip(id,pro){
   if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
   if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
-  return {kind:'station',st:id,pro:!!pro};
+  return {kind:'station',st:id,pro:pro||0};
 }
 const canCap=it=>S.up.canCap+(it.bonus||0);
 const basketCap=it=>S.up.basketCap+(it.bonus||0);
@@ -293,8 +298,8 @@ const storable=it=>!!it&&['station','can','basket'].includes(it.kind);
 // put objects on free spots outside; same-kind counters/planters join one pile
 function putOutside(objs){
   for(const o of objs){
-    if(o.kind==='station'&&PILE.includes(o.st)&&!o.plant){
-      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant);
+    if(o.kind==='station'&&PILE.includes(o.st)&&!o.plant&&!o.pro){
+      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant&&!it.pro);
       if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
     }
     const s=GROUND_SPOTS.find(([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item);
@@ -310,7 +315,7 @@ function setupLayout(){
   const objs=[{kind:'station',st:'counter',n:COUNTERS_GIVEN},{kind:'station',st:'planter',n:PLANTERS_GIVEN}];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x];
-    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:!!c.pro});
+    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0});
     if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))objs.push(c.item);
     if(!FIXED.has(c.t))S.map[y][x]=blankTile(y);
   }
@@ -339,10 +344,11 @@ function showEquipShop(){
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
   if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP),3).map(id=>equipOffer(id,1,0.15));
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
-    const desc=o.pro?E.pro.d:(E.tool?'道具（台の上に置く）':'器具（床に置く）');
-    return `<button class="ovbtn town${done&&S.eqBought!==i?' dim':''}${o.pro?' rare':''}" data-act="eqbuy" data-v="${i}">
+    const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':'器具（床に置く）');
+    return `<button class="ovbtn town${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
+      ${o.pro?'<span class="rarebadge">★ レア</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span>
-      <span class="needs"><span class="${o.pro?'pay':'sub'}">${o.pro?'レア　':''}${desc}</span></span></button>`}).join('');
+      <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box"><h2>器具屋</h2>
     <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>です。買った物は、このあとの配置の時間にトラックに置きます。所持金 <b>${S.money}G</b></p>
     <div class="cards">${cards}</div>
@@ -384,13 +390,20 @@ function furnPick(p,c,tx,ty){
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
-    if(S.players.some(q=>Math.abs(q.x-(tx+.5))<0.8&&Math.abs(q.y-(ty+.5))<0.8)){say(p,'人がいて置けない');return true}
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:!!h.pro};p.hold=null;rebuildStations();return true;
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0};p.hold=null;rebuildStations();return true;
+  }
+  // holding equipment and pressing equipment that is already placed: put it there and take the old one back
+  // (in layout anything; otherwise cooking equipment for cooking equipment). Tools on counters are never swapped.
+  if(holdsFurn(p)&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
+    if(c.item){say(p,'上の物をどけてから');return true}
+    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null};
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0};
+    p.hold=old;rebuildStations();return true;
   }
   // layout: pick up furniture from the truck (a counter only when nothing is on it; a planter takes its crop along)
   if(lay&&!h&&FURN.includes(c.t)&&inTruck(tx,ty)){
     if(c.item){if(c.t==='counter')return false;say(p,'上の物をどけてから');return true}
-    p.hold={kind:'station',st:c.t,pro:!!c.pro,plant:c.plant||null};
+    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null};
     S.map[ty][tx]=blankTile(ty);rebuildStations();return true;
   }
   // outside (layout, or the town stop): equipment and tools can be set down and picked up
@@ -401,7 +414,7 @@ function furnPick(p,c,tx,ty){
       else{p.hold=it;c.item=null;delete it.n}
       return true}
     if(h&&!it){if(!storable(h)){say(p,'外には置けない');return true}c.item=h;p.hold=null;return true}
-    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant){it.n=(it.n||1)+1;p.hold=null;return true}
+    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant&&!h.pro&&!it.pro){it.n=(it.n||1)+1;p.hold=null;return true}
   }
   if(holdsFurn(p)){say(p,'トラックの床に置く');return true}
   return false;
@@ -626,7 +639,7 @@ function waterPlant(p,c,tx,ty){
   if(can.water<=0){say(p,'じょうろが空。シンクで汲む');return}
   can.water--;c.plant.watered=true;float(tx+.5,ty,'💧','#9fd8ff');
 }
-function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus;S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6')}
+function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0);S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6')}
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
 function buy(list,p,shop,tx,ty){
   if(!list||!list.length)return;
@@ -951,7 +964,7 @@ function update(dt){
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*S.up.grow;
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*S.up.grow*(c.pro===2?1.5:1);
       continue}
     const it=c.item; if(!it||it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
@@ -1105,7 +1118,10 @@ function drawTile(c,x,y){
         if(f>=1){emoji(ING[c.plant.id].e,X+T/2,Y+T/2,24);const a=0.5+0.5*Math.sin(S.t*6);ctx.strokeStyle=`rgba(255,240,140,${a})`;ctx.lineWidth=3;rr(X+3,Y+3,T-6,T-6,6);ctx.stroke()}
         else{
           const wet=c.plant.watered;
-          emoji(f<0.5?'🌱':'🌿',X+T/2,Y+T/2-2,f<0.5?16:22);bar(X+7,Y+T-11,T-14,f,wet?'#7fd893':'#8a9497');
+          emoji(f<0.5?'🌱':'🌿',X+T/2+3,Y+T/2,f<0.5?16:22);bar(X+7,Y+T-11,T-14,f,wet?'#7fd893':'#8a9497');
+          // what is growing here: the crop in a small badge
+          ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(X+12,Y+12,9.5,0,7);ctx.fill();
+          emoji(ING[c.plant.id].e,X+12,Y+12.5,13);
           if(!wet&&Math.sin(S.t*6)>-0.3)emoji('💧',X+T-10,Y+11,14);
         }}
       else text('菜園',X+T/2,Y+T/2,10,'#d9c3a3');
@@ -1250,14 +1266,58 @@ function drawPlayers(){
     const c=tile(p.tx,p.ty);
     const furnSpot=c&&(c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&inTruck(p.tx,p.ty);
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
-    ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(X,Y+13,14,5,0,0,7);ctx.fill();
-    ctx.fillStyle=PCOL[p.i];ctx.beginPath();ctx.arc(X,Y,16,0,7);ctx.fill();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X+p.dx*7,Y+p.dy*7-2,5,0,7);ctx.fill();
-    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(X+p.dx*9,Y+p.dy*9-2,2.4,0,7);ctx.fill();
+    // held item goes behind the chef when facing away, in front otherwise
+    const holdAt=()=>{if(p.hold)drawItem(p.hold,X+p.dx*16,Y+p.dy*14-4,T*0.62)};
+    if(p.dy===-1)holdAt();
+    drawChef(p,X,Y);
+    if(p.dy!==-1)holdAt();
     const me=NET.role!=='off'&&NET.mySlot===p.i;
-    text('P'+(p.i+1)+(me?' あなた':''),X,Y-24,10,me?'#ffe08a':'#fff',800);
-    if(p.hold)drawItem(p.hold,X+p.dx*16,Y+p.dy*16-6,T*0.62);
-    if(p.msgT>0){ctx.globalAlpha=Math.min(1,p.msgT*2);ctx.fillStyle='rgba(16,26,30,.9)';ctx.font=`700 12px ${FNT}`;const w=ctx.measureText(p.msg).width+14;rr(X-w/2,Y-52,w,20,6);ctx.fill();text(p.msg,X,Y-42,12,'#fff');ctx.globalAlpha=1}
+    const lab='P'+(p.i+1)+(me?' あなた':'');
+    ctx.font=`800 10px ${FNT}`;const lw=ctx.measureText(lab).width+10;
+    ctx.fillStyle=PCOL[p.i];rr(X-lw/2,Y-45,lw,14,7);ctx.fill();
+    text(lab,X,Y-38,10,'#fff',800);
+    if(p.msgT>0){ctx.globalAlpha=Math.min(1,p.msgT*2);ctx.fillStyle='rgba(16,26,30,.9)';ctx.font=`700 12px ${FNT}`;const w=ctx.measureText(p.msg).width+14;rr(X-w/2,Y-70,w,20,6);ctx.fill();text(p.msg,X,Y-60,12,'#fff');ctx.globalAlpha=1}
+  }
+}
+function shade(hex,k){
+  const n=parseInt(hex.slice(1),16),f=v=>Math.max(0,Math.min(255,Math.round(v*(1+k))));
+  return `rgb(${f(n>>16)},${f((n>>8)&255)},${f(n&255)})`;
+}
+// a small round chef: body in the player's colour, white hat with a coloured band, face toward where they look
+function drawChef(p,X,Y){
+  const col=PCOL[p.i],dark=shade(col,-0.3),light=shade(col,0.25);
+  const mv=p.lx!=null&&Math.hypot(p.x-p.lx,p.y-p.ly)>0.002;p.lx=p.x;p.ly=p.y;
+  const ph=S.t*14+p.i;
+  const bob=mv?Math.abs(Math.sin(ph))*2.6:Math.sin(S.t*3+p.i)*0.7;
+  const by=Y-bob;
+  ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(X,Y+15,13,4.5,0,0,7);ctx.fill();
+  // feet
+  const st=mv?Math.sin(ph)*2.2:0;
+  ctx.fillStyle=dark;ctx.beginPath();ctx.ellipse(X-6,Y+13-st,5,3.4,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(X+6,Y+13+st,5,3.4,0,0,7);ctx.fill();
+  // body
+  ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(X,by+1,15.5,14.5,0,0,7);ctx.fill();
+  ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(X-5,by-5,6,4,-0.5,0,7);ctx.fill(); // shine
+  // apron when facing the viewer
+  if(p.dy!==-1){ctx.fillStyle='rgba(255,255,255,.9)';rr(X-7+p.dx*2,by+5,14,8,[2,2,5,5]);ctx.fill()}
+  // chef hat
+  const hy=by-13;
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.arc(X-6,hy-5,6,0,7);ctx.arc(X+6,hy-5,6,0,7);ctx.arc(X,hy-9,7.5,0,7);ctx.fill();
+  rr(X-9,hy-5,18,7,2);ctx.fill();
+  ctx.fillStyle=col;ctx.fillRect(X-9,hy+0.5,18,2.5);
+  // face
+  if(p.dy!==-1){
+    const fx=X+p.dx*4,fy=by-1+(p.dy>0?1:0);
+    const blink=((S.t+p.i*1.37)%3.6)<0.12;
+    for(const s of [-1,1]){
+      const ex=fx+s*5.5;
+      if(blink){ctx.strokeStyle='#2b2230';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(ex-2.4,fy-2);ctx.lineTo(ex+2.4,fy-2);ctx.stroke();continue}
+      ctx.fillStyle='#2b2230';ctx.beginPath();ctx.ellipse(ex,fy-2,2.6,3.3,0,0,7);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex+0.9,fy-3.3,1.05,0,7);ctx.fill();
+    }
+    ctx.fillStyle='rgba(255,110,140,.55)';
+    ctx.beginPath();ctx.ellipse(fx-9.5,fy+3,3.2,2.1,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(fx+9.5,fy+3,3.2,2.1,0,0,7);ctx.fill();
+    ctx.strokeStyle='#2b2230';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(fx,fy+2.2,2.4,0.15*Math.PI,0.85*Math.PI);ctx.stroke();
   }
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
@@ -1507,16 +1567,16 @@ function encItem(it){
     case 'can':return [2,it.water,it.bonus||0];
     case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id))];
     case 'seed':return [4,ING_K.indexOf(it.id)];
-    case 'station':return [5,TILE_K.indexOf(it.st),it.pro?1:0,it.n||0,encPlant(it.plant)];
+    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant)];
   }
   return 0;
 }
-const encOffer=o=>[OFFER_K.indexOf(o.type),o.type==='equip'?EQ_K.indexOf(o.id):o.id?ING_K.indexOf(o.id):-1,o.qty||0,o.price,o.sold?1:0,o.pro?1:0];
+const encOffer=o=>[OFFER_K.indexOf(o.type),o.type==='equip'?EQ_K.indexOf(o.id):o.id?ING_K.indexOf(o.id):-1,o.qty||0,o.price,o.sold?1:0,o.pro||0];
 function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro?1:0];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -1650,7 +1710,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:!!e[5]};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0};
   }
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='ground')S.map[y][x].item=null;
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
@@ -1676,14 +1736,14 @@ function decItem(a){
     case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0};
     case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean)};
     case 4:return {kind:'seed',id:ING_K[a[1]]||'lettuce'};
-    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:!!a[2],plant:decPlant(a[4])};if(a[3])o.n=+a[3];return o}
+    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4])};if(a[3])o.n=+a[3];return o}
   }
   return null;
 }
 function decOffer(a){
   const type=OFFER_K[a[0]]||'pack',id=type==='equip'?EQ_K[a[1]]:ING_K[a[1]];
   if(type!=='mystery'&&!id)return {type:'mystery',price:+a[3]||0,sold:true};
-  return {type,id,qty:+a[2]||0,price:+a[3]||0,sold:!!a[4],pro:!!a[5]};
+  return {type,id,qty:+a[2]||0,price:+a[3]||0,sold:!!a[4],pro:+a[5]||0};
 }
 
 // ----- PeerJS transport (file version): same small API as the claude.ai room, host in the middle -----

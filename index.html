@@ -207,9 +207,20 @@ const SHOPTYPES=[
   {n:'肉とチーズの店',e:'🍖',c:'#b9484a',w:2,gen:()=>pickN(['meat','cheese','milk'],2).map(pack)},
   {n:'魚屋',e:'🐠',c:'#3a7fae',w:1,gen:()=>['fish','shrimp'].map(pack)},
   {n:'種屋',e:'🌱',c:'#6f8f2f',w:3,gen:()=>pickN(['lettuce','tomato','potato','strawberry'],2+rnd(2)).map(seedItem)},
-  {n:'あやしい露店',e:'🎲',c:'#6d4f9e',w:1,gen:()=>[{type:'mystery',price:9},{type:'mystery',price:9}]},
-  {n:'道具屋',e:'🧰',c:'#5a6470',w:2,gen:()=>pickN(Object.keys(EQUIP),2).map(id=>equipOffer(id,0.7,0.1))},
 ];
+// not part of the 3–4 food shops: an occasional bonus stall, and the gas station that always comes last
+const MYSTERY_SHOP={n:'あやしい露店',e:'🎲',c:'#6d4f9e',w:0,gen:()=>[{type:'mystery',price:9},{type:'mystery',price:9}]};
+const GAS_SHOP={n:'ガソリンスタンド',e:'⛽',c:'#c0392b',w:0,gas:true,gen:()=>[{type:'fuel',qty:2,price:8},{type:'fuel',qty:5,price:18}]};
+const ALLSHOPS=[...SHOPTYPES,MYSTERY_SHOP,GAS_SHOP];
+// ---------- driving: distance, speed lever, fuel ----------
+// While a shop is in front of a window the truck always rolls at WIN_SPEED (buying time never changes);
+// between shops it runs at the lever's speed. Arriving earlier/later than at ふつう changes the service time.
+const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう','急ぐ'];
+const SHOP_GAP=11, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35;
+const FUEL_MAX=10, FUEL_RATE=[0,2/36,6/36]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
+const LEVER=[16,4], LEVER_FRONT=[15,4];
+const inWindowZone=s=>[3.5,13.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
+const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
 // A rare "pro" version (★) exists for some of them.
 const EQUIP={
@@ -277,6 +288,7 @@ function buildMap(){
   const top=['counter','fridge','seedbox','sink','board','board','counter','stove','stove','blender','counter','plates','trash','counter'];
   top.forEach((t,i)=>set(2+i,2,t));
   for(let y=3;y<=5;y++){set(2,y,'planter',{plant:null});set(15,y,'counter')}
+  set(15,4,'floor');set(16,4,'lever');
   for(let x=7;x<=9;x++)set(x,4,'counter');
   const bot=['counter','window','counter','counter','door','counter','serve','serve','counter','counter','counter','window','counter','counter'];
   bot.forEach((t,i)=>set(2+i,6,t));
@@ -290,7 +302,7 @@ function buildMap(){
 let S=null;
 const START_POS=[[4.5,3.5],[11.5,3.5],[4.5,5.5],[11.5,5.5]];
 function newRun(np,mode){
-  S={np,money:40,hearts:5,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
+  S={np,money:40,hearts:5,fuel:FUEL_MAX,speed:1,dist:0,route:1,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
     phase:'choose',view:'road',town:null,next:null,timer:0,sub:'',shops:[],cust:[],spawnT:0,
     earned:0,served:0,missed:0,totalEarned:0,totalServed:0,floats:[],map:buildMap(),players:[],
     roadOff:0,gatherLeft:[0,0],market:[],paused:false,t:0,
@@ -407,6 +419,7 @@ function unreachable(){
     if(c.t==='floor'||c.t==='gap'||c.t==='counter')continue;
     if(!touchesFloor(ok,x,y))bad.push([x,y]);
   }
+  if(S.map[LEVER[1]][LEVER[0]].t==='lever'&&!ok.has(LEVER_FRONT.join(',')))bad.push(LEVER);
   return bad;
 }
 const holdsFurn=p=>!!p.hold&&p.hold.kind==='station'&&FURN.includes(p.hold.st);
@@ -427,6 +440,7 @@ function furnPick(p,c,tx,ty){
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
+    if(tx===LEVER_FRONT[0]&&ty===LEVER_FRONT[1]){say(p,'レバーの前はあけておく');return true}
     S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
@@ -666,6 +680,8 @@ function doPick(p,c,tx,ty){
       return;
     case 'counter':case 'board':case 'stove':case 'blender':
       placeOrTake(p,c);return;
+    case 'lever':
+      S.speed=S.speed===2?1:2;say(p,'スピード：'+SPEED_N[S.speed]);return;
     case 'window':
       if(S.phase==='drive')say(p,shopAtWindow(tx)?'作業ボタン長押しで買う':'お店が来たら買える');
       return;
@@ -691,6 +707,9 @@ function buy(list,p,shop,tx,ty){
   if(it.sold){say(p,'売り切れ');return}
   if(S.money<it.price){say(p,'お金が足りない');return}
   if(it.type==='equip'&&p.hold){say(p,'手を空けて受け取る');return}
+  if(it.type==='fuel'){
+    if(S.fuel>=FUEL_MAX){say(p,'もう満タン');return}
+    S.money-=it.price;S.fuel=Math.min(FUEL_MAX,S.fuel+it.qty);float(tx+.5,ty,'⛽ +'+it.qty+(S.fuel>=FUEL_MAX?'（満タン）':''),'#ffd0c0');return}
   S.money-=it.price;
   if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
   if(it.type==='pack'){S.stock[it.id]=(S.stock[it.id]||0)+it.qty;float(tx+.5,ty,'+'+it.qty+' '+ING[it.id].e)}
@@ -785,9 +804,14 @@ function serve(p,tx,ty){
 
 // ---------- phases ----------
 function startDrive(){
-  S.phase='drive';S.view='road';S.timer=DRIVE+S.up.drive;
-  const n=3+rnd(2),sp=(n===3?6:4.5)+S.up.drive*SPEED/n;
-  S.shops=[];for(let k=0;k<n;k++){const ty=weighted(SHOPTYPES);S.shops.push({x:16+k*sp,type:ty,items:genShopItems(ty)})}
+  S.phase='drive';S.view='road';S.timer=0;
+  const n=3+rnd(2)+S.up.drive,list=[];
+  for(let k=0;k<n;k++)list.push(weighted(SHOPTYPES));
+  if(Math.random()<MYSTERY_CHANCE)list.splice(1+rnd(n),0,MYSTERY_SHOP);  // a bonus stall, never first
+  list.push(GAS_SHOP);
+  S.shops=list.map((ty,k)=>({x:17+k*SHOP_GAP,type:ty,items:genShopItems(ty)}));
+  S.dist=0;S.refT=0;S.actT=0;S.gasWarn=false;
+  S.route=S.shops[S.shops.length-1].x+3;   // arrive once the gas station has gone past the back window
   bringInside();hideOv();
 }
 function genShopItems(ty){
@@ -811,6 +835,10 @@ function genMarket(town){
   return out;
 }
 function arrive(){
+  // earlier / later than running at ふつう the whole way → more / less service time
+  const delta=Math.round((S.refT||0)-(S.actT||0));
+  if(delta){S.bonus=(S.bonus||0)+delta;
+    S.toast={text:delta>0?'予定より'+delta+'秒早く着いた！ 営業 +'+delta+'秒':'到着が'+(-delta)+'秒遅れた… 営業 −'+(-delta)+'秒',t:0,life:3.5}}
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
 }
@@ -874,7 +902,7 @@ const UPS=[
   {id:'shoes',e:'👟',n:'軽い靴',d:'移動速度 +15%',max:2,apply:u=>u.speed*=1.15},
   {id:'gather',e:'🎣',n:'採取の名人',d:'採取がかんたんに（連打が少なく、釣りの待ちが短く、当たりが広い）',max:2,apply:u=>{u.gatherSpd*=1.4}},
   {id:'basket',e:'🧺',n:'カゴの改造',d:'カゴ1つに入る数 +2',max:2,tgt:'basket'},
-  {id:'drive',e:'🛣️',n:'遠回りルート',d:'走行時間 +10秒（仕込みの時間が増える）',max:2,apply:u=>u.drive+=10},
+  {id:'drive',e:'🛣️',n:'遠回りルート',d:'走行中の材料の店 +1軒',max:2,apply:u=>u.drive+=1},
   {id:'heart',e:'❤️',n:'いい口コミ',d:'評判 ♥ を1つ回復',max:9,cond:()=>S.hearts<5,apply:()=>{S.hearts++}},
 ];
 // the new planter is handed over outside and placed in the next layout time
@@ -1136,19 +1164,26 @@ function update(dt){
   // phase
   if(S.phase==='layout'){S.timer=Math.max(0,S.timer-dt)}
   else if(S.phase==='drive'){
-    S.timer-=dt;S.roadOff+=SPEED*dt;
+    const zone=S.shops.some(inWindowZone);
+    const lev=S.fuel>0?S.speed:0;
+    const v=zone?WIN_SPEED:SPEEDS[lev],d=v*dt;
+    S.roadOff+=d;S.dist+=d;S.actT+=dt;
+    S.refT+=d/(zone?WIN_SPEED:SPEEDS[1]);          // how long ふつう would have taken for the same stretch
+    if(!zone&&S.fuel>0){S.fuel=Math.max(0,S.fuel-d*FUEL_RATE[S.speed]);
+      if(S.fuel<=0&&!S.gasWarn){S.gasWarn=true;S.toast={text:'⛽ ガス欠！ ゆっくりしか走れない',t:0,life:3}}}
     for(const s of S.shops){
-      s.x-=SPEED*dt;
+      s.x-=d;
       // once a shop has passed the back window it can't be bought from: fade it out quickly
       if(s.x+2+WMARGIN<3.5)s.fade=(s.fade||0)+dt;
     }
     S.shops=S.shops.filter(s=>!(s.fade>0.3));
-    if(S.timer<=0)arrive();
+    if(S.dist>=S.route)arrive();
   } else if(S.phase==='stop'){
     S.timer-=dt;
     if(S.sub==='prep'){if(S.timer<=0){
-      S.sub='service';S.timer=SERVICE+(S.bonus||0);S.spawnT=1.5;
-      if(S.bonus){S.toast={text:'レイアウトボーナス：営業時間 +'+S.bonus+'秒',t:0,life:3};S.bonus=0}}}
+      const b=S.bonus||0;
+      S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;
+      if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
     else{
       S.spawnT-=dt;
       if(S.spawnT<=0){if(S.cust.length<6)spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
@@ -1241,6 +1276,15 @@ function drawTile(c,x,y){
     if(S.phase==='stop'||S.phase==='layout'){ctx.fillStyle='#ece3cf';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#bfa77a';ctx.fillRect(X,Y+T-6,T,6)}
     else{ctx.fillStyle='#c8862a';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#f6d36a';ctx.beginPath();ctx.arc(X+T*0.78,Y+T*0.5,3,0,7);ctx.fill()}
     text('ドア',X+T/2,Y+T*0.5,11,(S.phase==='stop'||S.phase==='layout')?'#8a7550':'#fff3d6');return}
+  if(c.t==='lever'){
+    ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);
+    ctx.fillStyle='#2f3a40';rr(X+5,Y+6,T-10,T-12,6);ctx.fill();
+    const fast=S&&S.speed===2,a=fast?0.75:-0.15;
+    ctx.strokeStyle='#cfd6da';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(X+T/2,Y+T*0.62);ctx.lineTo(X+T/2+Math.sin(a)*14,Y+T*0.62-Math.cos(a)*14);ctx.stroke();ctx.lineCap='butt';
+    ctx.fillStyle=fast?'#ff5d5d':'#7fd893';ctx.beginPath();ctx.arc(X+T/2+Math.sin(a)*14,Y+T*0.62-Math.cos(a)*14,5,0,7);ctx.fill();
+    text(fast?'急ぐ':'ふつう',X+T/2,Y+T*0.84,9,fast?'#ffb0b0':'#c9f2d2',800);
+    text('レバー',X+T/2,Y+11,8,'#cfd6da',800);
+    return}
   const col=TCOL[c.t]; if(!col)return;
   ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);
   ctx.fillStyle=col;rr(X+2,Y+2,T-4,T-4,6);ctx.fill();
@@ -1359,6 +1403,7 @@ function drawOffer(items,cx,y,shop){
     const X=x0+i*w,cxx=X+w/2;
     ctx.globalAlpha=it.sold?0.35:1;
     if(it.type==='mystery'){emoji('🎁',cxx,y+16,20);text('?',cxx+12,y+6,11,'#e2c9ff',800)}
+    else if(it.type==='fuel'){emoji('⛽',cxx,y+16,20)}
     else if(it.type==='equip'){drawItem(makeEquip(it.id,it.pro),cxx,y+16,30)}
     else{emoji(ING[it.id].e,cxx,y+16,20);if(it.type==='seed')text('種',cxx+13,y+6,10,'#bff2c6',800)}
     text(it.type==='mystery'?'×?':'×'+it.qty,cxx,y+34,10,'#cfe',700);
@@ -1542,12 +1587,21 @@ function drawTopBar(){
   text('町 '+Math.min(S.stop+1,STOPS)+'/'+STOPS,345,y,15,'#f4eedf',800,'left');
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'レイアウト '+fmtT(S.timer):'時間切れ';
-  else if(S.phase==='drive')ph='走行中 '+fmtT(S.timer);
+  else if(S.phase==='drive')ph='🛣 '+kmTxt(Math.min(S.dist,S.route))+' / '+kmTxt(S.route)+' km';
   else if(S.phase==='stop')ph=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
   else if(S.phase==='choose')ph='町を選ぶ';
   const tw=S.phase==='drive'?S.next:S.town;
   if(tw&&(S.phase==='drive'||S.phase==='stop'))text((S.phase==='drive'?'→ ':'')+tw.e+' '+tw.n+'　'+payLabel(tw.pay),412,y,14,'#f4eedf',800,'left');
   text(ph,GW*T-22,y,18,S.phase==='stop'&&S.sub==='service'&&S.timer<20?'#ff9c9c':'#f4eedf',800,'right');
+  // fuel gauge + lever setting, just under the bar on the right
+  const fx=GW*T-232,fy=T*0.98;
+  ctx.fillStyle='rgba(16,26,30,.85)';rr(fx,fy,222,24,8);ctx.fill();
+  emoji('⛽',fx+14,fy+12,14);
+  for(let k=0;k<FUEL_MAX;k++){const f=Math.max(0,Math.min(1,S.fuel-k));
+    ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(fx+28+k*11,fy+6,9,12);
+    if(f>0){ctx.fillStyle=S.fuel<=2?'#ff6d6d':'#ffb347';ctx.fillRect(fx+28+k*11,fy+6+12*(1-f),9,12*f)}}
+  const lv=S.fuel>0?S.speed:0;
+  text(SPEED_N[lv],fx+214,fy+12,12,lv===2?'#ff9c9c':lv===0?'#9db3b4':'#c9f2d2',800,'right');
 }
 function drawMenus(){
   for(const p of S.players)if(p.g)drawGather(p);
@@ -1641,7 +1695,7 @@ function renderHud(){
   if(!S){hudEl.innerHTML='';infoEl.innerHTML='人数を選んでスタート';stockEl.innerHTML='';readyBtn.hidden=true;return}
   let phase='';
   if(S.phase==='layout')phase=S.timer>0?`レイアウト ${fmtT(S.timer)}`:'時間切れ';
-  else if(S.phase==='drive')phase=`走行中 ${fmtT(S.timer)}`;
+  else if(S.phase==='drive')phase=`走行中 ${kmTxt(Math.min(S.dist,S.route))} / ${kmTxt(S.route)} km`;
   else if(S.phase==='stop')phase=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
   else if(S.phase==='choose')phase='町を選ぶ';
   else phase='—';
@@ -1680,7 +1734,7 @@ const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:
   pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
 const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
 const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve'];
-const OFFER_K=['pack','seed','mystery','equip'];
+const OFFER_K=['pack','seed','mystery','equip','fuel'];
 const r2=v=>Math.round(v*100)/100;
 (async function initNet(){
   // the file version (sent to friends) connects through PeerJS instead of claude.ai
@@ -1833,11 +1887,11 @@ function sendSnap(){
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue]),
-    sh:S.shops.map(s=>[Math.round(s.x*100),SHOPTYPES.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
+    sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
-    sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
+    fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
   let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
   if(bytes>3800){d.fl=[];bytes=new TextEncoder().encode(JSON.stringify(d)).length}
   NET.snapBytes=bytes;
@@ -1941,6 +1995,7 @@ function applySnap(d){
   const n=v=>+v||0;
   S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
   S.roadOff=n(d.ro)/100;S.bonus=n(d.bn);S.paused=!!d.pa;
+  S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100}):null;
   S.town=town(d.tw);S.next=town(d.nx);
   const u=Array.isArray(d.up)?d.up:[];
@@ -1962,7 +2017,7 @@ function applySnap(d){
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2])}));
-  S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:SHOPTYPES[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
+  S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));
   S.toast=Array.isArray(d.to)?{text:String(d.to[0]||''),t:n(d.to[1])/10,life:n(d.to[2])/10}:null;
@@ -1985,6 +2040,7 @@ function decItem(a){
 }
 function decOffer(a){
   const type=OFFER_K[a[0]]||'pack',id=type==='equip'?EQ_K[a[1]]:ING_K[a[1]];
+  if(type==='fuel')return {type,qty:+a[2]||0,price:+a[3]||0,sold:false};
   if(type!=='mystery'&&!id)return {type:'mystery',price:+a[3]||0,sold:true};
   return {type,id,qty:+a[2]||0,price:+a[3]||0,sold:!!a[4],pro:+a[5]||0};
 }

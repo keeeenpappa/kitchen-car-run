@@ -1678,17 +1678,25 @@ function drawRoadIdle(){
 // ---------- DOM HUD ----------
 // the player on this device (P1 when playing locally)
 const localP=()=>S.players[NET.role==='off'?0:NET.mySlot]||S.players[0];
-const upsText=o=>Object.entries(o.ups||{}).filter(([,n])=>n>0).map(([k,n])=>{const U=upById(k);return U?U.e+U.n+(n>1?'×'+n:''):''}).join('・');
+// what the stacked power-ups on one unit add up to
+const pct=m=>Math.round((1-m)*100);
+const UP_EFF={cook:n=>'焼く時間 -'+pct(Math.pow(0.75,n))+'%',chop:n=>'切る時間 -'+pct(Math.pow(0.7,n))+'%',blend:n=>'混ぜる時間 -'+pct(Math.pow(0.6,n))+'%',
+  burn:n=>'焦げるまで +'+6*n+'秒',grow:n=>'育つ速さ '+Math.pow(1.3,n).toFixed(2).replace(/0$/,'')+'倍',yield:n=>'収穫 +'+n+'個',can:n=>'水 +'+2*n+'回分',basket:n=>'入る数 +'+2*n};
+const upsText=o=>Object.entries(o.ups||{}).filter(([,n])=>n>0).map(([k,n])=>{const U=upById(k);return U?U.e+U.n+(n>1?'×'+n:'')+'（'+(UP_EFF[k]?UP_EFF[k](n):U.d)+'）':''}).join('　');
 function upInfo(){
   const ps=[localP(),...S.players].filter(Boolean);
   const hp=ps.find(q=>q.hold&&q.hold.kind==='power');
   if(hp){const U=upById(hp.hold.up);if(U)return `<br><b style="color:#ffd84a">⬆ ${U.e} ${U.n}</b>：${U.d}。<b>${TGTN[U.tgt]}</b>に重ねると、その1台だけ強くなります`}
   const p=localP();if(!p)return '';
-  const c=tile(p.tx,p.ty);if(!c)return '';
-  const o=(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))?c.item:c;
-  const t=upsText(o),pro=o.pro?proInfo(o.st||o.t,o.pro):null;
-  if(!t&&!pro&&!o.bonus)return '';
-  return `<br><span class="dim">この${TGTN[o.kind==='can'||o.kind==='basket'?o.kind:c.t]||'器具'}：</span>${o.pro||o.bonus?'<b style="color:#ff79b8">★レア</b> ':''}${t?'<b style="color:#ffd84a">⬆ '+t+'</b>':''}`;
+  // the unit in hand first, otherwise the one being faced
+  const h=p.hold, held=h&&(h.kind==='station'||h.kind==='can'||h.kind==='basket');
+  let o,id;
+  if(held){o=h;id=h.kind==='station'?h.st:h.kind}
+  else{const c=tile(p.tx,p.ty);if(!c)return '';o=(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))?c.item:c;id=o.kind==='can'||o.kind==='basket'?o.kind:c.t}
+  const t=upsText(o),rare=o.pro?proInfo(id,o.pro):o.bonus?proInfo(id,1):null;
+  if(!t&&!rare)return '';
+  return `<br><span class="dim">${held?'持っている':'この'}${TGTN[id]||(EQUIP[id]&&EQUIP[id].n)||'器具'}：</span>`+
+    (rare?`<b style="color:#ff79b8">★レア ${rare.n}</b>（${rare.d}）　`:'')+(t?'<b style="color:#ffd84a">⬆</b> '+t:'');
 }
 const readyBtn=document.getElementById('readyBtn');
 readyBtn.addEventListener('pointerdown',e=>{e.preventDefault();readyPtr=true;try{readyBtn.setPointerCapture(e.pointerId)}catch(_){}});

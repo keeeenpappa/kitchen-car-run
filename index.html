@@ -943,9 +943,9 @@ function showTitle(){
     <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
     <div id="netTitle">${netTitleHtml()}</div></div>`);
 }
-const MOOD={'-10':'静か','0':'落ち着いた','10':'ほどよい人通り','20':'にぎやか','30':'活気あり','40':'大にぎわい','50':'お祭り'};
+const MOOD={'-10':'静か','0':'落ち着いた','10':'ほどよい人通り','20':'にぎやか','30':'活気あり'};
 // the town's mood sets both the sell price and how many customers come
-const CROWD={'-10':0.85,'0':1,'10':1.1,'20':1.2,'30':1.3,'40':1.35,'50':1.4};
+const CROWD={'-10':0.9,'0':1,'10':1.1,'20':1.2,'30':1.3};
 const crowdOf=p=>CROWD[Math.round((p-1)*100)]||1;
 function payLabel(p,withCrowd){const d=Math.round((p-1)*100);
   return (MOOD[d]||'')+'（売値'+(d===0?'±0':(d>0?'＋':'−')+Math.abs(d))+'％'+(withCrowd?'・客 '+crowdOf(p)+'倍':'')+'）'}
@@ -965,7 +965,7 @@ function showChoose(){
   // sell-price rate is rolled each time a town is offered: 0.9 – 1.5
   chooseOpts=pickN(ids,n).map(k=>{
     // the station town is busy by nature: it never rolls a quiet mood
-    const roll=TOWNS[k].lively?[1.1,1.2,1.2,1.3,1.3,1.4,1.5]:[0.9,1,1,1.1,1.1,1.2,1.2,1.3,1.4,1.5];
+    const roll=TOWNS[k].lively?[1.1,1.2,1.2,1.3,1.3]:[0.9,1,1,1.1,1.1,1.2,1.2,1.3];
     const pay=roll[rnd(roll.length)];
     return Object.assign({},TOWNS[k],{id:k,pay,rate:crowdOf(pay)})});
   const cards=chooseOpts.map((t,i)=>`<button class="ovbtn town" data-act="town" data-v="${i}">

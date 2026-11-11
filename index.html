@@ -45,7 +45,9 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);mar
 canvas{display:block;width:100%;height:auto;aspect-ratio:18/12}
 #ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--scrim);padding:16px;overflow:auto}
 #ov[hidden]{display:none}
-#readyBtn{position:absolute;top:9%;right:12px;z-index:5;background:var(--truck);color:#1b1206;border-color:#1b1206}
+#readyBtn{position:absolute;top:9%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
+  background-image:linear-gradient(90deg,rgba(255,255,255,.65) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
+.ovbtn.hold{background-image:linear-gradient(90deg,rgba(243,183,58,.55) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
 #readyBtn[hidden]{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
 .box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
@@ -114,7 +116,7 @@ body.touch .narrow{display:none}
   <div id="info">　</div>
   <div class="stage">
     <canvas id="cv" width="864" height="576" aria-label="ゲーム画面"></canvas>
-    <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（R）</button>
+    <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（長押し）</button>
     <div id="ov"></div>
   </div>
   <div id="stock"></div>
@@ -220,9 +222,17 @@ function makeEquip(id,pro){
   if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
   return {kind:'station',st:id,pro:pro||0};
 }
-const canCap=it=>S.up.canCap+(it.bonus||0);
-const basketCap=it=>S.up.basketCap+(it.bonus||0);
+// power-ups picked after a town are applied to ONE unit (a stove, a planter, a watering can...), stored as ups:{key:n}
+const UPK=['cook','chop','blend','burn','grow','yield','can','basket'];
+const upN=(o,k)=>(o&&o.ups&&o.ups[k])||0;
+const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
+const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
+const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
 const proMul=c=>c.pro?(PRO_MUL[c.t]||1):1;
+const cookT=c=>COOK*proMul(c)*Math.pow(0.75,upN(c,'cook'));
+const chopT=c=>CHOP*proMul(c)*Math.pow(0.7,upN(c,'chop'));
+const blendT=c=>BLEND*proMul(c)*Math.pow(0.6,upN(c,'blend'));
+const burnT=c=>BURN+6*upN(c,'burn');
 
 // ---------- helpers ----------
 function rnd(n){return Math.floor(Math.random()*n)}
@@ -294,12 +304,12 @@ const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_FRONT=[6,5];
 const emptyT=y=>y===6?'gap':'floor';
 const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 const GROUND_SPOTS=[[1,9],[3,9],[5,9],[7,9],[9,9],[11,9],[13,9],[15,9],[5,10],[7,10],[9,10],[11,10],[13,10],[15,10],[1,10],[3,8],[5,8],[1,8],[7,8],[15,8]];
-const storable=it=>!!it&&['station','can','basket'].includes(it.kind);
+const storable=it=>!!it&&['station','can','basket','power'].includes(it.kind);
 // put objects on free spots outside; same-kind counters/planters join one pile
 function putOutside(objs){
   for(const o of objs){
-    if(o.kind==='station'&&PILE.includes(o.st)&&!o.plant&&!o.pro){
-      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant&&!it.pro);
+    if(o.kind==='station'&&PILE.includes(o.st)&&!o.plant&&!o.pro&&!upTotal(o)){
+      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant&&!it.pro&&!upTotal(it));
       if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
     }
     const s=GROUND_SPOTS.find(([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item);
@@ -315,7 +325,7 @@ function setupLayout(){
   const objs=[{kind:'station',st:'counter',n:COUNTERS_GIVEN},{kind:'station',st:'planter',n:PLANTERS_GIVEN}];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x];
-    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0});
+    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0,ups:c.ups||null});
     if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))objs.push(c.item);
     if(!FIXED.has(c.t))S.map[y][x]=blankTile(y);
   }
@@ -326,7 +336,7 @@ function setupLayout(){
 }
 function finishLayout(){
   if(!S||S.phase!=='layout')return;
-  if(S.players.some(holdsFurn)){S.toast={text:'手に持っている器具を置いてから',t:0,life:2.5};return}
+  if(S.players.some(q=>holdsFurn(q)||(q.hold&&q.hold.kind==='power'))){S.toast={text:'手に持っている物を置いてから',t:0,life:2.5};return}
   if(S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor'){S.toast={text:'ドアの前はあけておく',t:0,life:2.5};return}
   const bad=unreachable();
   if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};return}
@@ -345,17 +355,17 @@ function showEquipShop(){
   if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP),3).map(id=>equipOffer(id,1,0.15));
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
     const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':'器具（床に置く）');
-    return `<button class="ovbtn town${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
+    return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box"><h2>器具屋</h2>
-    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>です。買った物は、このあとの配置の時間にトラックに置きます。所持金 <b>${S.money}G</b></p>
+    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（長押しで購入）。買った物は、町を選んだあとの配置の時間に外に出ます。所持金 <b>${S.money}G</b></p>
     <div class="cards">${cards}</div>
-    <div class="row"><button class="ovbtn" data-act="eqdone">${S.eqBought!=null?'配置へ進む':'買わずに配置へ進む'}（${DAY_LAYOUT_TIME}秒）</button></div></div>`);
+    <div class="row"><button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（長押し）</button></div></div>`);
 }
 function startDayLayout(){
-  const objs=S.stored.concat(S.pendingEquip.map(o=>makeEquip(o.id,o.pro)));
+  const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
   S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;
   putOutside(objs);
   S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
@@ -387,23 +397,34 @@ const holdsFurn=p=>!!p.hold&&p.hold.kind==='station'&&FURN.includes(p.hold.st);
 // returns true when the press was handled as moving furniture / equipment
 function furnPick(p,c,tx,ty){
   const h=p.hold,lay=S.phase==='layout';
+  // a power-up block goes onto ONE unit of its kind
+  if(lay&&h&&h.kind==='power'){
+    const U=upById(h.up),tg=U&&U.tgt;
+    let target=null;
+    if(inTruck(tx,ty)&&c.t===tg)target=c;
+    else if(c.item&&c.item.kind===tg)target=c.item;   // a watering can / basket on a counter or outside
+    if(target){
+      target.ups=Object.assign({},target.ups||{});target.ups[h.up]=(target.ups[h.up]||0)+1;
+      p.hold=null;float(tx+.5,ty,'⬆ '+U.n+'！','#ffe08a');return true}
+    if(!(c.t==='ground'&&!c.item)){say(p,(TGTN[tg]||'器具')+'に重ねる');return true}
+  }
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0};p.hold=null;rebuildStations();return true;
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
   // (in layout anything; otherwise cooking equipment for cooking equipment). Tools on counters are never swapped.
   if(holdsFurn(p)&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
     if(c.item){say(p,'上の物をどけてから');return true}
-    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null};
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0};
+    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null};
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};
     p.hold=old;rebuildStations();return true;
   }
   // layout: pick up furniture from the truck (a counter only when nothing is on it; a planter takes its crop along)
   if(lay&&!h&&FURN.includes(c.t)&&inTruck(tx,ty)){
     if(c.item){if(c.t==='counter')return false;say(p,'上の物をどけてから');return true}
-    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null};
+    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null};
     S.map[ty][tx]=blankTile(ty);rebuildStations();return true;
   }
   // outside (layout, or the town stop): equipment and tools can be set down and picked up
@@ -414,7 +435,7 @@ function furnPick(p,c,tx,ty){
       else{p.hold=it;c.item=null;delete it.n}
       return true}
     if(h&&!it){if(!storable(h)){say(p,'外には置けない');return true}c.item=h;p.hold=null;return true}
-    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant&&!h.pro&&!it.pro){it.n=(it.n||1)+1;p.hold=null;return true}
+    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant&&!h.pro&&!it.pro&&!upTotal(h)&&!upTotal(it)){it.n=(it.n||1)+1;p.hold=null;return true}
   }
   if(holdsFurn(p)){say(p,'トラックの床に置く');return true}
   return false;
@@ -576,6 +597,13 @@ function placeOrTake(p,c){
 }
 function doPick(p,c,tx,ty){
   if(furnPick(p,c,tx,ty))return;
+  if(S.phase==='layout'){
+    // only rearranging: tools can go on / come off counters, nothing else is used
+    const tool=it=>it&&(it.kind==='can'||it.kind==='basket');
+    if(c.t==='counter'&&(tool(p.hold)||(!p.hold&&tool(c.item)))){placeOrTake(p,c);return}
+    if(c.t!=='floor'&&c.t!=='gap'&&c.t!=='wall')say(p,'配置の時間は並べ替えだけ');
+    return;
+  }
   switch(c.t){
     case 'fridge':{
       if(!p.hold){if(!stockList().length){say(p,'在庫がない');return}
@@ -639,7 +667,7 @@ function waterPlant(p,c,tx,ty){
   if(can.water<=0){say(p,'じょうろが空。シンクで汲む');return}
   can.water--;c.plant.watered=true;float(tx+.5,ty,'💧','#9fd8ff');
 }
-function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0);S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6')}
+function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6')}
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
 function buy(list,p,shop,tx,ty){
   if(!list||!list.length)return;
@@ -656,10 +684,11 @@ function buy(list,p,shop,tx,ty){
   if(shop)it.sold=true;
 }
 function doAct(p,c,tx,ty,dt){
+  if(S.phase==='layout')return; // layout time: rearranging only
   const key=tx+','+ty;
   if(p.actKey!==key){p.actKey=key;p.actT=0}
   if(p.lock)return;
-  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt;if(c.prog>=CHOP*S.up.chop*proMul(c)){c.item.step++;c.prog=0}return}
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
@@ -770,45 +799,48 @@ function endStop(){
 }
 // ---------- upgrades (pick 1 of 3 after each town, free; reroll costs money) ----------
 const UPS=[
-  {id:'cook',e:'🔥',n:'強火コンロ',d:'焼く時間 -25%',max:3,apply:u=>u.cook*=0.75},
-  {id:'chop',e:'🔪',n:'よく切れる包丁',d:'切る時間 -30%',max:3,apply:u=>u.chop*=0.7},
-  {id:'blend',e:'🌀',n:'高速ミキサー',d:'ミキサー時間 -40%',max:2,apply:u=>u.blend*=0.6},
-  {id:'burn',e:'🍳',n:'厚手のフライパン',d:'焦げるまで +6秒',max:3,apply:u=>u.burn+=6},
+  {id:'cook',e:'🔥',n:'強火',d:'コンロ1台の焼く時間 -25%',max:3,tgt:'stove'},
+  {id:'chop',e:'🔪',n:'よく切れる包丁',d:'まな板1台の切る時間 -30%',max:3,tgt:'board'},
+  {id:'blend',e:'🌀',n:'高速モーター',d:'ミキサー1台の時間 -40%',max:2,tgt:'blender'},
+  {id:'burn',e:'🍳',n:'厚手のフライパン',d:'コンロ1台の焦げるまで +6秒',max:3,tgt:'stove'},
   {id:'pat',e:'🪑',n:'座り心地のいい椅子',d:'客の待ち時間 +20%',max:3,apply:u=>u.pat*=1.2},
   {id:'tip',e:'😊',n:'笑顔の接客',d:'チップ 1.5倍',max:2,apply:u=>u.tip*=1.5},
   {id:'pay',e:'📈',n:'看板メニュー',d:'料理の値段 +10%',max:3,apply:u=>u.pay*=1.1},
   {id:'plot',e:'🪴',n:'菜園を広げる',d:'菜園 +1マス（次の配置で置く）',max:3,apply:()=>addPlanter()},
-  {id:'grow',e:'🌿',n:'肥料',d:'作物が 1.3倍速で育つ',max:2,apply:u=>u.grow*=1.3},
-  {id:'can',e:'💧',n:'大きなじょうろ',d:'じょうろの水 +2回分',max:2,apply:u=>u.canCap+=2},
-  {id:'yield',e:'🧺',n:'豊作',d:'収穫 +1個',max:2,apply:u=>u.yieldPlus++},
+  {id:'grow',e:'🌿',n:'肥料',d:'菜園1つの育つ速さ 1.3倍',max:3,tgt:'planter'},
+  {id:'can',e:'💧',n:'じょうろの改造',d:'じょうろ1つの水 +2回分',max:2,tgt:'can'},
+  {id:'yield',e:'🌾',n:'豊作',d:'菜園1つの収穫 +1個',max:3,tgt:'planter'},
   {id:'shopx',e:'🛒',n:'顔なじみの店',d:'窓口の品数 +1',max:2,apply:u=>u.shopExtra++},
   {id:'disc',e:'🏷️',n:'値切り上手',d:'窓口の値段 -15%',max:2,apply:u=>u.shopDisc*=0.85},
   {id:'shoes',e:'👟',n:'軽い靴',d:'移動速度 +15%',max:2,apply:u=>u.speed*=1.15},
   {id:'gather',e:'🎣',n:'採集の道具',d:'採集が速くなり、量 +3',max:2,apply:u=>{u.gatherSpd*=1.4;u.gatherPlus+=3}},
-  {id:'basket',e:'🧺',n:'大きなカゴ',d:'カゴに入る数 +2',max:2,apply:u=>u.basketCap+=2},
+  {id:'basket',e:'🧺',n:'カゴの改造',d:'カゴ1つに入る数 +2',max:2,tgt:'basket'},
   {id:'drive',e:'🛣️',n:'遠回りルート',d:'走行時間 +10秒（仕込みの時間が増える）',max:2,apply:u=>u.drive+=10},
   {id:'heart',e:'❤️',n:'いい口コミ',d:'評判 ♥ を1つ回復',max:9,cond:()=>S.hearts<5,apply:()=>{S.hearts++}},
 ];
 // the new planter is handed over outside and placed in the next layout time
-function addPlanter(){S.pendingEquip.push({id:'planter',pro:false})}
+function addPlanter(){S.pendingEquip.push({id:'planter',pro:0})}
+const TGTN={stove:'コンロ',board:'まな板',blender:'ミキサー',planter:'菜園',can:'じょうろ',basket:'カゴ'};
+const upById=id=>UPS.find(u=>u.id===id);
 function showUpgrade(){
   S.phase='upgrade';
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
   S.offers=pickN(pool,3);
   const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
-  const cards=S.offers.map((u,i)=>`<button class="ovbtn town" data-act="up" data-v="${i}">
+  const cards=S.offers.map((u,i)=>`<button class="ovbtn town hold" data-act="up" data-v="${i}">
       <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
-      <span class="needs"><span class="sub">${S.upCount[u.id]?'持っている数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
+      <span class="needs">${u.tgt?`<span class="pay">⬆ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box"><h2>強化を1つ選ぶ</h2>
-    <p>無料で1つもらえます。所持金 ${S.money}G</p>
+    <p>無料で1つもらえます。カードは<b>長押し</b>で決定。所持金 ${S.money}G</p>
     <div class="cards">${cards}</div>
     <div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G）</button></div>
     ${owned?`<p class="mut">持っている強化：${owned}</p>`:''}</div>`);
 }
 function takeUpgrade(i){
   const u=S.offers[i]; if(!u)return;
-  u.apply(S.up); S.upCount[u.id]=(S.upCount[u.id]||0)+1; S.rerollCost=8;
-  showChoose();
+  if(u.tgt)S.pendingEquip.push({power:u.id});else u.apply(S.up);
+  S.upCount[u.id]=(S.upCount[u.id]||0)+1; S.rerollCost=8;
+  showEquipShop();
 }
 function gameOver(){
   S.phase='over';
@@ -826,11 +858,41 @@ function showEnd(){
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
 function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
-function paintOv(html){ov.innerHTML=html;ov.hidden=false;ovSel=0;markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
+function paintOv(html){ov.innerHTML=html;ov.hidden=false;ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
 function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
 function ovButtons(){return [...ov.querySelectorAll('.ovbtn')]}
 function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel))}
-ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b)doOv(b.dataset.act,b.dataset.v)});
+ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
+const HOLD=0.6, READY_HOLD=0.8;
+let ovHold={btn:null,t:0,src:null},ovHoldLock=false;
+const setP=(b,f)=>{if(b)b.style.setProperty('--p',Math.round(Math.min(1,f)*100)+'%')};
+const holdReset=()=>{setP(ovHold.btn,0);ovHold={btn:null,t:0,src:null}};
+ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if(!b)return;e.preventDefault();
+  holdReset();ovHold={btn:b,t:0,src:'ptr'};ovSel=Math.max(0,ovButtons().indexOf(b));markSel();try{b.setPointerCapture(e.pointerId)}catch(_){}});
+for(const ev of ['pointerup','pointercancel'])ov.addEventListener(ev,()=>{if(ovHold.src==='ptr')holdReset()});
+ov.addEventListener('contextmenu',e=>{if(e.target.closest('.ovbtn.hold'))e.preventDefault()});
+function ovHoldTick(dt){
+  const b=ovButtons()[ovSel],keyHeld=held.has('Space')||held.has('Enter')||!!(pads[0]&&pads[0].now.a);
+  if(!keyHeld)ovHoldLock=false;
+  if(ovHold.src!=='ptr'){
+    if(b&&b.classList.contains('hold')&&keyHeld&&!ovHoldLock){if(ovHold.btn!==b){holdReset();ovHold={btn:b,t:0,src:'key'}}}
+    else if(ovHold.src==='key')holdReset();
+  }
+  if(!ovHold.btn)return;
+  if(!ovHold.btn.isConnected){ovHold={btn:null,t:0,src:null};return}
+  ovHold.t+=dt;setP(ovHold.btn,ovHold.t/HOLD);
+  if(ovHold.t>=HOLD){const x=ovHold.btn;if(ovHold.src==='key')ovHoldLock=true;holdReset();doOv(x.dataset.act,x.dataset.v)}
+}
+// 準備完了: long-press the button, R, or the pad's Back button
+let readyT=0,readyLock=false,readyPtr=false;
+function readyTick(dt){
+  const on=S&&S.phase==='layout'&&ov.hidden;
+  const h=on&&(readyPtr||held.has('KeyR')||!!(pads[0]&&pads[0].now.back));
+  if(!h){readyT=0;readyLock=false;setP(readyBtn,0);return}
+  if(readyLock)return;
+  readyT+=dt;setP(readyBtn,readyT/READY_HOLD);
+  if(readyT>=READY_HOLD){readyT=0;readyLock=true;setP(readyBtn,0);doOv('ready')}
+}
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
@@ -840,14 +902,14 @@ function doOv(a,v){
 function ovAction(a,v){
   if(netAction(a,v))return;
   if(a==='np'){const [n,m]=String(v).split('|');newRun(+n,m||'preset')}
-  else if(a==='town'){S.next=chooseOpts[+v];if(S.stop===0)startDrive();else showEquipShop()}
+  else if(a==='town'){S.next=chooseOpts[+v];if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
     if(S.eqBought!=null)return;
     const o=S.eqOffers[+v];if(!o)return;
     if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
     S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});S.eqBought=+v;showEquipShop();
   }
-  else if(a==='eqdone')startDayLayout();
+  else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();
   else if(a==='upg')showUpgrade();
   else if(a==='up')takeUpgrade(+v);
@@ -906,7 +968,7 @@ function showChoose(){
   showOv(`<div class="box"><h2>${S.stop+1}つ目の町を選ぶ（全${STOPS}町）</h2>
     <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。所持金 ${S.money}G</p>
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
-    ${S.stop>0?`<p class="mut">町を選んだら、器具屋 → 配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
+    ${S.stop>0?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
     <div class="cards">${cards}</div>
     <p class="mut">キー <kbd>1</kbd>〜<kbd>${n}</kbd> かクリックで選択</p></div>`);
 }
@@ -918,9 +980,9 @@ function overlayInput(){
   if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r')))mv=1;
   if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l')))mv=-1;
   if(pressed.has('Space')||pressed.has('Enter')||(p0&&p0.edge('a')))ok=true;
-  for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;ok=true}
+  for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel()}
-  if(ok){const x=b[ovSel];if(x)doOv(x.dataset.act,x.dataset.v)}
+  if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
 }
 
 // ---------- fridge / seed box menu ----------
@@ -964,13 +1026,13 @@ function update(dt){
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*S.up.grow*(c.pro===2?1.5:1);
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     const it=c.item; if(!it||it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
-      if(nextStep(it)==='cook'){c.prog+=dt;if(c.prog>=COOK*S.up.cook*proMul(c)){it.step++;c.prog=0;c.burn=0}}
-      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=BURN+S.up.burn)it.burnt=true}
-    } else if(c.t==='blender'&&nextStep(it)==='blend'){c.prog+=dt;if(c.prog>=BLEND*S.up.blend*proMul(c)){it.step++;c.prog=0}}
+      if(nextStep(it)==='cook'){c.prog+=dt;if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
+    } else if(c.t==='blender'&&nextStep(it)==='blend'){c.prog+=dt;if(c.prog>=blendT(c)){it.step++;c.prog=0}}
   }
   // players
   S.players.forEach((p,i)=>{
@@ -1040,9 +1102,18 @@ function drawItem(it,cx,cy,s){
     if(rid)emoji(RECIPES[rid].e,cx+s*0.42,cy-s*0.42,s*0.38);
     return;
   }
+  if(it.kind==='power'){
+    const U=upById(it.up)||{e:'⬆'},g=0.5+0.5*Math.sin((S?S.t:0)*5);
+    ctx.fillStyle=`rgba(255,216,74,${0.25+0.25*g})`;rr(cx-s*0.44,cy-s*0.44,s*0.88,s*0.88,10);ctx.fill();
+    ctx.fillStyle='#ffd84a';rr(cx-s*0.36,cy-s*0.36,s*0.72,s*0.72,8);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    emoji(U.e,cx,cy+s*0.02,s*0.36);
+    text('⬆',cx+s*0.26,cy-s*0.25,13,'#c0392b',800);
+    return;
+  }
   if(it.kind==='station'){
     ctx.save();ctx.translate(cx-s/2,cy-s/2);ctx.scale(s/T,s/T);
-    drawTile({t:it.st,pro:it.pro,item:null,prog:0,burn:0,plant:it.plant||null},0,0);
+    drawTile({t:it.st,pro:it.pro,ups:it.ups,item:null,prog:0,burn:0,plant:it.plant||null},0,0);
     ctx.restore();
     if(it.st==='counter'&&s>=T*0.8)text('台',cx,cy,13,'#8a7550',800);
     if(it.n>1){ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.65)';ctx.textAlign='center';ctx.strokeText('×'+it.n,cx+s*0.28,cy+s*0.36);text('×'+it.n,cx+s*0.28,cy+s*0.36,14,'#fff',800)}
@@ -1053,7 +1124,8 @@ function drawItem(it,cx,cy,s){
     ctx.strokeStyle='#8a5a28';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy-s*0.08,s*0.28,Math.PI,0);ctx.stroke();
     it.items.slice(0,4).forEach((id,k)=>emoji(ING[id].e,cx-s*0.24+k*s*0.16,cy-s*0.06,s*0.26));
     text(it.items.length+'/'+basketCap(it),cx,cy+s*0.14,10,'#fff',800);
-    if(it.bonus)text('★',cx+s*0.36,cy-s*0.3,12,'#ffd84a',800);
+    if(it.bonus)text('★',cx+s*0.36,cy-s*0.3,12,'#ff4fa3',800);
+    if(upTotal(it))text('⬆'+upTotal(it),cx-s*0.34,cy-s*0.32,11,'#ffd84a',800);
     return;
   }
   if(it.kind==='can'){
@@ -1061,7 +1133,8 @@ function drawItem(it,cx,cy,s){
     ctx.strokeStyle='#4f8fa8';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(cx+s*0.16,cy);ctx.lineTo(cx+s*0.42,cy-s*0.22);ctx.stroke();
     ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx-s*0.06,cy-s*0.22,s*0.14,Math.PI,0);ctx.stroke();
     const cap=canCap(it);
-    if(it.bonus)text('★',cx+s*0.36,cy-s*0.34,12,'#ffd84a',800);
+    if(it.bonus)text('★',cx+s*0.36,cy-s*0.34,12,'#ff4fa3',800);
+    if(upTotal(it))text('⬆'+upTotal(it),cx-s*0.34,cy-s*0.34,11,'#ffd84a',800);
     for(let k=0;k<cap;k++){ctx.fillStyle=k<it.water?'#9fd8ff':'rgba(0,0,0,.45)';ctx.beginPath();ctx.arc(cx-s*0.06-(cap-1)*4+k*8,cy+s*0.36,3.2,0,7);ctx.fill()}
     return;
   }
@@ -1127,13 +1200,17 @@ function drawTile(c,x,y){
       else text('菜園',X+T/2,Y+T/2,10,'#d9c3a3');
       break}
   }
-  if(c.pro){ctx.strokeStyle='#ffd84a';ctx.lineWidth=2.5;rr(X+3,Y+3,T-6,T-6,6);ctx.stroke();text('★',X+T-9,Y+9,12,'#e0a800',800)}
+  // powered-up unit: yellow frame + ⬆count; rare unit: pink ★
+  const nu=upTotal(c);
+  if(nu){ctx.strokeStyle='#ffd84a';ctx.lineWidth=3.5;rr(X+2.5,Y+2.5,T-5,T-5,7);ctx.stroke();
+    ctx.fillStyle='#ffd84a';rr(X+1,Y+T-15,22,13,6);ctx.fill();text('⬆'+nu,X+12,Y+T-8.5,10,'#7a4b00',800)}
+  if(c.pro){ctx.strokeStyle='#ff4fa3';ctx.lineWidth=2;rr(X+(nu?6:3),Y+(nu?6:3),T-(nu?12:6),T-(nu?12:6),5);ctx.stroke();text('★',X+T-9,Y+9,12,'#ff4fa3',800)}
   if(c.item){
     drawItem(c.item,X+T/2,Y+T/2,T*0.8);
     if((c.t==='board'||c.t==='blender'||c.t==='stove')&&c.prog>0){
-      const tot=(c.t==='board'?CHOP*S.up.chop:c.t==='stove'?COOK*S.up.cook:BLEND*S.up.blend)*proMul(c);bar(X+6,Y+T-10,T-12,c.prog/tot,'#ffd25a')}
+      const tot=c.t==='board'?chopT(c):c.t==='stove'?cookT(c):blendT(c);bar(X+6,Y+T-10,T-12,c.prog/tot,'#ffd25a')}
     if(c.t==='stove'&&c.burn>0&&!c.item.burnt){
-      const bt=BURN+S.up.burn;
+      const bt=burnT(c);
       bar(X+6,Y+3,T-12,c.burn/bt,'#ff6d6d');
       if(c.burn>bt*0.45&&Math.sin(S.t*14)>0)emoji('⚠️',X+T-8,Y+10,14);
     }
@@ -1283,41 +1360,53 @@ function shade(hex,k){
   const n=parseInt(hex.slice(1),16),f=v=>Math.max(0,Math.min(255,Math.round(v*(1+k))));
   return `rgb(${f(n>>16)},${f((n>>8)&255)},${f(n&255)})`;
 }
-// a small round chef: body in the player's colour, white hat with a coloured band, face toward where they look
+// a small round chef: body in the player's colour, white hat with a coloured band.
+// Facing down: full face. Facing up: back of the head. Facing left/right: full profile.
 function drawChef(p,X,Y){
   const col=PCOL[p.i],dark=shade(col,-0.3),light=shade(col,0.25);
   const mv=p.lx!=null&&Math.hypot(p.x-p.lx,p.y-p.ly)>0.002;p.lx=p.x;p.ly=p.y;
   const ph=S.t*14+p.i;
   const bob=mv?Math.abs(Math.sin(ph))*2.6:Math.sin(S.t*3+p.i)*0.7;
-  const by=Y-bob;
+  const by=Y-bob, side=p.dx!==0, d=p.dx||1, back=p.dy===-1&&!side;
+  const ink='#2b2230';
   ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(X,Y+15,13,4.5,0,0,7);ctx.fill();
-  // feet
-  const st=mv?Math.sin(ph)*2.2:0;
-  ctx.fillStyle=dark;ctx.beginPath();ctx.ellipse(X-6,Y+13-st,5,3.4,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(X+6,Y+13+st,5,3.4,0,0,7);ctx.fill();
+  // feet: side by side from the front, one ahead of the other in profile
+  const st=mv?Math.sin(ph)*2.4:0;
+  ctx.fillStyle=dark;
+  if(side){ctx.beginPath();ctx.ellipse(X+d*(4+st),Y+13,5.5,3.4,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(X-d*(4+st),Y+13,5.5,3.4,0,0,7);ctx.fill()}
+  else{ctx.beginPath();ctx.ellipse(X-6,Y+13-st,5,3.4,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(X+6,Y+13+st,5,3.4,0,0,7);ctx.fill()}
   // body
-  ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(X,by+1,15.5,14.5,0,0,7);ctx.fill();
-  ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(X-5,by-5,6,4,-0.5,0,7);ctx.fill(); // shine
-  // apron when facing the viewer
-  if(p.dy!==-1){ctx.fillStyle='rgba(255,255,255,.9)';rr(X-7+p.dx*2,by+5,14,8,[2,2,5,5]);ctx.fill()}
-  // chef hat
-  const hy=by-13;
+  ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(X,by+1,side?14:15.5,14.5,0,0,7);ctx.fill();
+  ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(X-(side?d*4:5),by-5,6,4,-0.5*(side?d:1),0,7);ctx.fill();
+  if(side){
+    // nose bump and apron edge on the front side, an arm in the middle
+    ctx.fillStyle=col;ctx.beginPath();ctx.arc(X+d*14,by+0.5,3.6,0,7);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.9)';rr(X+d*7-(d>0?0:5),by+4,5,9,2);ctx.fill();
+    ctx.fillStyle=dark;ctx.beginPath();ctx.ellipse(X-d*1,by+6,3.6,5,0,0,7);ctx.fill();
+  } else if(!back){ctx.fillStyle='rgba(255,255,255,.9)';rr(X-7,by+5,14,8,[2,2,5,5]);ctx.fill()}
+  // chef hat (pushed back a little in profile)
+  const hx=X-(side?d*2.5:0),hy=by-13;
   ctx.fillStyle='#fff';
-  ctx.beginPath();ctx.arc(X-6,hy-5,6,0,7);ctx.arc(X+6,hy-5,6,0,7);ctx.arc(X,hy-9,7.5,0,7);ctx.fill();
-  rr(X-9,hy-5,18,7,2);ctx.fill();
-  ctx.fillStyle=col;ctx.fillRect(X-9,hy+0.5,18,2.5);
-  // face
-  if(p.dy!==-1){
-    const fx=X+p.dx*4,fy=by-1+(p.dy>0?1:0);
-    const blink=((S.t+p.i*1.37)%3.6)<0.12;
-    for(const s of [-1,1]){
-      const ex=fx+s*5.5;
-      if(blink){ctx.strokeStyle='#2b2230';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(ex-2.4,fy-2);ctx.lineTo(ex+2.4,fy-2);ctx.stroke();continue}
-      ctx.fillStyle='#2b2230';ctx.beginPath();ctx.ellipse(ex,fy-2,2.6,3.3,0,0,7);ctx.fill();
-      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex+0.9,fy-3.3,1.05,0,7);ctx.fill();
-    }
+  ctx.beginPath();ctx.arc(hx-6,hy-5,6,0,7);ctx.arc(hx+6,hy-5,6,0,7);ctx.arc(hx,hy-9,7.5,0,7);ctx.fill();
+  rr(hx-9,hy-5,18,7,2);ctx.fill();
+  ctx.fillStyle=col;ctx.fillRect(hx-9,hy+0.5,18,2.5);
+  if(back)return;
+  const blink=((S.t+p.i*1.37)%3.6)<0.12;
+  const eye=(ex,ey)=>{
+    if(blink){ctx.strokeStyle=ink;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(ex-2.4,ey);ctx.lineTo(ex+2.4,ey);ctx.stroke();return}
+    ctx.fillStyle=ink;ctx.beginPath();ctx.ellipse(ex,ey,2.6,3.3,0,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex+0.9*(side?d:1),ey-1.3,1.05,0,7);ctx.fill();
+  };
+  const fy=by-1;
+  if(side){
+    eye(X+d*8,fy-2);
+    ctx.fillStyle='rgba(255,110,140,.55)';ctx.beginPath();ctx.ellipse(X+d*4.5,fy+3.5,3.2,2.1,0,0,7);ctx.fill();
+    ctx.strokeStyle=ink;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(X+d*9.5,fy+4.5);ctx.quadraticCurveTo(X+d*11.5,fy+6,X+d*13,fy+4);ctx.stroke();
+  } else {
+    for(const s2 of [-1,1])eye(X+s2*5.5,fy-1);
     ctx.fillStyle='rgba(255,110,140,.55)';
-    ctx.beginPath();ctx.ellipse(fx-9.5,fy+3,3.2,2.1,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(fx+9.5,fy+3,3.2,2.1,0,0,7);ctx.fill();
-    ctx.strokeStyle='#2b2230';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(fx,fy+2.2,2.4,0.15*Math.PI,0.85*Math.PI);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(X-9.5,fy+4,3.2,2.1,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(X+9.5,fy+4,3.2,2.1,0,0,7);ctx.fill();
+    ctx.strokeStyle=ink;ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(X,fy+3.2,2.4,0.15*Math.PI,0.85*Math.PI);ctx.stroke();
   }
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
@@ -1397,8 +1486,24 @@ function drawRoadIdle(){
 }
 
 // ---------- DOM HUD ----------
+// the player on this device (P1 when playing locally)
+const localP=()=>S.players[NET.role==='off'?0:NET.mySlot]||S.players[0];
+const upsText=o=>Object.entries(o.ups||{}).filter(([,n])=>n>0).map(([k,n])=>{const U=upById(k);return U?U.e+U.n+(n>1?'×'+n:''):''}).join('・');
+function upInfo(){
+  const ps=[localP(),...S.players].filter(Boolean);
+  const hp=ps.find(q=>q.hold&&q.hold.kind==='power');
+  if(hp){const U=upById(hp.hold.up);if(U)return `<br><b style="color:#ffd84a">⬆ ${U.e} ${U.n}</b>：${U.d}。<b>${TGTN[U.tgt]}</b>に重ねると、その1台だけ強くなります`}
+  const p=localP();if(!p)return '';
+  const c=tile(p.tx,p.ty);if(!c)return '';
+  const o=(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))?c.item:c;
+  const t=upsText(o),pro=o.pro?proInfo(o.st||o.t,o.pro):null;
+  if(!t&&!pro&&!o.bonus)return '';
+  return `<br><span class="dim">この${TGTN[o.kind==='can'||o.kind==='basket'?o.kind:c.t]||'器具'}：</span>${o.pro||o.bonus?'<b style="color:#ff79b8">★レア</b> ':''}${t?'<b style="color:#ffd84a">⬆ '+t+'</b>':''}`;
+}
 const readyBtn=document.getElementById('readyBtn');
-readyBtn.addEventListener('click',()=>doOv('ready'));
+readyBtn.addEventListener('pointerdown',e=>{e.preventDefault();readyPtr=true;try{readyBtn.setPointerCapture(e.pointerId)}catch(_){}});
+for(const ev of ['pointerup','pointercancel'])readyBtn.addEventListener(ev,()=>{readyPtr=false});
+readyBtn.addEventListener('contextmenu',e=>e.preventDefault());
 const hudEl=document.getElementById('hud'),infoEl=document.getElementById('info'),stockEl=document.getElementById('stock');
 let hudT=0;
 function renderHud(){
@@ -1428,6 +1533,7 @@ function renderHud(){
     info=`<b>キッチンのレイアウト</b>　調理器具・台（カウンター）・菜園はトラックの床に、じょうろとカゴは台の上に置きます。置いた物も持ち直せます。<br>`+
       (door?`<span class="ng">ドアの前はあけておく</span>`:bad?`<span class="ng">手が届かない器具 ${bad}個（赤い枠）</span>`:`<span class="ok">「準備完了」で出発できます</span>`)+
       (left?`　<span class="dim">外に置いたままの ${left}個は持って行かず、次の配置のときにまた外に出ます</span>`:'')+
+      upInfo()+
       `　<span class="dim">｜残り時間は次の町の営業時間にプラス（0になっても続けられます）</span>`;
   }
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
@@ -1558,16 +1664,19 @@ function emitOv(){
   const id=NET.ovId,h=NET.ovHtml,parts=[];for(let i=0;i<h.length;i+=700)parts.push(h.slice(i,i+700));
   parts.forEach((s,k)=>NET.room.emit('ov',{id,k,n:parts.length,s}).catch(()=>{}));
 }
+const encUps=o=>upTotal(o)?UPK.map(k=>upN(o,k)):0;
+const decUps=a=>Array.isArray(a)?Object.fromEntries(UPK.map((k,i)=>[k,+a[i]||0]).filter(([,n])=>n>0)):null;
 const encPlant=pl=>pl?[ING_K.indexOf(pl.id),Math.round(pl.t*10),pl.watered?1:0]:0;
 function encItem(it){
   if(!it)return 0;
   switch(it.kind){
     case 'ing':return [0,ING_K.indexOf(it.id),it.step,it.burnt?1:0];
     case 'plate':return [1,it.bare?1:0,it.items.map(x=>[ING_K.indexOf(x.id),x.step,x.burnt?1:0])];
-    case 'can':return [2,it.water,it.bonus||0];
-    case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id))];
+    case 'can':return [2,it.water,it.bonus||0,encUps(it)];
+    case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id)),encUps(it)];
+    case 'power':return [6,UPK.indexOf(it.up)];
     case 'seed':return [4,ING_K.indexOf(it.id)];
-    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant)];
+    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant),encUps(it)];
   }
   return 0;
 }
@@ -1576,7 +1685,7 @@ function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c)];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -1635,7 +1744,6 @@ function guestFrame(dt){
   if(ov.hidden&&S){
     if(inp.pick)NET.pk++; if(inp.sw)NET.sw++;
     if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))guestSend('pause');
-    if(S.phase==='layout'&&(pressed.has('KeyR')||(pads[0]&&pads[0].edge('back'))))guestSend('ready');
   } else if(!ov.hidden)overlayInput();
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw]:[0,0,0,NET.pk,NET.sw];
@@ -1710,7 +1818,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6])};
   }
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='ground')S.map[y][x].item=null;
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
@@ -1733,10 +1841,11 @@ function decItem(a){
   switch(a[0]){
     case 0:return ing(a[1],a[2],a[3]);
     case 1:return {kind:'plate',bare:!!a[1],items:(Array.isArray(a[2])?a[2]:[]).slice(0,3).map(x=>ing(x[0],x[1],x[2]))};
-    case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0};
-    case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean)};
+    case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0,ups:decUps(a[3])};
+    case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean),ups:decUps(a[3])};
+    case 6:return UPK[a[1]]?{kind:'power',up:UPK[a[1]]}:null;
     case 4:return {kind:'seed',id:ING_K[a[1]]||'lettuce'};
-    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4])};if(a[3])o.n=+a[3];return o}
+    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4]),ups:decUps(a[5])};if(a[3])o.n=+a[3];return o}
   }
   return null;
 }
@@ -1806,11 +1915,12 @@ let last=performance.now();
 function frame(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   pollPads();
+  if(!ov.hidden)ovHoldTick(dt);
+  if(S)readyTick(dt);
   if(NET.role==='guest'){guestFrame(dt)}
   else if(!ov.hidden){overlayInput()}
   else if(S&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout')){
     // layout: R (or the gamepad Back/Select button) finishes; finishing opens the town choice
-    if(S.phase==='layout'&&(pressed.has('KeyR')||(pads[0]&&pads[0].edge('back'))))finishLayout();
     if(!ov.hidden){}
     else if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))pauseGame();
     else update(dt);

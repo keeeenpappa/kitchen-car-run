@@ -413,7 +413,7 @@ function finishLayout(){
   const miss=missingUnits();
   if(miss.length){S.toast={text:'トラックに置いていない：'+miss.map(reqName).join('・'),t:0,life:3.5};sfx('nope');return}
   const bad=unreachable();
-  if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：レバーの前（右端の真ん中）をあけて通路をつなぐ（赤い枠）',t:0,life:3};sfx('nope');return}
+  if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：運転席の前まで通路をつなぐ（赤い枠）',t:0,life:3};sfx('nope');return}
   if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};sfx('nope');return}
   const left=layoutLeft();
   stashOutside();
@@ -494,6 +494,7 @@ function furnPick(p,c,tx,ty){
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
+    if(tx===LEVER_FRONT[0]&&ty===LEVER_FRONT[1]){say(p,'運転席の前はあけておく');return true}
     S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
@@ -1642,7 +1643,7 @@ function box3d(X,Y,top,front,opt){
   ctx.strokeStyle='rgba(60,35,10,.22)';ctx.lineWidth=1;rr(x,y,w,th+fh,7);ctx.stroke();
   return {x,y,w,th,cx:X+T/2,cy:y+th/2,fy:y+th,fh};
 }
-const BOXOPT={fridge:{front:12,lift:4}};
+const BOXOPT={fridge:{front:24,lift:6}};
 function unitGeom(t,X,Y){
   if(t==='trash')return {cx:X+T/2,cy:Y+T/2-4};
   if(t==='window')return {cx:X+T/2,cy:Y+T/2};
@@ -1678,7 +1679,7 @@ function unitBase(c,X,Y,loose){
       ctx.strokeStyle='#1f2125';ctx.lineWidth=2;ctx.beginPath();for(let k=0;k<4;k++){const a=k*Math.PI/2+Math.PI/4;ctx.moveTo(b.cx+Math.cos(a)*5,b.cy+Math.sin(a)*5);ctx.lineTo(b.cx+Math.cos(a)*13,b.cy+Math.sin(a)*13)}ctx.stroke();
       break}
     case 'blender':{
-      b=box3d(X,Y,'#e9d3a8','#b98d55');
+      b=box3d(X,Y,'#a9e0cf','#4f9a86');   // mint stand: not mistaken for a counter
       ctx.save();ctx.shadowColor='rgba(0,0,0,.3)';ctx.shadowBlur=4;ctx.shadowOffsetY=3;
       ctx.fillStyle='#4a4f57';rr(b.cx-11,b.cy+1,22,11,4);ctx.fill();ctx.restore();
       ctx.fillStyle='#7fd893';ctx.beginPath();ctx.arc(b.cx+6,b.cy+6.5,1.8,0,7);ctx.fill();
@@ -1687,13 +1688,18 @@ function unitBase(c,X,Y,loose){
       ctx.strokeStyle='rgba(60,110,140,.5)';ctx.lineWidth=1;ctx.stroke();
       ctx.fillStyle='rgba(255,255,255,.75)';ctx.fillRect(b.cx-7,b.cy-15,2.2,13);
       ctx.fillStyle='#3a3f46';rr(b.cx-11,b.cy-20,22,4,2);ctx.fill();
-      frontLabel(b,'ミキサー','#6b4a22');
+      frontLabel(b,'ミキサー','#1f4d43');
       break}
     case 'fridge':{
-      b=box3d(X,Y,'#e3f1f7','#b9d4e0',BOXOPT.fridge);
-      ctx.strokeStyle='rgba(70,110,130,.35)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(b.x+2,b.fy+8);ctx.lineTo(b.x+b.w-2,b.fy+8);ctx.stroke();
-      ctx.fillStyle='#8aa9b8';rr(b.x+b.w-9,b.fy+2,3,5,1.5);ctx.fill();rr(b.x+b.w-9,b.fy+11,3,8,1.5);ctx.fill();
-      emoji('❄️',b.cx,b.cy,15);text('冷蔵庫',b.cx-3,b.fy+15,8,'#2d5566',800);
+      // tall: a narrow top and a big front with two doors (freezer above, fridge below)
+      b=box3d(X,Y,'#e3f1f7','#c9e0ea',BOXOPT.fridge);
+      const fg=ctx.createLinearGradient(b.x,0,b.x+b.w,0);fg.addColorStop(0,'#d6e9f1');fg.addColorStop(0.5,'#eef7fb');fg.addColorStop(1,'#b7d2de');
+      ctx.fillStyle=fg;rr(b.x+1.5,b.fy+1,b.w-3,b.fh-2.5,[0,0,6,6]);ctx.fill();
+      const split=b.fy+b.fh*0.36;
+      ctx.strokeStyle='rgba(70,110,130,.45)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(b.x+2,split);ctx.lineTo(b.x+b.w-2,split);ctx.stroke();
+      ctx.fillStyle='#7d9eae';rr(b.x+b.w-9,b.fy+3,3,split-b.fy-6,1.5);ctx.fill();rr(b.x+b.w-9,split+3,3,b.fh*0.4,1.5);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.6)';rr(b.x+4,split+3,2.5,b.fh*0.45,1.2);ctx.fill();
+      emoji('❄️',b.cx-3,b.fy+(split-b.fy)/2+0.5,10);
       break}
     case 'seedbox':{
       b=box3d(X,Y,'#d7b583','#9c7343');
@@ -1701,12 +1707,16 @@ function unitBase(c,X,Y,loose){
       emoji('🌱',b.cx,b.cy,15);frontLabel(b,'種箱');
       break}
     case 'plates':{
-      b=box3d(X,Y,'#e9d3a8','#b98d55');
-      for(let k=0;k<4;k++){const py=b.cy+5-k*3.4;
-        ctx.fillStyle='#d9d4c8';ctx.beginPath();ctx.ellipse(b.cx,py+1.3,14,5.5,0,0,7);ctx.fill();
+      // a blue-grey stand with a tall stack of plates rising above it
+      b=box3d(X,Y,'#c9dbe8','#6f8ea6');
+      ctx.save();ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=4;ctx.shadowOffsetY=3;
+      ctx.fillStyle='#d9d4c8';ctx.beginPath();ctx.ellipse(b.cx,b.cy+6,14,5.5,0,0,7);ctx.fill();ctx.restore();
+      const N=8;
+      for(let k=0;k<N;k++){const py=b.cy+5-k*3;
+        ctx.fillStyle=k%2?'#cfc9bb':'#d9d4c8';ctx.beginPath();ctx.ellipse(b.cx,py+1.4,14,5.5,0,0,7);ctx.fill();
         const g=ctx.createLinearGradient(0,py-5,0,py+5);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#e9e4d8');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(b.cx,py,14,5.5,0,0,7);ctx.fill()}
-      ctx.strokeStyle='rgba(120,160,190,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(b.cx,b.cy+5-3*3.4,9,3.2,0,0,7);ctx.stroke();
-      frontLabel(b,'皿','#6b4a22');
+      ctx.strokeStyle='rgba(70,120,170,.7)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(b.cx,b.cy+5-(N-1)*3,9,3.2,0,0,7);ctx.stroke();
+      frontLabel(b,'皿','#18324a');
       break}
     case 'trash':{
       if(!loose)softShadow(X+T/2+2,Y+T-6,18,6,.3);
@@ -1715,7 +1725,6 @@ function unitBase(c,X,Y,loose){
       ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=1;for(const k of [-6,0,6]){ctx.beginPath();ctx.moveTo(cx+k,Y+17);ctx.lineTo(cx+k*0.85,Y+T-9);ctx.stroke()}
       const lg=ctx.createLinearGradient(0,Y+6,0,Y+16);lg.addColorStop(0,'#c9d1d6');lg.addColorStop(1,'#7c878e');
       ctx.fillStyle=lg;ctx.beginPath();ctx.ellipse(cx,Y+12,16,5.5,0,0,7);ctx.fill();ctx.fillStyle='#59636a';rr(cx-5,Y+5,10,4,2);ctx.fill();
-      text('ゴミ箱',cx,Y+T-12,8,'#fff',800);
       break}
     case 'sink':{
       b=box3d(X,Y,'#d5dde1','#8f9ca4');
@@ -1726,7 +1735,6 @@ function unitBase(c,X,Y,loose){
       ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1;rr(bx,by,bw,bh,6);ctx.stroke();
       ctx.strokeStyle='#b5c0c6';ctx.lineWidth=3.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(b.cx,b.y+1);ctx.lineTo(b.cx,b.y-4);ctx.quadraticCurveTo(b.cx,b.y-8,b.cx+5,b.y-7);ctx.stroke();
       ctx.strokeStyle='#eef3f5';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(b.cx-0.8,b.y);ctx.lineTo(b.cx-0.8,b.y-4);ctx.stroke();ctx.lineCap='butt';
-      frontLabel(b,'シンク');
       break}
     case 'planter':{
       b=box3d(X,Y,'#8a6038','#5e3e20');
@@ -1763,44 +1771,37 @@ function drawCab(front){
     ctx.beginPath();ctx.moveTo(cx+2,cy+4);ctx.lineTo(cx+13,cy+22);ctx.stroke();           // column
     ctx.lineWidth=4.5;ctx.beginPath();ctx.ellipse(cx,cy,4.5,13,-0.28,0,7);ctx.stroke();    // the wheel, seen from the side
     ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(cx-1,cy,4.5,12,-0.28,Math.PI*0.9,Math.PI*1.4);ctx.stroke();
+    // the speed lever by the seat (green = ふつう, tilted forward and red = 急ぐ)
+    const fast=S&&S.speed===2;LEVA+=((fast?0.6:-0.35)-LEVA)*0.25;
+    const px=16.98*T,py=3.5*T,L=13,kx=px+Math.sin(LEVA)*L,ky=py-Math.cos(LEVA)*L;
+    ctx.fillStyle='#1d4f4c';ctx.beginPath();ctx.ellipse(px,py,6,2.6,0,0,7);ctx.fill();
+    ctx.strokeStyle='#9aa4aa';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(kx,ky);ctx.stroke();
+    const kg=ctx.createRadialGradient(kx-1.5,ky-1.5,0.5,kx,ky,5);kg.addColorStop(0,fast?'#ffb3a8':'#c9f5d3');kg.addColorStop(0.5,fast?'#ff5d5d':'#52c374');kg.addColorStop(1,fast?'#b52a2a':'#2b8a4a');
+    ctx.fillStyle=kg;ctx.beginPath();ctx.arc(kx,ky,5,0,7);ctx.fill();
     ctx.lineCap='butt';
   }
   ctx.restore();
 }
 let LEVA=-0.5;
+// the tile under the cab window is the way into the driver's seat: a cab door with a step
 function drawLever(X,Y){
-  const fast=S&&S.speed===2,target=fast?0.65:-0.5;
-  LEVA+=(target-LEVA)*0.25;
-  const cx=X+T/2+4;
-  softShadow(cx,Y+T-3,T*0.46,5,.35);
-  // console: teal top, darker front, cream trim
-  ctx.fillStyle='#22625f';rr(cx-T*0.44,Y+T*0.42,T*0.88,T*0.52,[4,4,9,9]);ctx.fill();
-  const g=ctx.createLinearGradient(0,Y+6,0,Y+T*0.62);g.addColorStop(0,'#7fd6d1');g.addColorStop(1,'#3fa6a1');
-  ctx.fillStyle=g;rr(cx-T*0.44,Y+6,T*0.88,T*0.56,10);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-T*0.32,Y+7);ctx.lineTo(cx+T*0.32,Y+7);ctx.stroke();
-  // the slot the lever moves in, with the two marks
-  const px=cx,py=Y+T*0.5,L=16;
-  ctx.strokeStyle='#1d4f4c';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.arc(px,py,L,-Math.PI/2-0.55,-Math.PI/2+0.7);ctx.stroke();
-  for(const [a,col] of [[-0.5,'#7fd893'],[0.65,'#ff6d6d']]){ctx.fillStyle=col;ctx.beginPath();ctx.arc(px+Math.sin(a)*(L+6),py-Math.cos(a)*(L+6),2.4,0,7);ctx.fill()}
-  // stick (chrome) and a big glossy knob
-  const kx=px+Math.sin(LEVA)*L,ky=py-Math.cos(LEVA)*L;
-  ctx.strokeStyle='#9aa4aa';ctx.lineWidth=4.5;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(kx,ky);ctx.stroke();
-  ctx.strokeStyle='#eef2f4';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px-1,py);ctx.lineTo(kx-1,ky);ctx.stroke();ctx.lineCap='butt';
-  ctx.fillStyle='#1d4f4c';ctx.beginPath();ctx.ellipse(px,py,6,3,0,0,7);ctx.fill();
-  const kg=ctx.createRadialGradient(kx-2.5,ky-2.5,1,kx,ky,8);kg.addColorStop(0,fast?'#ffb3a8':'#c9f5d3');kg.addColorStop(0.5,fast?'#ff5d5d':'#52c374');kg.addColorStop(1,fast?'#b52a2a':'#2b8a4a');
-  ctx.fillStyle=kg;ctx.beginPath();ctx.arc(kx,ky,7.5,0,7);ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.ellipse(kx-2.5,ky-3,2.2,1.4,-0.6,0,7);ctx.fill();
-  // speed tag on the front
-  ctx.fillStyle=fast?'#d63b3b':'#2e7d4f';rr(cx-16,Y+T*0.74-7,32,14,7);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1;ctx.stroke();
-  text(fast?'急ぐ':'ふつう',cx,Y+T*0.74,9,'#fff',800);
+  const x=X+6,y=Y+3,w=T-10,h=T-8;
+  softShadow(x+w/2,Y+T-2,w*0.55,4,.3);
+  const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,'#e3a12a');g.addColorStop(1,'#c4861a');
+  ctx.fillStyle=g;rr(x,y,w,h,[6,10,4,4]);ctx.fill();
+  ctx.strokeStyle='rgba(110,60,0,.45)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x+4,y+2);ctx.lineTo(x+w-6,y+2);ctx.stroke();
+  ctx.fillStyle='#fff3d6';rr(x+w-11,y+h*0.45,8,3.5,1.7);ctx.fill();                 // handle
+  ctx.fillStyle='#8c5a12';rr(x-2,Y+T-8,w+4,5,2);ctx.fill();                          // step
+  ctx.fillStyle='rgba(255,255,255,.35)';rr(x-1,Y+T-8,w+2,1.5,1);ctx.fill();
+  emoji('💺',x+w/2-3,y+h*0.42,15);
 }
 function frontLabel(b,t,col){text(t,b.cx,b.fy+b.fh/2-0.5,8,col||'rgba(255,255,255,.9)',800)}
 function drawTile(c,x,y){
   const X=x*T,Y=y*T;
   const lay=S&&S.phase==='layout'&&inTruck(x,y);
   if(c.t==='floor'){   // the planks themselves come from the cached floor layer
-    if(lay&&S.players.some(q=>holdsFurn(q)&&q.hold.st!=='table')&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])){ctx.strokeStyle='rgba(60,120,140,.4)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
+    if(lay&&S.players.some(q=>holdsFurn(q)&&q.hold.st!=='table')&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])&&!(x===LEVER_FRONT[0]&&y===LEVER_FRONT[1])){ctx.strokeStyle='rgba(60,120,140,.4)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
     return}
   if(c.t==='gap'){ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#d99a22';ctx.fillRect(X+4,Y+T-12,T-8,6);
     if(lay){ctx.strokeStyle='rgba(90,60,10,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}

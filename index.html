@@ -49,6 +49,7 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 #ov[hidden]{display:none}
 #readyBtn{position:absolute;bottom:4%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
   background-image:linear-gradient(90deg,rgba(255,255,255,.65) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
+.money{display:flex;align-items:baseline;justify-content:center;gap:.4em;margin:.2em 0 .5em;font-weight:800;color:#ffe08a}.money .mk{font-size:1em;color:#cfe0e2}.money .mv{font-size:2.4em;line-height:1;text-shadow:0 2px 0 rgba(0,0,0,.35)}.money .mx{font-size:1em;color:#ff9c9c;margin-left:.8em}
 .ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
 .ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
 #readyBtn[hidden]{display:none}
@@ -436,7 +437,7 @@ function showEquipShop(){
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
-    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（←→で選んで <b>${OVK()}</b> で購入）。買った物は、町を選んだあとの配置の時間に外に出ます。所持金 <b>${S.money}G</b></p>
+    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（←→で選んで <b>${OVK()}</b> で購入）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
     <div class="cards">${cards}</div>
     <div class="row"><button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
@@ -1046,7 +1047,7 @@ function endStop(){
   const last=S.stop>=STOPS;
   showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
     <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b></p>
-    <p>所持金 ${S.money}G ／ 評判 ${'♥'.repeat(S.hearts)}</p>
+    ${moneyBig('評判 '+'♥'.repeat(S.hearts))}
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
     <div class="row"><button class="ovbtn hold autofocus" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}（${OVK()}）</button></div></div>`);
 }
@@ -1075,6 +1076,8 @@ const UPS=[
 function addPlanter(){S.pendingEquip.push({id:'planter',pro:0})}
 const TGTN={stove:'コンロ',board:'まな板',blender:'ミキサー',planter:'菜園',can:'じょうろ',basket:'カゴ'};
 const upById=id=>UPS.find(u=>u.id===id);
+// the money, big, on the screens between towns
+const moneyBig=extra=>`<div class="money"><span class="mk">所持金</span><span class="mv">🪙 ${S.money}G</span>${extra?`<span class="mx">${extra}</span>`:''}</div>`;
 function showUpgrade(){
   S.phase='upgrade';
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
@@ -1084,7 +1087,7 @@ function showUpgrade(){
       <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
       <span class="needs">${u.tgt?`<span class="pay">⬆ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
-    <p>無料で1つもらえます。←→で選んで <b>${OVK()}</b> で決定。所持金 ${S.money}G</p>
+    <p>無料で1つもらえます。←→で選んで <b>${OVK()}</b> で決定。</p>${moneyBig()}
     <div class="cards">${cards}</div>
     <div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G）</button></div>
     ${owned?`<p class="mut">持っている強化：${owned}</p>`:''}</div>`);
@@ -1268,7 +1271,7 @@ function showChoose(){
       <span class="needs">${townNeeds(t).map(id=>needLine(id,t)).join('')}</span>
       <span class="pay">${MOOD[Math.round((t.pay-1)*100)]||""}<br>${payLabel(t.pay,true).replace(/^[^（]*/,"")}</span>${t.lively?'<span class="sub">駅前なので、にぎわいやすい</span>':''}</button>`).join('');
   showOv(`<div class="box big"><h2>${S.stop+1}つ目の町を選ぶ（全${STOPS}町）</h2>
-    <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。所持金 ${S.money}G</p>
+    <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。</p>${moneyBig()}
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
     ${S.stop>0?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
     <div class="cards">${cards}</div>
@@ -2324,6 +2327,26 @@ function drawPlayers(){
     if(p.msgT>0){ctx.globalAlpha=Math.min(1,p.msgT*2);ctx.fillStyle='rgba(16,26,30,.9)';ctx.font=`700 12px ${FNT}`;const w=ctx.measureText(p.msg).width+14;rr(X-w/2,Y-70,w,20,6);ctx.fill();text(p.msg,X,Y-60,12,'#fff');ctx.globalAlpha=1}
   }
 }
+// online: friends who joined mid-game wait here (small chefs) until the town's service is over
+function drawWaiting(){
+  const n=S.waitN||0,watching=NET.role==='guest'&&NET.mySlot<0;
+  if(n>0){
+    const x0=18.2*T,y0=7.0*T,w=5.8*T,h=50;
+    ctx.fillStyle='rgba(16,26,30,.88)';rr(x0,y0,w,h,12);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
+    text('待機中',x0+12,y0+16,13,'#ffe08a',800,'left');
+    text('営業が終わったら参加',x0+12,y0+35,11,'#cfe0e2',700,'left');
+    for(let k=0;k<n;k++){const slot=S.players.length+k,cx=x0+w-26-k*44,cy=y0+30;
+      ctx.save();ctx.translate(cx,cy);ctx.scale(0.62,0.62);ctx.globalAlpha=0.55+0.45*Math.abs(Math.sin(S.t*2+k));
+      drawChef({i:slot,x:0,y:0,dx:0,dy:1},0,0);ctx.restore();
+      text('P'+(slot+1),cx,y0+8,10,PCOL[slot],800)}
+  }
+  if(watching){
+    const msg='観戦中：営業が終わったら参加します',y=(VH-1.05)*T;
+    ctx.font=`800 15px ${FNT}`;const w=ctx.measureText(msg).width+36;
+    ctx.fillStyle='rgba(60,36,96,.92)';rr(GW*T/2-w/2,y,w,30,15);ctx.fill();ctx.strokeStyle='#e2c9ff';ctx.lineWidth=1.5;ctx.stroke();
+    text(msg,GW*T/2,y+15,15,'#fff',800);
+  }
+}
 function shade(hex,k){
   const n=parseInt(hex.slice(1),16),f=v=>Math.max(0,Math.min(255,Math.round(v*(1+k))));
   return `rgb(${f(n>>16)},${f((n>>8)&255)},${f(n&255)})`;
@@ -2530,6 +2553,7 @@ function draw(){
   drawMenus();
   drawTopBar();
   drawSidePanel();
+  drawWaiting();
   if(arr)drawArrive();
   if(S.toast){
     const a=Math.min(1,(S.toast.life-S.toast.t)*2);ctx.globalAlpha=a;
@@ -2710,6 +2734,14 @@ function leaveOnline(){
   if(NET.lobby&&NET.role==='host')NET.lobby.presence({host:null}).catch(()=>{});
   Object.assign(NET,{role:'off',mirror:false,localOv:null,slots:{},mySlot:0,inputs:[],hostPeer:null});
 }
+// this browser's id: a guest who drops out and joins again gets the same player back
+let UID=null;
+function myUid(){
+  if(UID)return UID;
+  try{UID=localStorage.getItem('kcr-uid')}catch(_){}
+  if(!UID||!/^[a-z0-9]{8,16}$/.test(UID)){UID=Math.random().toString(36).slice(2,12).padEnd(8,'0');try{localStorage.setItem('kcr-uid',UID)}catch(_){}}
+  return UID;
+}
 // ----- host -----
 async function startHosting(){
   if(!NET.lobby)return;
@@ -2741,11 +2773,49 @@ function showHostLobby(){
 }
 function hostStart(mode){
   const g=hostGuests().slice(0,3);
-  NET.slots={};
-  g.forEach((p,i)=>{const pr=p.presence,k=i+1;NET.slots[p.peer]=k;
-    NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0});
-  NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:false}}).catch(()=>{});
+  NET.slots={};NET.uidSlot={};NET.waiting=[];
+  g.forEach((p,i)=>bindSlot(p,i+1));
+  // the room stays open: friends can still join (they watch, and come in once the town's service is over)
+  NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true}}).catch(()=>{});
   newRun(1+g.length,mode==='layout'?'layout':'preset');
+}
+// tie a guest to player slot k (its presses so far don't count)
+function bindSlot(p,k){
+  const pr=p.presence||{};
+  for(const peer in NET.slots)if(NET.slots[peer]===k)delete NET.slots[peer];
+  NET.slots[p.peer]=k;if(typeof pr.uid==='string')NET.uidSlot[pr.uid]=k;
+  NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0;
+}
+// a free spot on the truck floor near the slot's start position
+function spawnSpot(k){
+  let [x,y]=START_POS[k]||START_POS[0];
+  if(S.phase==='stop'||hit(x,y)){for(let yy=5;yy>=2;yy--)for(let xx=3;xx<=14;xx++)if(!hit(xx+.5,yy+.5)&&!S.players.some(q=>Math.hypot(q.x-xx-.5,q.y-yy-.5)<0.8))return [xx+.5,yy+.5]}
+  return [x,y];
+}
+// guests in the room but not playing yet; rejoining guests get their old chef back at once,
+// new ones are let in when no town is open (layout, drive, the screens in between)
+function hostRoster(){
+  const guests=NET.room.peers().filter(p=>!p.sameTab&&p.presence&&p.presence.g===1),live=new Set(guests.map(p=>p.peer));
+  for(const p of guests){
+    if(NET.slots[p.peer])continue;
+    const k=NET.uidSlot[p.presence.uid];
+    const taken=k&&Object.keys(NET.slots).some(peer=>NET.slots[peer]===k&&live.has(peer));
+    if(k&&S.players[k]&&!taken){bindSlot(p,k);S.toast={text:'P'+(k+1)+' がもどってきました',t:0,life:2.5};continue}
+    if(!NET.waiting.includes(p.peer))NET.waiting.push(p.peer);
+  }
+  // someone who left: their chef stands still (no stuck keys)
+  for(const peer in NET.slots)if(!live.has(peer)){NET.inputs[NET.slots[peer]]=null}
+  NET.waiting=NET.waiting.filter(peer=>live.has(peer)&&!NET.slots[peer]);
+  const canIn=S.phase!=='stop'&&S.phase!=='over'&&S.phase!=='end';
+  while(canIn&&NET.waiting.length&&S.players.length<4){
+    const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
+    const k=S.players.length,[x,y]=spawnSpot(k);
+    S.players.push({i:k,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0});
+    S.np=S.players.length;bindSlot(p,k);
+    S.toast={text:'P'+(k+1)+' が参加しました！',t:0,life:3};sfx('ready');
+    NET.lobby.presence({host:{code:NET.code,n:S.np,open:true}}).catch(()=>{});
+  }
+  S.waitN=Math.min(NET.waiting.length,4-S.players.length);
 }
 function remoteInput(i){
   const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false};
@@ -2774,6 +2844,7 @@ function hostFrame(dt){
   // presses made while a screen was up are dropped
   if(!ov.hidden||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4]}});
   if(!S)return;
+  hostRoster();
   NET.snapT-=dt; if(NET.snapT<=0){NET.snapT=1/15;sendSnap()}
   if(!ov.hidden&&performance.now()-NET.ovSentAt>2500)emitOv();
 }
@@ -2828,6 +2899,7 @@ function sendSnap(){
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
+  d.wt=S.waitN||0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
   let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
@@ -2847,7 +2919,7 @@ async function joinRoom(code){
     if(NET.role!=='guest'){room.leave().catch(()=>{});return}
     NET.room=room;
     room.on('ov',onOvMsg,()=>{});
-    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null]}).catch(()=>{});
+    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null],uid:myUid()}).catch(()=>{});
     if(NET.localOv==='conn')guestLocalOv('wait');
   }catch(e){if(NET.role!=='guest')return;leaveOnline();NET.err='部屋 '+code+' が見つかりませんでした。コードを確かめてください。';showTitle()}
 }
@@ -2886,8 +2958,8 @@ function guestFrame(dt){
     if(d.q!==NET.seenSnap){
       NET.seenSnap=d.q;NET.lastSnapAt=performance.now();
       const slot=me&&d.sl&&typeof d.sl==='object'?d.sl[me.peer]:undefined;
-      if(slot==null){if(NET.localOv!=='late')guestLocalOv('late');return}
-      NET.mySlot=+slot||0;
+      // not playing yet: watch the game (the host lets us in once the town's service is over)
+      NET.mySlot=slot==null?-1:+slot||0;
       try{applySnap(d)}catch(e){}
       NET.localOv=null;syncGuestOv(+d.o||0);
       // follow the host's cursor (and its long-press bar) on the host's screens
@@ -2941,6 +3013,7 @@ function applySnap(d){
   const n=v=>+v||0;
   S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;
+  S.waitN=Math.max(0,Math.min(3,n(d.wt)));
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100}):null;
   S.town=town(d.tw);S.next=town(d.nx);

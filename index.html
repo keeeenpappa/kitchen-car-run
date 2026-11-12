@@ -728,7 +728,7 @@ function doPick(p,c,tx,ty){
       if(S.phase==='drive')say(p,shopAtWindow(tx)?BL(p,'act')+'長押しで買う':'お店が来たら買える');
       return;
     case 'market':
-      if(S.phase==='stop')say(p,BL(p,'act')+'長押しで買う');
+      if(S.phase==='stop'&&S.market.length){p.mk=true;p.menuLast='0,0';p.actT=0;p.lock=true}
       return;
     case 'gather':
       startGather(p,c,tx,ty);return;
@@ -1145,6 +1145,18 @@ const MENU={
   fridge:{title:'冷蔵庫',cols:5,list:()=>stockList(),count:id=>S.stock[id]||0,key:'lastF'},
   seedbox:{title:'種箱',cols:4,list:()=>seedList(),count:id=>S.seeds[id]||0,key:'lastS'},
 };
+function marketInput(p,inp,dt){
+  const c=tile(p.tx,p.ty);
+  if(S.phase!=='stop'||!c||c.t!=='market'||inp.pick||inp.sw){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
+  const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0, dy=inp.my<-0.5?-1:0, key=dx+','+dy;
+  if(dy<0){p.mk=false;p.prevAct=inp.act;return}           // step back up: close the list
+  let move=false;
+  if(dx){if(key!==p.menuLast){move=true;p.menuRep=0.32}else{p.menuRep-=dt;if(p.menuRep<=0){move=true;p.menuRep=0.11}}}
+  p.menuLast=key;
+  if(move){p.cur=wrap(p.cur,S.market.length)+dx;p.actT=0}
+  if(!inp.act){p.lock=false;p.actT=0}else doAct(p,c,p.tx,p.ty,dt);
+  p.prevAct=inp.act;
+}
 function menuInput(p,inp,dt){
   const M=MENU[p.menu.kind],list=M.list(),n=list.length,cols=M.cols;
   if(!n){p.menu=null;return}
@@ -1193,6 +1205,7 @@ function update(dt){
   S.players.forEach((p,i)=>{
     const inp=readInput(i);
     if(p.menu){menuInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
+    if(p.mk){marketInput(p,inp,dt);if(p.msgT>0)p.msgT-=dt;return}
     if(p.g){gatherInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
@@ -1541,6 +1554,10 @@ function drawTown(){
   text('市場（種もある）',mx-T*0.4,(GH-0.5)*T,11,'#f4eedf',800,'left');
   drawGroundItems();
   drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
+  const mp=S.players.find(q=>q.mk);
+  if(mp){const hx=(MKT[0]+1.2)*T,hy=(MKT[1]-0.45)*T-14;
+    ctx.font=`800 11px ${FNT}`;const msg='←→ 選ぶ　'+BL(mp,'act')+'長押し 買う　'+BL(mp,'pick')+' 閉じる',w=ctx.measureText(msg).width+16;
+    ctx.fillStyle='rgba(16,26,30,.9)';rr(hx-4,hy-10,w,20,8);ctx.fill();text(msg,hx+4,hy,11,'#ffe08a',800,'left')}
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
     const O=GOBJ[k],X=O.x*T,Y=GROW*T;
@@ -2077,7 +2094,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList(),
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -2206,7 +2223,7 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12]});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));

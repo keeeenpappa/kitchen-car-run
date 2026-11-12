@@ -1331,6 +1331,7 @@ function drawTile(c,x,y){
     if(lay){ctx.strokeStyle='rgba(90,60,10,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
     return}
   if(c.t==='wall')return;   // the rounded body is drawn by drawTruckShell
+  if(c.t==='table'){drawTableShape(X+T/2,Y+T/2);return}
   if(c.t==='door'){
     if(S.phase==='stop'||S.phase==='layout'){ctx.fillStyle='#ece3cf';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#bfa77a';ctx.fillRect(X,Y+T-6,T,6)}
     else{ctx.fillStyle='#c8862a';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#f6d36a';ctx.beginPath();ctx.arc(X+T*0.78,Y+T*0.5,3,0,7);ctx.fill()}
@@ -1399,14 +1400,11 @@ function drawTile(c,x,y){
 function drawTruckShell(){
   // soft shadow on the ground
   ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(9.4*T,7*T+14,8.6*T,10,0,0,7);ctx.fill();
-  // cab: round nose, big round window, headlight, a little face
+  // cab: round nose, big round window, headlight
   ctx.fillStyle='#e9a92c';rr(15.6*T,1.9*T,T*2.2,5.1*T-2,[10,30,22,10]);ctx.fill();
   ctx.fillStyle='#d48f1c';rr(15.6*T,5.05*T,T*2.2,10,[0,0,6,0]);ctx.fill();
   ctx.fillStyle='#bfe4f2';rr(16.25*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.fill();
   ctx.fillStyle='rgba(255,255,255,.7)';rr(16.4*T,2.32*T,7,T*0.8,4);ctx.fill();
-  ctx.fillStyle='#2a1d05';ctx.beginPath();ctx.arc(16.95*T,4.15*T,3.2,0,7);ctx.arc(17.38*T,4.15*T,3.2,0,7);ctx.fill();
-  ctx.strokeStyle='#2a1d05';ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.arc(17.16*T,4.3*T,6,0.15*Math.PI,0.85*Math.PI);ctx.stroke();ctx.lineCap='butt';
-  ctx.fillStyle='rgba(255,120,120,.55)';ctx.beginPath();ctx.ellipse(16.7*T,4.45*T,6,4,0,0,7);ctx.ellipse(17.62*T,4.45*T,6,4,0,0,7);ctx.fill();
   ctx.fillStyle='#fff3d6';ctx.beginPath();ctx.arc(17.72*T,5.7*T,8,0,7);ctx.fill();ctx.fillStyle='#f6d36a';ctx.beginPath();ctx.arc(17.72*T,5.7*T,5,0,7);ctx.fill();
   // body: one rounded box behind the kitchen tiles
   ctx.fillStyle='#e9a92c';rr(T,T,15.4*T,6*T-2,24);ctx.fill();
@@ -1565,12 +1563,14 @@ function drawQueueMat(){
 function drawTables(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){
     if(S.map[y][x].t!=='table')continue;
-    const X=x*T+T/2,Y=y*T+T/2;
-    ctx.fillStyle='rgba(0,0,0,.15)';ctx.beginPath();ctx.ellipse(X,Y+T*0.36,T*0.42,7,0,0,7);ctx.fill();
-    ctx.fillStyle='#8a5a34';ctx.fillRect(X-3,Y+2,6,T*0.34);
-    ctx.fillStyle='#c98b52';ctx.beginPath();ctx.ellipse(X,Y+2,T*0.44,T*0.26,0,0,7);ctx.fill();
-    ctx.strokeStyle='#8a5a34';ctx.lineWidth=2;ctx.stroke();
+    drawTableShape(x*T+T/2,y*T+T/2);
   }
+}
+function drawTableShape(X,Y){
+  ctx.fillStyle='rgba(0,0,0,.15)';ctx.beginPath();ctx.ellipse(X,Y+T*0.36,T*0.42,7,0,0,7);ctx.fill();
+  ctx.fillStyle='#8a5a34';ctx.fillRect(X-3,Y+2,6,T*0.34);
+  ctx.fillStyle='#c98b52';ctx.beginPath();ctx.ellipse(X,Y+2,T*0.44,T*0.26,0,0,7);ctx.fill();
+  ctx.strokeStyle='#8a5a34';ctx.lineWidth=2;ctx.stroke();
 }
 function drawCustBody(X,Y,c){
   ctx.fillStyle=`hsl(${c.hue} 45% 62%)`;ctx.beginPath();ctx.arc(X,Y,13,0,7);ctx.fill();

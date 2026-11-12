@@ -575,6 +575,14 @@ function bringInside(){
 
 // ---------- feedback ----------
 function say(p,m){p.msg=m;p.msgT=1.6}
+// button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
+const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
+const BTN_N={pick:'持つ',act:'作業',sw:'切替'};
+function BL(p,k){
+  if(isTouch&&(NET.role!=='off'||!p||p.i===0))return BTN_N[k];
+  const i=NET.role!=='off'?0:Math.min(2,p?p.i:0);
+  return BTN_N[k]+'（'+KEYL[i][k]+'）';
+}
 function float(x,y,text,col){S.floats.push({x,y,text,col:col||'#fff',t:0})}
 
 // ---------- lists ----------
@@ -662,7 +670,7 @@ function doPick(p,c,tx,ty){
       if(p.hold){if(p.hold.kind==='can')say(p,'じょうろは捨てられない');else if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
       return;
     case 'sink':
-      if(p.hold&&p.hold.kind==='can')say(p,'作業ボタン長押しで水を汲む');
+      if(p.hold&&p.hold.kind==='can')say(p,BL(p,'act')+'長押しで水を汲む');
       return;
     case 'planter':
       if(c.plant){
@@ -683,10 +691,10 @@ function doPick(p,c,tx,ty){
     case 'lever':
       S.speed=S.speed===2?1:2;say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）');return;
     case 'window':
-      if(S.phase==='drive')say(p,shopAtWindow(tx)?'作業ボタン長押しで買う':'お店が来たら買える');
+      if(S.phase==='drive')say(p,shopAtWindow(tx)?BL(p,'act')+'長押しで買う':'お店が来たら買える');
       return;
     case 'market':
-      if(S.phase==='stop')say(p,'作業ボタン長押しで買う');
+      if(S.phase==='stop')say(p,BL(p,'act')+'長押しで買う');
       return;
     case 'gather':
       startGather(p,c,tx,ty);return;
@@ -1551,22 +1559,22 @@ function drawChef(p,X,Y){
 }
 function drawGather(p){
   const g=p.g,O=GOBJ[g.obj];if(!O)return;
-  const w=176,h=62;let x=p.x*T-w/2,y=p.y*T-100;x=Math.max(4,Math.min(GW*T-w-4,x));
+  const w=176,h=78;let x=p.x*T-w/2,y=p.y*T-116;x=Math.max(4,Math.min(GW*T-w-4,x));
   ctx.fillStyle='rgba(16,26,30,.95)';rr(x,y,w,h,10);ctx.fill();ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.stroke();
   const cx=x+w/2;
   if(g.st===2){
     const I=ING[g.item];if(!I)return;
     emoji(I.e,x+28,y+31,28);text(I.n+'がとれた！',x+52,y+21,13,'#fff',800,'left');
-    text('持つ：入れる　切替：戻す',x+52,y+43,10,'#ffe08a',800,'left');return}
+    text(BL(p,'pick')+'：入れる　'+BL(p,'sw')+'：戻す',x+52,y+43,10,'#ffe08a',800,'left');return}
   if(O.act==='fish'){
-    if(g.st===1){text('！',cx,y+24,32,'#ff5d5d',800);text('今だ！ 作業',cx,y+50,11,'#fff',800)}
+    if(g.st===1){text('！',cx,y+24,32,'#ff5d5d',800);text('今だ！ '+BL(p,'act'),cx,y+50,11,'#fff',800)}
     else{emoji('🎣',cx-34,y+26,22);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx-24,y+16);ctx.lineTo(cx+18,y+26);ctx.stroke();
       const d=Math.sin(S.t*4)*2;ctx.fillStyle='#ff6d6d';ctx.beginPath();ctx.arc(cx+20,y+27+d,5,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(cx+15,y+26+d,10,2);
-      text('「！」が出たら 作業',cx,y+50,10,'#9db3b4',700)}
+      text('「！」が出たら '+BL(p,'act'),cx,y+50,10,'#9db3b4',700)}
   } else if(O.act==='mash'){
-    text(O.e+' 作業を連打！',cx,y+18,12,'#fff',800);bar(x+14,y+32,w-28,g.v/Math.max(1,g.need),'#7fd893');
+    text(O.e+' '+BL(p,'act')+'を連打！',cx,y+18,12,'#fff',800);bar(x+14,y+32,w-28,g.v/Math.max(1,g.need),'#7fd893');
   } else if(O.act==='timing'){
-    text('作業で止める（緑で2個）',cx,y+16,10,'#fff',800);
+    text(BL(p,'act')+'で止める（緑で2個）',cx,y+16,10,'#fff',800);
     const bx=x+14,bw=w-28,by=y+28,z=timingZone();
     ctx.fillStyle='rgba(255,255,255,.15)';rr(bx,by,bw,14,7);ctx.fill();
     ctx.fillStyle='rgba(127,216,147,.85)';ctx.fillRect(bx+bw*(0.5-z),by,bw*z*2,14);
@@ -1575,7 +1583,7 @@ function drawGather(p){
     text('この順に入力',cx,y+14,10,'#fff',800);
     g.seq.forEach((k,j)=>{const A=ARW[k];if(A)text(A[2],cx-22+j*44,y+38,26,j<g.v?'#7fd893':'#ffe08a',800)});
   }
-  text('切替：やめる',x+w-7,y+h-7,9,'#9db3b4',700,'right');
+  text(BL(p,'sw')+'：やめる',x+w-7,y+h-7,9,'#9db3b4',700,'right');
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
 function drawTopBar(){
@@ -1620,7 +1628,7 @@ function drawMenus(){
     ctx.fillStyle='rgba(16,26,30,.94)';rr(x,y,w,h,10);ctx.fill();
     ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.stroke();
     text(M.title,x+10,y+14,12,'#fff',800,'left');
-    text('持つ：取る　切替：閉じる',x+w-10,y+14,10,'#9db3b4',700,'right');
+    text(BL(p,'pick')+'：取る　'+BL(p,'sw')+'：閉じる',x+w-10,y+14,10,'#9db3b4',700,'right');
     list.forEach((id,k)=>{
       const cx=x+8+(k%cols)*cw+cw/2,cy=y+30+Math.floor(k/cols)*cw+cw/2,n=M.count(id);
       ctx.globalAlpha=n>0?1:0.3;
@@ -1692,7 +1700,7 @@ function upInfo(){
   const h=p.hold, held=h&&(h.kind==='station'||h.kind==='can'||h.kind==='basket');
   let o,id;
   if(held){o=h;id=h.kind==='station'?h.st:h.kind}
-  else{const c=tile(p.tx,p.ty);if(!c)return '';o=(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))?c.item:c;id=o.kind==='can'||o.kind==='basket'?o.kind:c.t}
+  else{const c=tile(p.tx,p.ty);if(!c)return '';const it=c.item;o=(it&&(it.kind==='can'||it.kind==='basket'||it.kind==='station'))?it:c;id=o.kind==='can'||o.kind==='basket'?o.kind:o.kind==='station'?o.st:c.t}
   const t=upsText(o),rare=o.pro?proInfo(id,o.pro):o.bonus?proInfo(id,1):null;
   if(!t&&!rare)return '';
   return `<br><span class="dim">${held?'持っている':'この'}${TGTN[id]||(EQUIP[id]&&EQUIP[id].n)||'器具'}：</span>`+
@@ -1725,6 +1733,7 @@ function renderHud(){
       const ahead=S.shops.filter(s=>s.x+2+WMARGIN>3.5);
       info+=`　<span class="dim">｜この先のお店 あと${ahead.length}軒</span>`;
     }
+    info+=upInfo();
   }
   if(S.phase==='layout'){
     const left=layoutLeft(), bad=unreachable().length, door=S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor';

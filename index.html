@@ -2092,9 +2092,9 @@ function drawTableShape(X,Y){
   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fill();
   ctx.strokeStyle='rgba(60,30,10,.6)';ctx.lineWidth=1.5;ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,cy,R-3,ry-2,0,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
-  // the cloth: a square turned corner-wise; all four corners reach past the edge and hang down
+  // the cloth: a square turned corner-wise, centred on the table; each corner reaches the same way past the edge
   const hang=6,cw=R+hang,ch=ry+hang;
-  const pts=[[X,cy-ch+2],[X+cw,cy+7],[X,cy+ry+hang],[X-cw,cy+7]];
+  const pts=[[X,cy-ch],[X+cw,cy],[X,cy+ch],[X-cw,cy]];
   ctx.save();ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();
   ctx.fillStyle='#f4f8fd';ctx.fill();ctx.clip();
   ctx.fillStyle='rgba(58,120,200,.5)';
@@ -2105,7 +2105,9 @@ function drawTableShape(X,Y){
   ctx.restore();
   ctx.strokeStyle='rgba(30,70,130,.6)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();ctx.stroke();
   // a little flower vase in the middle
-  ctx.fillStyle='#8fc7e0';rr(X-3,cy-7,6,7,2);ctx.fill();ctx.fillStyle='#ff8fb1';ctx.beginPath();ctx.arc(X,cy-9,3,0,7);ctx.fill();ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(X,cy-9,1.2,0,7);ctx.fill();
+  // flower vase in the very middle of the table
+  ctx.fillStyle='rgba(20,50,90,.25)';ctx.beginPath();ctx.ellipse(X,cy+2,4.5,1.8,0,0,7);ctx.fill();
+  ctx.fillStyle='#8fc7e0';rr(X-3,cy-4,6,6,2);ctx.fill();ctx.fillStyle='#ff8fb1';ctx.beginPath();ctx.arc(X,cy-6,3,0,7);ctx.fill();ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(X,cy-6,1.2,0,7);ctx.fill();
 }
 function drawCustBody(X,Y,c){
   softShadow(X,Y+13,13,4.5,.3);

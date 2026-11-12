@@ -1653,7 +1653,8 @@ function drawGroundItems(){
 }
 function drawPlayers(){
   for(const p of S.players){
-    const X=p.x*T,Y=p.y*T;
+    // the chef is drawn a little lower so the body sits on its own tile and the dotted target frame looks right next to it
+    const X=p.x*T,Y=p.y*T+CHEF_DY;
     // facing target highlight
     const c=tile(p.tx,p.ty);
     const furnSpot=c&&(c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&inTruck(p.tx,p.ty);
@@ -1677,6 +1678,7 @@ function shade(hex,k){
 }
 // a small round chef: body in the player's colour, white hat with a coloured band.
 // Facing down: full face. Facing up: back of the head. Facing left/right: full profile.
+const CHEF_DY=8;
 function drawChef(p,X,Y){
   const col=PCOL[p.i],dark=shade(col,-0.3),light=shade(col,0.25);
   const mv=p.lx!=null&&Math.hypot(p.x-p.lx,p.y-p.ly)>0.002;p.lx=p.x;p.ly=p.y;

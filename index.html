@@ -34,7 +34,7 @@
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px 24px}
-#app{max-width:min(100%,calc((100dvh - 58px) * 1.714));margin:0 auto;display:flex;flex-direction:column;gap:6px}
+#app{max-width:min(100%,calc((100dvh - 58px) * 1.7778));margin:0 auto;display:flex;flex-direction:column;gap:6px}
 header{display:none!important}
 header{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
 h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);margin:0;color:var(--truck);letter-spacing:.03em}
@@ -44,7 +44,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);mar
 #info{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:22px;line-height:1.6;font-variant-numeric:tabular-nums}
 #info .ok{color:var(--good)} #info .ng{color:var(--bad)} #info .dim{color:var(--muted)}
 .stage{position:relative;border-radius:14px;overflow:hidden;background:#0d1519;border:1px solid var(--line)}
-canvas{display:block;width:100%;height:auto;aspect-ratio:24/14}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 #ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--scrim);padding:16px;overflow:auto}
 #ov[hidden]{display:none}
 #readyBtn{position:absolute;bottom:4%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
@@ -108,7 +108,7 @@ body.touch .narrow{display:none}
   body.touch{padding-block:4px}
   body.touch #app{gap:4px}
   body.touch #info{font-size:11px;padding:3px 8px;line-height:1.4}
-  body.touch .stage{width:100%;max-width:calc((100dvh - 64px) * 1.714);margin:0 auto}
+  body.touch .stage{width:100%;max-width:calc((100dvh - 64px) * 1.7778);margin:0 auto}
   body.touch #stock{font-size:11px;gap:4px;min-height:0}
 }
 </style>
@@ -145,7 +145,7 @@ body.touch .narrow{display:none}
 <script>
 'use strict';
 // ---------- constants ----------
-const T=48, GW=24, GH=14; // 16:9-ish field: truck top-left, town below and to the right
+const T=48, GW=24, GH=14, VH=13.5; // VH: rows shown (24 x 13.5 = 16:9); the last row is only a border // 16:9-ish field: truck top-left, town below and to the right
 const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
 const QX=18, QY=8, QMAX=5, EAT_T=4;              // waiting line x18..22 on row 8; eating time at the table
@@ -227,6 +227,7 @@ const ALLSHOPS=[...SHOPTYPES,MYSTERY_SHOP,GAS_SHOP];
 // While a shop is in front of a window the truck always rolls at WIN_SPEED (buying time never changes);
 // between shops it runs at the lever's speed. Arriving earlier/later than at ふつう changes the service time.
 const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう','急ぐ'], FUEL_USE_TXT=['','⛽約2','⛽約6'];
+const FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
 const SHOP_GAP=10, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
 const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
 const LEVER=[16,4], LEVER_FRONT=[15,4];
@@ -285,7 +286,13 @@ function townNeeds(town){const s=new Set();for(const r of town.menu)for(const i 
 
 // ---------- canvas ----------
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-function fitCanvas(){const d=Math.min(2,window.devicePixelRatio||1);cv.width=GW*T*d;cv.height=GH*T*d;ctx.setTransform(d,0,0,d,0,0)}
+function fitCanvas(){
+  const d=window.devicePixelRatio||1, w=cv.clientWidth||GW*T, sc=Math.max(1,Math.min(4,w*d/(GW*T)));
+  const W=Math.round(GW*T*sc),H=Math.round(VH*T*sc);
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+  ctx.setTransform(sc,0,0,sc,0,0);
+}
+if(window.ResizeObserver)new ResizeObserver(()=>fitCanvas()).observe(cv);
 fitCanvas(); addEventListener('resize',fitCanvas);
 
 // ---------- map ----------
@@ -402,7 +409,7 @@ function showEquipShop(){
     const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}
-      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span>
+      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
     <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（←→で選んで <b>${OVK()}</b> で購入）。買った物は、町を選んだあとの配置の時間に外に出ます。所持金 <b>${S.money}G</b></p>
@@ -858,7 +865,7 @@ function startDrive(){
   for(let k=0;k<n;k++)list.push(weighted(SHOPTYPES));
   if(Math.random()<MYSTERY_CHANCE)list.splice(1+rnd(n),0,MYSTERY_SHOP);  // a bonus stall, never first
   list.push(GAS_SHOP);
-  S.shops=list.map((ty,k)=>({x:17+k*SHOP_GAP,type:ty,items:genShopItems(ty)}));
+  S.shops=list.map((ty,k)=>({x:FIRST_SHOP_X+k*SHOP_GAP,type:ty,items:genShopItems(ty)}));
   S.dist=0;S.refT=0;S.actT=0;S.gasWarn=false;
   S.route=S.shops[S.shops.length-1].x+3;   // arrive once the gas station has gone past the back window
   bringInside();hideOv();
@@ -1111,7 +1118,7 @@ function needLine(id,town){
   if(GATHERABLE.has(id))src.push('採取で採れる');
   else if(I.grow)src.push('市場で種');
   else src.push('市場で買える');
-  const cls=st>0?'ok':(GATHERABLE.has(id)||sd>0?'sub':'ng');
+  const cls=st>0?'ok':'ng';
   return `<span class="${cls}">${I.e} ${I.n} 在庫${st}${sd?`・種${sd}`:''}</span> <span class="sub">(${src.join('・')})</span>`;
 }
 function showChoose(){
@@ -1565,7 +1572,7 @@ function drawTown(){
   ctx.fillStyle='#8f5a3a';rr(mx+2,my+2,T-4,T-4,6);ctx.fill();
   for(let k=0;k<4;k++){ctx.fillStyle=k%2?'#fff':'#d4561c';ctx.fillRect(mx+2+k*(T-4)/4,my+2,(T-4)/4,9)}
   emoji('🏪',mx+T/2,my+T*0.58,22);
-  text('市場（種もある）',mx-T*0.4,(GH-0.5)*T,11,'#f4eedf',800,'left');
+  text('市場（種もある）',mx-T*0.4,(VH-0.25)*T,11,'#f4eedf',800,'left');
   drawGroundItems();
   drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
   const mp=S.players.find(q=>q.mk);
@@ -1584,7 +1591,7 @@ function drawTown(){
   drawQueueMat();
   drawTables();
   drawCustomers();
-  if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(GH-0.5)*T,13,'#1d2a20',800);
+  if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(VH-0.25)*T,13,'#1d2a20',800);
 }
 function drawQueueMat(){
   ctx.fillStyle='rgba(255,255,255,.18)';rr(QX*T+2,QY*T+4,QMAX*T-4,T-8,10);ctx.fill();
@@ -1642,7 +1649,7 @@ function drawLayoutGround(){
     ctx.setLineDash([]);
   }
   drawGroundItems();
-  text(S.timer>0?'器具・台・菜園は床に、じょうろとカゴは台の上に、テーブルは広場に。いらない物は外に置いておける':'時間切れ。置き終わったら準備完了',GW*T/2,(GH-0.5)*T,13,'#1d2a20',800);
+  text(S.timer>0?'器具・台・菜園は床に、じょうろとカゴは台の上に、テーブルは広場に。いらない物は外に置いておける':'時間切れ。置き終わったら準備完了',GW*T/2,(VH-0.25)*T,13,'#1d2a20',800);
 }
 function drawGroundItems(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){
@@ -1679,10 +1686,10 @@ function drawPlayers(){
     const X=p.x*T,Y=p.y*T+CHEF_DY;
     // facing target highlight
     const c=tile(p.tx,p.ty);
-    const furnSpot=c&&(c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&inTruck(p.tx,p.ty);
+    const furnSpot=c&&(((c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&p.hold.st!=='table'&&inTruck(p.tx,p.ty))||(c.t==='ground'&&!c.item&&p.hold&&p.hold.kind==='station'&&p.hold.st==='table'&&inTblZone(p.tx,p.ty)));
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
     if(S.phase==='layout'){const lb=layoutHint(p,c,p.tx,p.ty);
-      if(lb){const msg=AL(p,'pick',lb);ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
+      if(lb&&lb!=='置く'){const msg=AL(p,'pick',lb);ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     // held item goes behind the chef when facing away, in front otherwise
     const holdAt=()=>{if(p.hold)drawItem(p.hold,X+p.dx*16,Y+p.dy*14-4,T*0.62)};
@@ -1820,7 +1827,7 @@ function drawMenus(){
     if(!list.length)continue;
     const w=cols*cw+16,h=rows*cw+40;
     let x=p.x*T-w/2,y=p.y*T+24;
-    x=Math.max(4,Math.min(GW*T-w-4,x)); if(y+h>GH*T-4)y=p.y*T-24-h;
+    x=Math.max(4,Math.min(GW*T-w-4,x)); if(y+h>VH*T-4)y=p.y*T-24-h;
     ctx.fillStyle='rgba(16,26,30,.94)';rr(x,y,w,h,10);ctx.fill();
     ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.stroke();
     text(M.title,x+10,y+14,12,'#fff',800,'left');

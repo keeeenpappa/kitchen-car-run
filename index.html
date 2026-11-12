@@ -34,7 +34,8 @@
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px 24px}
-#app{max-width:min(1900px,calc((100dvh - 104px) * 1.714));margin:0 auto;display:flex;flex-direction:column;gap:6px}
+#app{max-width:min(100%,calc((100dvh - 58px) * 1.714));margin:0 auto;display:flex;flex-direction:column;gap:6px}
+header{display:none!important}
 header{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
 h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);margin:0;color:var(--truck);letter-spacing:.03em}
 #hud{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-variant-numeric:tabular-nums;font-weight:700;min-width:0}
@@ -72,6 +73,7 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:24/14}
 .box .ng{color:var(--bad)}
 .ovtime{color:var(--truck);font-family:var(--display);font-size:22px;font-weight:400}
 #stock{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;align-items:center}
+.chip.zero{color:var(--bad);opacity:.85}
 .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .chip.seed{border-style:dashed}
 .lbl{color:var(--muted);font-size:12px;letter-spacing:.06em;margin-right:4px}
@@ -1977,9 +1979,11 @@ function renderHud(){
   if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info+='<br><b style="color:#ffd84a">強化</b>　'+gl.join('　');
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   infoEl.innerHTML=info||'　';S.sideInfo=info;
-  const ch=Object.keys(ING).filter(k=>(S.stock[k]||0)>0).map(k=>`<span class="chip">${ING[k].e} ${ING[k].n} ${S.stock[k]}</span>`).join('');
+  const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
+  const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
+  const ch=ids.map(k=>{const n=S.stock[k]||0;return `<span class="chip${n?'':' zero'}">${ING[k].e} ${ING[k].n} ${n}</span>`}).join('');
   const sd=Object.keys(ING).filter(k=>(S.seeds[k]||0)>0).map(k=>`<span class="chip seed">🌱${ING[k].n}の種 ${S.seeds[k]}</span>`).join('');
-  stockEl.innerHTML=`<span class="lbl">在庫</span>${ch||'<span class="chip">なし</span>'}${sd?'<span class="lbl" style="margin-left:8px">種</span>'+sd:''}`;
+  stockEl.innerHTML=`<span class="lbl">${twn?twn.e+' '+twn.n+'で使う材料':'在庫'}</span>${ch||'<span class="chip">なし</span>'}${sd?'<span class="lbl" style="margin-left:8px">種</span>'+sd:''}`;
 }
 
 // ---------- online (artifact room): the host runs the game; guests send their controls and draw the host's state ----------

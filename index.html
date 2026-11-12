@@ -2093,7 +2093,7 @@ function drawTableShape(X,Y){
   ctx.strokeStyle='rgba(60,30,10,.6)';ctx.lineWidth=1.5;ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,cy,R-3,ry-2,0,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
   // the cloth: a square turned corner-wise, centred on the table; each corner reaches the same way past the edge
-  const hang=6,cw=R+hang,ch=ry+hang;
+  const hang=2.5,cw=R+hang,ch=ry+hang*0.6;
   const pts=[[X,cy-ch],[X+cw,cy],[X,cy+ch],[X-cw,cy]];
   ctx.save();ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();
   ctx.fillStyle='#f4f8fd';ctx.fill();ctx.clip();

@@ -162,6 +162,7 @@ const tableOK=(x,y)=>inTblZone(x,y)&&S.map[y][x].t==='ground'&&!S.map[y][x].item
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const HEART_MAX=3;
+const WAIT_PAT=1.2;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
 const DRIVE=65, PREP=15, SERVICE=120, SPEED=0.45, STOPS=4, WMARGIN=0.6;
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
@@ -539,17 +540,26 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>held.delete(e.code));
 addEventListener('blur',()=>held.clear());
-let pads=[], padPrev=[];
+let pads=[], padPrev=[], PADGP=[], ONLINE_PAD=0;
 function pollPads(){
-  const gps=navigator.getGamepads?navigator.getGamepads():[];
+  let gps=[];try{gps=navigator.getGamepads?[...navigator.getGamepads()]:[]}catch(_){}
+  // connected pads in order, with no holes: the browser can put the only pad in slot 2 (after a reconnect, or next to
+  // a virtual pad), and P1 / an online player must still get it
+  PADGP=gps.filter(gp=>gp&&gp.connected!==false&&gp.buttons&&gp.buttons.length).slice(0,4);
   pads=[];
   for(let i=0;i<4;i++){
-    const gp=gps[i]; if(!gp){pads[i]=null;continue}
+    const gp=PADGP[i]; if(!gp){pads[i]=null;continue}
     const b=k=>!!(gp.buttons[k]&&gp.buttons[k].pressed);
     const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(5)||b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
-    const prev=padPrev[i]||{};
-    pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0};
-    padPrev[i]=now;
+    const prev=padPrev[gp.index]||{};
+    pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0,gp};
+    padPrev[gp.index]=now;
+  }
+  // online this device is one player: whichever pad was used last drives it
+  if(NET.role!=='off'){
+    const busy=q=>q&&(Object.values(q.now).some(Boolean)||Math.abs(q.ax)>0.3||Math.abs(q.ay)>0.3);
+    const k=pads.findIndex(busy);if(k>=0)ONLINE_PAD=k;
+    if(ONLINE_PAD>0&&pads[ONLINE_PAD]){const t=pads[0];pads[0]=pads[ONLINE_PAD];pads[ONLINE_PAD]=t}
   }
 }
 // touch (drives P1)
@@ -652,7 +662,7 @@ function padKind(gp){const id=(gp&&gp.id)||'';
 function devOf(slot){
   const pref=DEVPREF[slot]||'auto';
   if(pref!=='auto')return pref==='kb'&&slot>1?'xbox':pref;
-  let gp=null;try{gp=navigator.getGamepads?navigator.getGamepads()[slot]:null}catch(_){}
+  const gp=pads[slot]?pads[slot].gp:null;
   if(slot>1||!gp)return slot>1?padKind(gp):'kb';
   return LASTIN[slot]==='pad'?padKind(gp):'kb';
 }
@@ -676,7 +686,15 @@ function AL(p,k,label,hold){
   const key=(isTouch&&(NET.role!=='off'||!p||p.i===0))?BTN_N[k]:keyName(devSlot(p),k);
   return label+'（'+key+(hold?'長押し':'')+'）';
 }
-const OVK=()=>isTouch?'長押し':BTN_N.act+'（'+keyName(0,'act')+'）長押し';   // overlay cards / buttons: every long press is 作業
+const ovkText=()=>isTouch?'長押し':BTN_N.act+'（'+keyName(0,'act')+'）長押し';   // overlay cards / buttons: every long press is 作業
+// in overlay HTML the key name is a marked span, so an online guest can show its own buttons on the host's screens
+const OVK=()=>`<span class="kn" data-v="hold">${ovkText()}</span>`;
+function localizeOv(){
+  for(const el of ov.querySelectorAll('.kn'))el.textContent=el.dataset.v==='menu'?keyName(0,'menu'):ovkText();
+  // the rows lose their id in the copy: find them by their buttons, give the id back, show this device's settings
+  for(const [act,id,inner] of [['dev','devRow',devRowInner],['snd','sndRow',sndRowInner]]){
+    const b=ov.querySelector(`[data-act="${act}"]`);if(!b)continue;const row=b.parentElement;row.id=id;row.innerHTML=inner()}
+}
 function BL(p,k){
   if(isTouch&&(NET.role!=='off'||!p||p.i===0))return BTN_N[k];
   const i=NET.role!=='off'?0:Math.min(2,p?p.i:0);
@@ -1111,11 +1129,15 @@ const HOLD=0.6, READY_HOLD=0.8;
 let ovHold={btn:null,t:0,src:null},ovHoldLock=false;
 const setP=(b,f)=>{if(b)b.style.setProperty('--p',Math.round(Math.min(1,f)*100)+'%')};
 const holdReset=()=>{setP(ovHold.btn,0);ovHold={btn:null,t:0,src:null}};
-ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if(!b)return;e.preventDefault();
+// online: town / upgrade / shop / result screens are the host's to choose. Guests see the host's cursor and can't move it
+// (only the pause screen is shared: anyone can press つづける there)
+const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused);
+ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if(!b||guestLocked())return;e.preventDefault();
   holdReset();ovHold={btn:b,t:0,src:'ptr'};ovSel=Math.max(0,ovButtons().indexOf(b));markSel();try{b.setPointerCapture(e.pointerId)}catch(_){}});
 for(const ev of ['pointerup','pointercancel'])ov.addEventListener(ev,()=>{if(ovHold.src==='ptr')holdReset()});
 ov.addEventListener('contextmenu',e=>{if(e.target.closest('.ovbtn.hold'))e.preventDefault()});
 function ovHoldTick(dt){
+  if(guestLocked())return;
   const b=ovButtons()[ovSel],keyHeld=actHeldLocal();
   if(!keyHeld)ovHoldLock=false;
   if(ovHold.src!=='ptr'){
@@ -1144,6 +1166,7 @@ ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
   if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
+  if(a!=='dev'&&a!=='title'&&guestLocked())return;   // the host's choice screens: a guest only watches
   if(a!=='ready'&&a!=='pause')play('confirm');
   if(a==='dev'){cycleDev(+v);const r=document.getElementById('devRow');if(r){r.innerHTML=devRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='dev'&&b.dataset.v===String(v)));markSel()}return}
   if(NET.role==='guest'&&a!=='title'&&(NET.mirror||a==='ready'||a==='pause')){guestSend(a,v);return}
@@ -1190,7 +1213,7 @@ function canPause(){
 function pauseGame(){
   if(!S||S.paused||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
-  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':keyName(0,'menu')+' でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}</div>`);
+  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}</div>`);
 }
 function resumeGame(){
   if(!S)return;S.paused=false;
@@ -1252,7 +1275,7 @@ function showChoose(){
     <p class="mut">←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定</p></div>`);
 }
 function overlayInput(){
-  const b=ovButtons(); if(!b.length)return;
+  const b=ovButtons(); if(!b.length||guestLocked())return;
   if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
   const p0=pads[0];
   let mv=0,ok=false;
@@ -1407,7 +1430,7 @@ function update(dt){
           if(c.lx>GW+0.6)S.cust.splice(k,1);
           continue}
         if(c.st==='eat'){c.t-=dt;if(c.t<=0)startLeave(c,false);continue}
-        c.pat-=dt;
+        c.pat-=c.st==='wait'?dt/WAIT_PAT:dt;   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
       }
       if(S.timer<=0)endStop();
@@ -2411,8 +2434,18 @@ function drawTopBar(){
   else if(S.phase==='drive')ph='🛣 '+kmTxt(Math.min(S.dist,S.route))+' / '+kmTxt(S.route)+' km';
   else if(S.phase==='stop')ph=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
   else if(S.phase==='choose')ph='町を選ぶ';
-  const tw=S.phase==='drive'?S.next:S.town;
-  if(tw&&(S.phase==='drive'||S.phase==='stop'))text((S.phase==='drive'?'→ ':'')+tw.e+' '+tw.n+'　'+payLabel(tw.pay),412,y,14,'#f4eedf',800,'left');
+  // which town: where we are heading (drive, layout before a drive) or where we are open (stop)
+  const tw=S.phase==='stop'?S.town:(S.phase==='drive'||(S.phase==='layout'&&S.stop>0))?S.next:null;
+  if(tw){
+    const lab=S.phase==='stop'?'ここは':'行き先',nm=tw.e+' '+tw.n;
+    ctx.font=`800 18px ${FNT}`;const nw=ctx.measureText(nm).width;
+    ctx.font=`700 12px ${FNT}`;const lw=ctx.measureText(lab).width;
+    const px=412,pw=lw+nw+30;
+    ctx.fillStyle='#2f6f6a';rr(px,y-14,pw,28,14);ctx.fill();ctx.strokeStyle='#7fd6d1';ctx.lineWidth=1.5;ctx.stroke();
+    text(lab,px+12,y,12,'#c9f2ee',700,'left');
+    text(nm,px+lw+20,y,18,'#fff',800,'left');
+    text(payLabel(tw.pay),px+pw+10,y,13,'#cfe0e2',700,'left');
+  }
   text(ph,GW*T-22,y,18,S.phase==='stop'&&S.sub==='service'&&S.timer<20?'#ff9c9c':'#f4eedf',800,'right');
   // fuel gauge + lever setting, just under the bar on the right
   const fx=GW*T-232,fy=T*0.98;
@@ -2717,7 +2750,7 @@ function remoteInput(i){
   const cl=v=>Math.max(-1,Math.min(1,+v||0));
   return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw};
 }
-const GUEST_OK=new Set(['town','eqbuy','eqdone','upg','up','reroll','end','resume','next']);
+const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
 function guestAction(a,v){
   if(a==='ready'){if(ov.hidden)finishLayout();return}
   if(a==='pause'){pauseGame();return}
@@ -2791,6 +2824,7 @@ function sendSnap(){
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
+  d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
   let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
   if(bytes>3800){d.fl=[];bytes=new TextEncoder().encode(JSON.stringify(d)).length}
@@ -2831,7 +2865,11 @@ function guestFrame(dt){
   if(ov.hidden&&S){
     if(inp.pick)NET.pk++; if(inp.sw)NET.sw++;
     if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))guestSend('pause');
-  } else if(!ov.hidden)overlayInput();
+  } else if(!ov.hidden){
+    // the pause screen: Esc / Start again resumes, like on the host
+    if(S&&S.paused&&(pressed.has('Escape')||pressed.has('KeyP')||(pads[0]&&pads[0].edge('st'))))guestSend('resume');
+    else overlayInput();
+  }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw]:[0,0,0,NET.pk,NET.sw];
   const key=ins.join(',');
@@ -2848,6 +2886,9 @@ function guestFrame(dt){
       NET.mySlot=+slot||0;
       try{applySnap(d)}catch(e){}
       NET.localOv=null;syncGuestOv(+d.o||0);
+      // follow the host's cursor (and its long-press bar) on the host's screens
+      if(guestLocked()&&Array.isArray(d.os)){const bs=ovButtons(),k=Math.max(0,Math.min(bs.length-1,+d.os[0]||0));
+        if(k!==ovSel){ovSel=k;markSel()}bs.forEach((b,i)=>setP(b,i===k?(+d.os[1]||0)/100:0))}
     }
   }
   if(S&&NET.localOv!=='lost'&&performance.now()-NET.lastSnapAt>4000)guestLocalOv('lost');
@@ -2864,7 +2905,7 @@ function syncGuestOv(o){
   if(!o){if(!ov.hidden){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen')}NET.mirror=false;NET.shownOv=0;return}
   if(o===NET.shownOv)return;
   const P=NET.ovParts[o];
-  if(P&&P.got===P.n){paintOv(sanitizeOv(P.parts.join('')));NET.mirror=true;NET.shownOv=o}
+  if(P&&P.got===P.n){paintOv(sanitizeOv(P.parts.join('')));localizeOv();NET.mirror=true;NET.shownOv=o}
 }
 function onOvMsg(m){
   if(NET.role!=='guest'||(NET.hostPeer&&m.peer!==NET.hostPeer))return;

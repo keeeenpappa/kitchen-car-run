@@ -39,6 +39,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:8px 16p
 h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);margin:0;color:var(--truck);letter-spacing:.03em}
 #hud{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-variant-numeric:tabular-nums;font-weight:700;min-width:0}
 #hud .k{color:var(--muted);font-weight:400;margin-right:4px}
+#hud,#info{display:none!important}
 #info{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:22px;line-height:1.6;font-variant-numeric:tabular-nums}
 #info .ok{color:var(--good)} #info .ng{color:var(--bad)} #info .dim{color:var(--muted)}
 .stage{position:relative;border-radius:14px;overflow:hidden;background:#0d1519;border:1px solid var(--line)}
@@ -143,7 +144,7 @@ body.touch .narrow{display:none}
 'use strict';
 // ---------- constants ----------
 const T=48, GW=24, GH=14; // 16:9-ish field: truck top-left, town below and to the right
-const MKT=[21,12], GROW=12;  // market spot and the row of gathering spots
+const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
 const QX=18, QY=8, QMAX=5, EAT_T=4;              // waiting line x18..22 on row 8; eating time at the table
 const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the plaza under the truck)
@@ -178,11 +179,11 @@ const STEPN={chop:'切る',cook:'焼く',blend:'ミキサー'};
 //  timing: stop the moving marker (middle = 2) / arrows: input the 2 shown directions
 // Spots with two possible items give a random one, then you choose to keep it (持つ) or put it back (切替).
 const GOBJ={
-  pond:{n:'釣り堀',e:'🎣',items:['fish','shrimp'],act:'fish',x:3,col:'#3d8ab3'},
-  tree:{n:'木',e:'🌳',items:['apple'],act:'mash',x:6,col:'#4f7a36'},
-  log:{n:'原木',e:'🪵',items:['mushroom'],act:'timing',x:9,col:'#6b4a2f'},
-  barn:{n:'畜舎',e:'🐄',items:['milk','egg'],act:'arrows',x:12,col:'#b8834f'},
-  field:{n:'畑',e:'🌱',items:['potato','strawberry'],act:'mash',x:15,col:'#7a5a34'},
+  pond:{n:'釣り堀',e:'🎣',items:['fish','shrimp'],act:'fish',x:13,col:'#3d8ab3'},
+  tree:{n:'木',e:'🌳',items:['apple'],act:'mash',x:15,col:'#4f7a36'},
+  log:{n:'原木',e:'🪵',items:['mushroom'],act:'timing',x:17,col:'#6b4a2f'},
+  barn:{n:'畜舎',e:'🐄',items:['milk','egg'],act:'arrows',x:19,col:'#b8834f'},
+  field:{n:'畑',e:'🌱',items:['potato','strawberry'],act:'mash',x:21,col:'#7a5a34'},
 };
 const GOBJ_K=Object.keys(GOBJ);
 const GATHERABLE=new Set(Object.values(GOBJ).flatMap(o=>o.items));
@@ -222,8 +223,8 @@ const ALLSHOPS=[...SHOPTYPES,MYSTERY_SHOP,GAS_SHOP];
 // While a shop is in front of a window the truck always rolls at WIN_SPEED (buying time never changes);
 // between shops it runs at the lever's speed. Arriving earlier/later than at ふつう changes the service time.
 const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう','急ぐ'], FUEL_USE_TXT=['','⛽約2','⛽約6'];
-const SHOP_GAP=11, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35;
-const FUEL_MAX=10, FUEL_RATE=[0,2/36,6/36]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
+const SHOP_GAP=10, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
+const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
 const LEVER=[16,4], LEVER_FRONT=[15,4];
 const inWindowZone=s=>[3.5,13.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
 const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
@@ -886,10 +887,12 @@ const waiting=()=>S.cust.filter(c=>c.st==='wait');
 const follower=p=>S.cust.find(c=>c.st==='follow'&&c.by===p.i);
 const guestAt=(x,y)=>S.cust.find(c=>(c.st==='seat'||c.st==='eat')&&c.tx===x&&c.ty===y);
 function custPos(c){
+  if(c.st==='leave')return [c.lx,c.ly];
   if(c.st==='wait'){const i=waiting().indexOf(c);return [QX+i+0.5,QY+0.5]}
   if(c.st==='follow'){const p=S.players[c.by];if(p)return [p.x-(p.dx||0)*0.7,p.y-(p.dy||0)*0.7]}
   return [c.tx+0.5,c.ty+0.5];
 }
+function startLeave(c,mad){const [x,y]=custPos(c);c.from=c.st;c.st='leave';c.mad=mad;c.lx=x;c.ly=y;c.by=-1}
 function spawnCust(){
   if(waiting().length>=QMAX)return;
   const order=S.town.menu[rnd(S.town.menu.length)],max=(S.np===1?85:70)*S.up.pat;
@@ -1236,9 +1239,15 @@ function update(dt){
       if(S.spawnT<=0){spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
       for(let k=S.cust.length-1;k>=0;k--){
         const c=S.cust[k];
-        if(c.st==='eat'){c.t-=dt;if(c.t<=0)S.cust.splice(k,1);continue}
+        if(c.st==='leave'){
+          // step down to the walkway under the tables, then walk out to the right
+          const gy=c.from==='wait'?c.ly:11.5;
+          if(Math.abs(c.ly-gy)>0.05)c.ly+=Math.sign(gy-c.ly)*Math.min(Math.abs(gy-c.ly),3*dt);else c.lx+=3*dt;
+          if(c.lx>GW+0.6)S.cust.splice(k,1);
+          continue}
+        if(c.st==='eat'){c.t-=dt;if(c.t<=0)startLeave(c,false);continue}
         c.pat-=dt;
-        if(c.pat<=0){const [fx,fy]=custPos(c);S.cust.splice(k,1);S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
+        if(c.pat<=0){const [fx,fy]=custPos(c);startLeave(c,true);S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
       }
       if(S.timer<=0)endStop();
     }
@@ -1484,9 +1493,9 @@ function drawTown(){
   ctx.fillStyle='#8f5a3a';rr(mx+2,my+2,T-4,T-4,6);ctx.fill();
   for(let k=0;k<4;k++){ctx.fillStyle=k%2?'#fff':'#d4561c';ctx.fillRect(mx+2+k*(T-4)/4,my+2,(T-4)/4,9)}
   emoji('🏪',mx+T/2,my+T*0.58,22);
-  text('市場（種もある）',mx-6,my+T*0.5,11,'#2a2018',800,'right');
+  text('市場（種もある）',mx-T*0.4,(GH-0.5)*T,11,'#f4eedf',800,'left');
   drawGroundItems();
-  drawOffer(S.market,(MKT[0]+0.5)*T,(MKT[1]-1.95)*T,null);
+  drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
     const O=GOBJ[k],X=O.x*T,Y=GROW*T;
@@ -1535,6 +1544,7 @@ function drawCustomers(){
       continue}
     const Y=py*T;
     drawCustBody(X,Y,c);
+    if(c.st==='leave'){if(c.mad)emoji('😠',X+12,Y-14,14);continue}
     bar(X-17,Y+15,34,f,col);
   }
 }
@@ -1739,6 +1749,7 @@ function draw(){
   ctx.restore();
   drawMenus();
   drawTopBar();
+  drawSidePanel();
   if(S.toast){
     const a=Math.min(1,(S.toast.life-S.toast.t)*2);ctx.globalAlpha=a;
     ctx.font=`800 18px ${FNT}`;const w=ctx.measureText(S.toast.text).width+40;
@@ -1747,6 +1758,41 @@ function draw(){
     text(S.toast.text,GW*T/2,T*1.05+20,18,'#fff',800);ctx.globalAlpha=1;
   }
   for(const f of S.floats){ctx.globalAlpha=1-f.t/1.4;ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.textAlign='center';const fy=(f.y-f.t*0.8)*T;ctx.strokeText(f.text,f.x*T,fy);ctx.fillStyle=f.col;ctx.fillText(f.text,f.x*T,fy);ctx.globalAlpha=1}
+}
+// the old info strip, drawn in the space right of the truck: <br> / 　 / ｜ start a new line, long lines wrap
+const GRAPH=(typeof Intl!=='undefined'&&Intl.Segmenter)?new Intl.Segmenter('ja',{granularity:'grapheme'}):null;
+const graphemes=t=>GRAPH?Array.from(GRAPH.segment(t),g=>g.segment):Array.from(t);
+function drawSidePanel(){
+  const html=S.sideInfo||'';if(!html.replace(/<[^>]*>|　/g,'').trim())return;
+  const x0=18.2*T,y0=2.25*T,w=GW*T-x0-8,h=6.85*T-y0,pad=9;
+  ctx.save();
+  ctx.fillStyle='rgba(16,26,30,.88)';rr(x0,y0,w,h,10);ctx.fill();
+  ctx.beginPath();ctx.rect(x0,y0,w,h);ctx.clip();
+  const BASE='#e8f0ee',runs=[],st=[{c:BASE,b:false}];
+  const re=/<br\s*\/?>|<(\/?)(b|span)([^>]*)>|([^<]+)/g;let m;
+  while((m=re.exec(html))){
+    if(m[0].startsWith('<br')){runs.push(null);continue}
+    if(m[2]){
+      if(m[1]){if(st.length>1)st.pop();continue}
+      const top=st[st.length-1],a=m[3]||'';let c=top.c;
+      if(/class="ok"/.test(a))c='#7fd893';else if(/class="ng"/.test(a))c='#ff8a8a';else if(/class="dim"/.test(a))c='#9db3b4';
+      const sc=a.match(/color:\s*(#[0-9a-fA-F]{3,6})/);if(sc)c=sc[1];else if(m[2]==='b'&&c===BASE)c='#fff';
+      st.push({c,b:top.b||m[2]==='b'});continue}
+    const top=st[st.length-1];
+    m[4].replace(/&amp;/g,'&').split(/[　｜]/).forEach((seg,i)=>{if(i>0)runs.push(null);if(seg.trim())runs.push({t:seg,c:top.c,b:top.b})});
+  }
+  const lh=17,right=x0+w-pad;let x=x0+pad,y=y0+pad+8,empty=true;
+  ctx.textBaseline='middle';ctx.textAlign='left';
+  for(const r of runs){
+    if(!r){if(!empty){y+=lh;empty=true}x=x0+pad;continue}
+    ctx.font=`${r.b?800:600} 12px ${FNT}`;ctx.fillStyle=r.c;
+    for(const ch of graphemes(r.t)){
+      if(empty&&ch===' ')continue;
+      const cw=ctx.measureText(ch).width;
+      if(x+cw>right){y+=lh;x=x0+pad+8}
+      ctx.fillText(ch,x,y);x+=cw;empty=false}
+  }
+  ctx.restore();
 }
 let idleOff=0;
 function drawRoadIdle(){
@@ -1820,7 +1866,7 @@ function renderHud(){
       `　<span class="dim">｜残り時間は次の町の営業時間にプラス（0になっても続けられます）</span>`;
   }
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
-  infoEl.innerHTML=info||'　';
+  infoEl.innerHTML=info||'　';S.sideInfo=info;
   const ch=Object.keys(ING).filter(k=>(S.stock[k]||0)>0).map(k=>`<span class="chip">${ING[k].e} ${ING[k].n} ${S.stock[k]}</span>`).join('');
   const sd=Object.keys(ING).filter(k=>(S.seeds[k]||0)>0).map(k=>`<span class="chip seed">🌱${ING[k].n}の種 ${S.seeds[k]}</span>`).join('');
   stockEl.innerHTML=`<span class="lbl">在庫</span>${ch||'<span class="chip">なし</span>'}${sd?'<span class="lbl" style="margin-left:8px">種</span>'+sd:''}`;
@@ -1964,7 +2010,7 @@ function encItem(it){
   return 0;
 }
 const encOffer=o=>[OFFER_K.indexOf(o.type),o.type==='equip'?EQ_K.indexOf(o.id):o.id?ING_K.indexOf(o.id):-1,o.qty||0,o.price,o.sold?1:0,o.pro||0];
-const CST_K=['wait','follow','seat','eat'];
+const CST_K=['wait','follow','seat','eat','leave'];
 function tablesList(){const a=[];for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table')a.push([x,y]);return a}
 function sendSnap(){
   const tiles=[];
@@ -1986,7 +2032,7 @@ function sendSnap(){
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0]),
-    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty]),
+    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
@@ -2117,7 +2163,7 @@ function applySnap(d){
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
-  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6])}));
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));

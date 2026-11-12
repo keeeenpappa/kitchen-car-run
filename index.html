@@ -119,7 +119,7 @@ body.touch .narrow{display:none}
   <div id="info">　</div>
   <div class="stage">
     <canvas id="cv" width="864" height="576" aria-label="ゲーム画面"></canvas>
-    <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（長押し）</button>
+    <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（R長押し）</button>
     <div id="ov"></div>
   </div>
   <div id="stock"></div>
@@ -150,6 +150,7 @@ const QX=18, QY=8, QMAX=5, EAT_T=4;              // waiting line x18..22 on row 
 const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the plaza under the truck)
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
 const PRESET_TABLES=[[4,9],[9,9],[14,9]];
+const tableOK=(x,y)=>inTblZone(x,y)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const HEART_MAX=3;
@@ -402,9 +403,9 @@ function showEquipShop(){
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
-    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（長押しで購入）。買った物は、町を選んだあとの配置の時間に外に出ます。所持金 <b>${S.money}G</b></p>
+    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（←→で選んで <b>${OVK()}</b> で購入）。買った物は、町を選んだあとの配置の時間に外に出ます。所持金 <b>${S.money}G</b></p>
     <div class="cards">${cards}</div>
-    <div class="row"><button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（長押し）</button></div></div>`);
+    <div class="row"><button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
 function startDayLayout(){
   const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
@@ -453,7 +454,7 @@ function furnPick(p,c,tx,ty){
   }
   // tables: set down / pick up on the plaza (layout time)
   if(lay&&h&&h.kind==='station'&&h.st==='table'){
-    if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
+    if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){if(!tableOK(tx,ty)){say(p,'となりにテーブルがある（お客さんが座る場所）');return true}S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
     if(inTruck(tx,ty)){say(p,'テーブルは外の広場に置く');return true}
   }
   if(lay&&!h&&c.t==='table'){p.hold={kind:'station',st:'table'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
@@ -598,6 +599,12 @@ function say(p,m){p.msg=m;p.msgT=1.6}
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
 const BTN_N={pick:'持つ',act:'作業',sw:'切替'};
+// action name first, then the key: 入れる（Space）, 購入（F長押し）
+function AL(p,k,label,hold){
+  const key=(isTouch&&(NET.role!=='off'||!p||p.i===0))?BTN_N[k]:KEYL[NET.role!=='off'?0:Math.min(2,p?p.i:0)][k];
+  return label+'（'+key+(hold?'長押し':'')+'）';
+}
+const OVK=()=>isTouch?'長押し':'Space長押し';   // overlay cards / buttons
 function BL(p,k){
   if(isTouch&&(NET.role!=='off'||!p||p.i===0))return BTN_N[k];
   const i=NET.role!=='off'?0:Math.min(2,p?p.i:0);
@@ -690,7 +697,7 @@ function doPick(p,c,tx,ty){
       if(p.hold){if(p.hold.kind==='can')say(p,'じょうろは捨てられない');else if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
       return;
     case 'sink':
-      if(p.hold&&p.hold.kind==='can')say(p,BL(p,'act')+'長押しで水を汲む');
+      if(p.hold&&p.hold.kind==='can')say(p,AL(p,'act','水を汲む',1));
       return;
     case 'planter':
       if(c.plant){
@@ -725,7 +732,7 @@ function doPick(p,c,tx,ty){
     case 'lever':
       S.speed=S.speed===2?1:2;say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）');return;
     case 'window':
-      if(S.phase==='drive')say(p,shopAtWindow(tx)?BL(p,'act')+'長押しで買う':'お店が来たら買える');
+      if(S.phase==='drive')say(p,shopAtWindow(tx)?AL(p,'sw','切替')+'　'+AL(p,'act','購入',1):'お店が来たら買える');
       return;
     case 'market':
       if(S.phase==='stop'&&S.market.length){p.mk=true;p.menuLast='0,0';p.actT=0;p.lock=true}
@@ -933,7 +940,7 @@ function endStop(){
     <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b></p>
     <p>所持金 ${S.money}G ／ 評判 ${'♥'.repeat(S.hearts)}</p>
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
-    <div class="row"><button class="ovbtn" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}</button></div></div>`);
+    <div class="row"><button class="ovbtn hold autofocus" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}（${OVK()}）</button></div></div>`);
 }
 // ---------- upgrades (pick 1 of 3 after each town, free; reroll costs money) ----------
 const UPS=[
@@ -969,7 +976,7 @@ function showUpgrade(){
       <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
       <span class="needs">${u.tgt?`<span class="pay">⬆ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
-    <p>無料で1つもらえます。カードは<b>長押し</b>で決定。所持金 ${S.money}G</p>
+    <p>無料で1つもらえます。←→で選んで <b>${OVK()}</b> で決定。所持金 ${S.money}G</p>
     <div class="cards">${cards}</div>
     <div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G）</button></div>
     ${owned?`<p class="mut">持っている強化：${owned}</p>`:''}</div>`);
@@ -1338,7 +1345,7 @@ function drawTile(c,x,y){
   const X=x*T,Y=y*T;
   const lay=S&&S.phase==='layout'&&inTruck(x,y);
   if(c.t==='floor'){ctx.fillStyle=(x+y)%2?'#f6efe0':'#ece3cf';ctx.fillRect(X,Y,T,T);
-    if(lay&&S.players.some(holdsFurn)&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])){ctx.strokeStyle='rgba(60,120,140,.4)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
+    if(lay&&S.players.some(q=>holdsFurn(q)&&q.hold.st!=='table')&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])){ctx.strokeStyle='rgba(60,120,140,.4)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
     return}
   if(c.t==='gap'){ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#d99a22';ctx.fillRect(X+4,Y+T-12,T-8,6);
     if(lay){ctx.strokeStyle='rgba(90,60,10,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(X+5,Y+5,T-10,T-10,5);ctx.stroke();ctx.setLineDash([])}
@@ -1355,7 +1362,8 @@ function drawTile(c,x,y){
     const fast=S&&S.speed===2,a=fast?0.75:-0.15;
     ctx.strokeStyle='#cfd6da';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(X+T/2,Y+T*0.62);ctx.lineTo(X+T/2+Math.sin(a)*14,Y+T*0.62-Math.cos(a)*14);ctx.stroke();ctx.lineCap='butt';
     ctx.fillStyle=fast?'#ff5d5d':'#7fd893';ctx.beginPath();ctx.arc(X+T/2+Math.sin(a)*14,Y+T*0.62-Math.cos(a)*14,5,0,7);ctx.fill();
-    text(fast?'急ぐ':'ふつう',X+T/2,Y+T*0.84,9,fast?'#ffb0b0':'#c9f2d2',800);
+    ctx.fillStyle=fast?'#d63b3b':'#2e7d4f';rr(X+T/2-15,Y+T*0.84-7,30,14,7);ctx.fill();
+    text(fast?'急ぐ':'ふつう',X+T/2,Y+T*0.84,9,'#fff',800);
     text('レバー',X+T/2,Y+11,8,'#cfd6da',800);
     return}
   const col=TCOL[c.t]; if(!col)return;
@@ -1497,6 +1505,7 @@ function drawOffer(items,cx,y,shop){
     ctx.globalAlpha=1;
   });
   // player cursors
+  let hinted=false;
   for(const p of S.players){
     let on=false;
     const c=tile(p.tx,p.ty);
@@ -1507,6 +1516,9 @@ function drawOffer(items,cx,y,shop){
     const k=wrap(p.cur,n),X=x0+k*w;
     ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=3;rr(X+2,y-1,w-4,T*1.15,6);ctx.stroke();
     if(p.actT>0)bar(X+4,y+T*1.18-8,w-8,p.actT/BUY,PCOL[p.i]);
+    if(shop&&!hinted){hinted=true;
+      const msg=AL(p,'sw','切替')+'　'+AL(p,'act','購入',1);ctx.font=`800 11px ${FNT}`;const hw=ctx.measureText(msg).width+16;
+      const hy=y+T*1.25+2;ctx.fillStyle='rgba(16,26,30,.9)';rr(x0-4,hy,hw,20,8);ctx.fill();text(msg,x0+4,hy+10,11,'#ffe08a',800,'left')}
   }
 }
 
@@ -1556,7 +1568,7 @@ function drawTown(){
   drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
   const mp=S.players.find(q=>q.mk);
   if(mp){const hx=(MKT[0]+1.2)*T,hy=(MKT[1]-0.45)*T-14;
-    ctx.font=`800 11px ${FNT}`;const msg='←→ 選ぶ　'+BL(mp,'act')+'長押し 買う　'+BL(mp,'pick')+' 閉じる',w=ctx.measureText(msg).width+16;
+    ctx.font=`800 11px ${FNT}`;const msg='選ぶ（←→）　'+AL(mp,'act','購入',1)+'　'+AL(mp,'pick','閉じる'),w=ctx.measureText(msg).width+16;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(hx-4,hy-10,w,20,8);ctx.fill();text(msg,hx+4,hy,11,'#ffe08a',800,'left')}
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
@@ -1622,6 +1634,11 @@ function drawLayoutGround(){
   text('テーブル置き場',(TBL_ZONE.x0+0.2)*T,TBL_ZONE.y0*T+14,11,'rgba(29,42,32,.6)',800,'left');
   drawQueueMat();
   drawTables();
+  if(S.players.some(q=>q.hold&&q.hold.kind==='station'&&q.hold.st==='table')){
+    ctx.strokeStyle='rgba(29,42,32,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;
+    for(let y=TBL_ZONE.y0;y<=TBL_ZONE.y1;y++)for(let x=TBL_ZONE.x0;x<=TBL_ZONE.x1;x++)if(tableOK(x,y))rr(x*T+5,y*T+5,T-10,T-10,5),ctx.stroke();
+    ctx.setLineDash([]);
+  }
   drawGroundItems();
   text(S.timer>0?'器具・台・菜園は床に、じょうろとカゴは台の上に、テーブルは広場に。いらない物は外に置いておける':'時間切れ。置き終わったら準備完了',GW*T/2,(GH-0.5)*T,13,'#1d2a20',800);
 }
@@ -1715,16 +1732,16 @@ function drawGather(p){
   if(g.st===2){
     const I=ING[g.item];if(!I)return;
     emoji(I.e,x+28,y+31,28);text(I.n+'がとれた！',x+52,y+21,13,'#fff',800,'left');
-    text(BL(p,'pick')+'：入れる　'+BL(p,'sw')+'：戻す',x+52,y+43,10,'#ffe08a',800,'left');return}
+    text(AL(p,'pick','入れる')+'　'+AL(p,'sw','戻す'),x+52,y+43,10,'#ffe08a',800,'left');return}
   if(O.act==='fish'){
-    if(g.st===1){text('！',cx,y+24,32,'#ff5d5d',800);text('今だ！ '+BL(p,'act'),cx,y+50,11,'#fff',800)}
+    if(g.st===1){text('！',cx,y+24,32,'#ff5d5d',800);text(AL(p,'act','今だ！'),cx,y+50,11,'#fff',800)}
     else{emoji('🎣',cx-34,y+26,22);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx-24,y+16);ctx.lineTo(cx+18,y+26);ctx.stroke();
       const d=Math.sin(S.t*4)*2;ctx.fillStyle='#ff6d6d';ctx.beginPath();ctx.arc(cx+20,y+27+d,5,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(cx+15,y+26+d,10,2);
-      text('「！」が出たら '+BL(p,'act'),cx,y+50,10,'#9db3b4',700)}
+      text(AL(p,'act','「！」が出たら'),cx,y+50,10,'#9db3b4',700)}
   } else if(O.act==='mash'){
-    text(O.e+' '+BL(p,'act')+'を連打！',cx,y+18,12,'#fff',800);bar(x+14,y+32,w-28,g.v/Math.max(1,g.need),'#7fd893');
+    text(O.e+' '+AL(p,'act','連打！'),cx,y+18,12,'#fff',800);bar(x+14,y+32,w-28,g.v/Math.max(1,g.need),'#7fd893');
   } else if(O.act==='timing'){
-    text(BL(p,'act')+'で止める（緑で2個）',cx,y+16,10,'#fff',800);
+    text(AL(p,'act','止める')+' 緑で2個',cx,y+16,10,'#fff',800);
     const bx=x+14,bw=w-28,by=y+28,z=timingZone();
     ctx.fillStyle='rgba(255,255,255,.15)';rr(bx,by,bw,14,7);ctx.fill();
     ctx.fillStyle='rgba(127,216,147,.85)';ctx.fillRect(bx+bw*(0.5-z),by,bw*z*2,14);
@@ -1733,7 +1750,7 @@ function drawGather(p){
     text('この順に入力',cx,y+14,10,'#fff',800);
     g.seq.forEach((k,j)=>{const A=ARW[k];if(A)text(A[2],cx-22+j*44,y+38,26,j<g.v?'#7fd893':'#ffe08a',800)});
   }
-  text(BL(p,'sw')+'：やめる',x+w-7,y+h-7,9,'#9db3b4',700,'right');
+  text(AL(p,'sw','やめる'),x+w-7,y+h-7,9,'#9db3b4',700,'right');
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
 function drawTopBar(){
@@ -1759,7 +1776,9 @@ function drawTopBar(){
     ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(fx+28+k*11,fy+6,9,12);
     if(f>0){ctx.fillStyle=S.fuel<=2?'#ff6d6d':'#ffb347';ctx.fillRect(fx+28+k*11,fy+6+12*(1-f),9,12*f)}}
   const lv=S.fuel>0?S.speed:0;
-  text(SPEED_N[lv],fx+214,fy+12,12,lv===2?'#ff9c9c':lv===0?'#9db3b4':'#c9f2d2',800,'right');
+  ctx.font=`800 12px ${FNT}`;const sw=ctx.measureText(SPEED_N[lv]).width+12;
+  ctx.fillStyle=lv===2?'#d63b3b':lv===0?'#4a5a60':'#2e7d4f';rr(fx+218-sw,fy+4,sw,16,8);ctx.fill();
+  text(SPEED_N[lv],fx+212,fy+12,12,'#fff',800,'right');
   // how much one drive burns at each lever setting (the current one is lit)
   ctx.fillStyle='rgba(16,26,30,.85)';rr(fx,fy+27,222,20,8);ctx.fill();
   text('1回の走行',fx+8,fy+37,11,'#9db3b4',700,'left');
@@ -1778,7 +1797,7 @@ function drawMenus(){
     ctx.fillStyle='rgba(16,26,30,.94)';rr(x,y,w,h,10);ctx.fill();
     ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.stroke();
     text(M.title,x+10,y+14,12,'#fff',800,'left');
-    text(BL(p,'pick')+'：取る　'+BL(p,'sw')+'：閉じる',x+w-10,y+14,10,'#9db3b4',700,'right');
+    text(AL(p,'pick','取る')+'　'+AL(p,'sw','閉じる'),x+w-10,y+14,10,'#9db3b4',700,'right');
     list.forEach((id,k)=>{
       const cx=x+8+(k%cols)*cw+cw/2,cy=y+30+Math.floor(k/cols)*cw+cw/2,n=M.count(id);
       ctx.globalAlpha=n>0?1:0.3;
@@ -1892,6 +1911,7 @@ function upInfo(){
     (rare?`<b style="color:#ff79b8">★レア ${rare.n}</b>（${rare.d}）　`:'')+(t?'<b style="color:#ffd84a">⬆</b> '+t:'');
 }
 const readyBtn=document.getElementById('readyBtn');
+if(isTouch)readyBtn.textContent='準備完了（長押し）';
 readyBtn.addEventListener('pointerdown',e=>{e.preventDefault();readyPtr=true;try{readyBtn.setPointerCapture(e.pointerId)}catch(_){}});
 for(const ev of ['pointerup','pointercancel'])readyBtn.addEventListener(ev,()=>{readyPtr=false});
 readyBtn.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1928,6 +1948,8 @@ function renderHud(){
       upInfo()+
       `　<span class="dim">｜残り時間は次の町の営業時間にプラス（0になっても続けられます）</span>`;
   }
+  const gl=UPS.filter(u=>!u.tgt&&u.id!=='heart'&&u.id!=='plot'&&S.upCount&&S.upCount[u.id]).map(u=>u.e+u.d+(S.upCount[u.id]>1?' ×'+S.upCount[u.id]:''));
+  if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info+='<br><b style="color:#ffd84a">強化</b>　'+gl.join('　');
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   infoEl.innerHTML=info||'　';S.sideInfo=info;
   const ch=Object.keys(ING).filter(k=>(S.stock[k]||0)>0).map(k=>`<span class="chip">${ING[k].e} ${ING[k].n} ${S.stock[k]}</span>`).join('');

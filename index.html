@@ -2458,6 +2458,10 @@ function drawTopBar(){
   ctx.font=`800 12px ${FNT}`;const sw=ctx.measureText(SPEED_N[lv]).width+12;
   ctx.fillStyle=lv===2?'#d63b3b':lv===0?'#4a5a60':'#2e7d4f';rr(fx+218-sw,fy+4,sw,16,8);ctx.fill();
   text(SPEED_N[lv],fx+212,fy+12,12,'#fff',800,'right');
+  // online: the room code stays on screen so friends can join later
+  if(NET.role!=='off'&&NET.code){const rx=fx-138;
+    ctx.fillStyle='rgba(16,26,30,.85)';rr(rx,fy,130,24,8);ctx.fill();ctx.strokeStyle='#7fd6d1';ctx.lineWidth=1.2;ctx.stroke();
+    text('部屋コード',rx+8,fy+12,11,'#9db3b4',700,'left');text(NET.code,rx+122,fy+12,16,'#ffe08a',800,'right')}
   // how much one drive burns at each lever setting (the current one is lit)
   ctx.fillStyle='rgba(16,26,30,.85)';rr(fx,fy+27,222,20,8);ctx.fill();
   text('1回の走行',fx+8,fy+37,11,'#9db3b4',700,'left');

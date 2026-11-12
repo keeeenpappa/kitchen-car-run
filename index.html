@@ -408,19 +408,19 @@ function missingUnits(){
 }
 function finishLayout(){
   if(!S||S.phase!=='layout')return;
-  if(S.players.some(q=>holdsFurn(q)||(q.hold&&q.hold.kind==='power'))){S.toast={text:'手に持っている物を置いてから',t:0,life:2.5};return}
-  if(S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor'){S.toast={text:'ドアの前はあけておく',t:0,life:2.5};return}
+  if(S.players.some(q=>holdsFurn(q)||(q.hold&&q.hold.kind==='power'))){S.toast={text:'手に持っている物を置いてから',t:0,life:2.5};sfx('nope');return}
+  if(S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor'){S.toast={text:'ドアの前はあけておく',t:0,life:2.5};sfx('nope');return}
   const miss=missingUnits();
-  if(miss.length){S.toast={text:'トラックに置いていない：'+miss.map(reqName).join('・'),t:0,life:3.5};return}
+  if(miss.length){S.toast={text:'トラックに置いていない：'+miss.map(reqName).join('・'),t:0,life:3.5};sfx('nope');return}
   const bad=unreachable();
-  if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：右から2列目までのどこかに通路をあける（赤い枠）',t:0,life:3};return}
-  if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};return}
+  if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：右から2列目までのどこかに通路をあける（赤い枠）',t:0,life:3};sfx('nope');return}
+  if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};sfx('nope');return}
   const left=layoutLeft();
   stashOutside();
   if(left)S.toast={text:'外に置いた'+left+'個は置いていきます（次の配置でまた出てきます）',t:0,life:3};
   S.bonus=Math.max(0,Math.ceil(S.timer));
   bringInside();
-  if(S.stop===0)showChoose();   // first layout of the run → pick the first town
+  if(S.stop===0){showChoose();sfx('ready')}   // first layout of the run → pick the first town
   else startDrive();             // between towns the town was already chosen
 }
 // ---------- equipment shop (between towns) → short layout ----------
@@ -748,7 +748,7 @@ function doPick(p,c,tx,ty){
       else if(p.hold.kind==='basket'){
         const b=p.hold.items;if(!b.length){say(p,'カゴは空');return}
         for(const id of b)S.stock[id]=(S.stock[id]||0)+1;
-        float(tx+.5,ty+1,'冷蔵庫へ '+b.map(id=>ING[id].e).join(''),'#bff2c6');p.hold.items=[]}
+        float(tx+.5,ty+1,'冷蔵庫へ '+b.map(id=>ING[id].e).join(''),'#bff2c6');p.hold.items=[];sfx('put')}
       return}
     case 'seedbox':{
       if(!p.hold){if(!seedList().length){say(p,'種がない');return}
@@ -756,6 +756,7 @@ function doPick(p,c,tx,ty){
       else if(p.hold.kind==='seed'){S.seeds[p.hold.id]=(S.seeds[p.hold.id]||0)+1;p.hold=null}
       return}
     case 'plates':
+      if(!p.hold||p.hold.kind==='plate'||(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt))sfx('plate');
       if(!p.hold)p.hold={kind:'plate',items:[]};
       else if(p.hold.kind==='plate'&&!p.hold.bare&&!p.hold.items.length)p.hold=null;
       // holding a finished stack or a prepared ingredient: take a plate with it on
@@ -765,7 +766,7 @@ function doPick(p,c,tx,ty){
       else say(p,'皿には乗せられない');
       return;
     case 'trash':
-      if(p.hold){if(p.hold.kind==='can')say(p,'じょうろは捨てられない');else if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
+      if(p.hold){if(p.hold.kind!=='can')sfx('trash');if(p.hold.kind==='can')say(p,'じょうろは捨てられない');else if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
       return;
     case 'sink':
       if(p.hold&&p.hold.kind==='can')say(p,AL(p,'act','水を汲む',1));
@@ -776,7 +777,7 @@ function doPick(p,c,tx,ty){
         if(c.plant.t>=ING[c.plant.id].grow)harvest(c,tx,ty);
         else say(p,c.plant.watered?'まだ育っていない':'水が必要（じょうろ）');
       }
-      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false};p.hold=null;say(p,'じょうろで水をあげる')}
+      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false};p.hold=null;say(p,'じょうろで水をあげる');sfx('plant')}
       else if(p.hold&&p.hold.kind==='can')say(p,'先に種を植える');
       else say(p,'種を持ってくる');
       return;
@@ -784,12 +785,12 @@ function doPick(p,c,tx,ty){
       if(S.phase!=='stop'||S.sub!=='service')return;
       const w=waiting()[c.slot];if(!w)return;
       if(follower(p)){say(p,'もう1人案内している');return}
-      w.st='follow';w.by=p.i;say(p,'空いているテーブルへ案内');return}
+      w.st='follow';w.by=p.i;say(p,'空いているテーブルへ案内');sfx('follow');return}
     case 'table':{
       if(S.phase!=='stop')return;
       const g=guestAt(tx,ty),f=follower(p);
       if(!g){
-        if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,RECIPES[f.order].e+' ご注文','#fff')}
+        if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,RECIPES[f.order].e+' ご注文','#fff');sfx('seat')}
         else say(p,S.sub==='service'?'並んでいるお客さんを案内してくる':'まだ営業前');
         return}
       if(g.st==='eat'){say(p,'食事中');return}
@@ -801,7 +802,7 @@ function doPick(p,c,tx,ty){
     case 'counter':case 'board':case 'stove':case 'blender':
       placeOrTake(p,c);return;
     case 'lever':
-      S.speed=S.speed===2?1:2;say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）');return;
+      S.speed=S.speed===2?1:2;sfx('lever');say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）');return;
     case 'window':
       if(S.phase==='drive')say(p,shopAtWindow(tx)?AL(p,'sw','切替')+'　'+AL(p,'act','購入',1):'お店が来たら買える');
       return;
@@ -821,7 +822,7 @@ function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,d
 function seatInput(p,inp){
   p.tx=-9;p.ty=-9;
   if(inp.sw||!(S.phase==='drive'||S.phase==='stop')){leaveSeat(p);return}
-  if(inp.pick||(inp.act&&!p.prevAct)){S.speed=S.speed===2?1:2;say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）')}
+  if(inp.pick||(inp.act&&!p.prevAct)){S.speed=S.speed===2?1:2;sfx('lever');say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）')}
 }
 const unseatAll=()=>{if(S)S.players.forEach(leaveSeat)};
 function waterPlant(p,c,tx,ty){
@@ -829,16 +830,18 @@ function waterPlant(p,c,tx,ty){
   if(c.plant.t>=ING[c.plant.id].grow){say(p,'もう実っている');return}
   if(c.plant.watered){say(p,'もう水をあげた');return}
   if(can.water<=0){say(p,'じょうろが空。シンクで汲む');return}
-  can.water--;c.plant.watered=true;float(tx+.5,ty,'💧','#9fd8ff');
+  can.water--;c.plant.watered=true;float(tx+.5,ty,'💧','#9fd8ff');sfx('water');
 }
-function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6')}
+function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6');sfx('harvest')}
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
 function buy(list,p,shop,tx,ty){
   if(!list||!list.length)return;
   const it=list[wrap(p.cur,list.length)];
-  if(it.sold){say(p,'売り切れ');return}
-  if(S.money<it.price){say(p,'お金が足りない');return}
-  if(it.type==='equip'&&p.hold){say(p,'手を空けて受け取る');return}
+  const no=m=>{say(p,m);sfx('nope')};
+  if(it.sold){no('売り切れ');return}
+  if(S.money<it.price){no('お金が足りない');return}
+  if(it.type==='equip'&&p.hold){no('手を空けて受け取る');return}
+  sfx(it.type==='fuel'&&S.fuel<FUEL_MAX?'fuel':it.type==='mystery'?'mystery':it.type==='fuel'?'nope':'buy');
   if(it.type==='fuel'){
     if(S.fuel>=FUEL_MAX){say(p,'もう満タン');return}
     S.money-=it.price;S.fuel=Math.min(FUEL_MAX,S.fuel+it.qty);float(tx+.5,ty,'⛽ +'+it.qty+(S.fuel>=FUEL_MAX?'（満タン）':''),'#ffd0c0');return}
@@ -859,7 +862,7 @@ function doAct(p,c,tx,ty,dt){
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
-    p.actT+=dt;if(p.actT>=FILL*proMul(c)){p.actT=0;p.lock=true;p.hold.water=canCap(p.hold);float(tx+.5,ty,'💧満タン','#9fd8ff')}
+    p.actT+=dt;if(p.actT>=FILL*proMul(c)){p.actT=0;p.lock=true;p.hold.water=canCap(p.hold);float(tx+.5,ty,'💧満タン','#9fd8ff');sfx('water')}
     return}
   if(c.t==='window'&&S.phase==='drive'){
     const sh=shopAtWindow(tx); if(!sh)return;
@@ -880,16 +883,16 @@ const timingZone=()=>Math.min(0.3,0.1*S.up.gatherSpd);
 function gatherInput(p,inp,dt){
   const g=p.g,O=GOBJ[g.obj],tap=inp.act&&!p.prevAct;
   if(g.st===2){ // a random catch: keep it or put it back
-    if(inp.pick){addToBasket(p,[g.item]);p.g=null}
-    else if(inp.sw){float(g.x+.5,g.y,'戻した','#cfe');p.g=null}
+    if(inp.pick){addToBasket(p,[g.item]);p.g=null;sfx('put')}
+    else if(inp.sw){float(g.x+.5,g.y,'戻した','#cfe');p.g=null;sfx('put')}
     return}
   if(inp.sw){p.g=null;return} // quit
   if(O.act==='fish'){
     g.t-=dt;
-    if(g.st===0){if(tap){say(p,'早すぎた！');p.g=null;return}if(g.t<=0){g.st=1;g.t=FISH_BITE}}
-    else{if(tap){gatherDone(p);return}if(g.t<=0){say(p,'逃げられた…');p.g=null}}
+    if(g.st===0){if(tap){say(p,'早すぎた！');sfx('miss');p.g=null;return}if(g.t<=0){g.st=1;g.t=FISH_BITE;sfx('bite')}}
+    else{if(tap){gatherDone(p);return}if(g.t<=0){say(p,'逃げられた…');sfx('miss');p.g=null}}
   } else if(O.act==='mash'){
-    if(tap){g.v++;if(g.v>=g.need)gatherDone(p)}
+    if(tap){g.v++;if(g.v>=g.need)gatherDone(p);else sfx('tap')}
   } else if(O.act==='timing'){
     g.t+=dt;g.v=1-Math.abs(((g.t*1.1)%2)-1);
     if(tap)gatherDone(p,Math.abs(g.v-0.5)<=timingZone()?2:1);
@@ -897,14 +900,15 @@ function gatherInput(p,inp,dt){
     const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,key=dx+','+dy;
     if(key!=='0,0'&&key!==p.gLast&&(dx===0||dy===0)){
       const want=ARW[g.seq[g.v]];
-      if(want[0]===dx&&want[1]===dy){g.v++;if(g.v>=g.seq.length)gatherDone(p)}
-      else{say(p,'ちがう！もう一回');g.seq=[rnd(4),rnd(4)];g.v=0}
+      if(want[0]===dx&&want[1]===dy){g.v++;if(g.v>=g.seq.length)gatherDone(p);else sfx('tap')}
+      else{say(p,'ちがう！もう一回');sfx('miss');g.seq=[rnd(4),rnd(4)];g.v=0}
     }
     p.gLast=key;
   }
 }
 function gatherDone(p,n){
   const g=p.g,O=GOBJ[g.obj];
+  sfx('catch');
   if(O.items.length>1){g.item=O.items[rnd(O.items.length)];g.st=2;return}
   addToBasket(p,Array(n||1).fill(O.items[0]));p.g=null;
 }
@@ -928,7 +932,7 @@ function serve(p,tx,ty,c){
   const R=RECIPES[rid];
   const pay=Math.round(R.price*S.town.pay*S.up.pay), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate());
   S.money+=pay+tip;S.earned+=pay+tip;S.served++;c.st='eat';c.t=EAT_T;p.hold=null;
-  float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a');
+  float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a');sfx('coin');
 }
 
 // ---------- phases ----------
@@ -941,7 +945,7 @@ function startDrive(){
   S.shops=list.map((ty,k)=>({x:FIRST_SHOP_X+k*SHOP_GAP,type:ty,items:genShopItems(ty)}));
   S.dist=0;S.refT=0;S.actT=0;S.gasWarn=false;
   S.route=S.shops[S.shops.length-1].x+3;   // arrive once the gas station has gone past the back window
-  bringInside();hideOv();
+  bringInside();hideOv();sfx('horn');
 }
 function genShopItems(ty){
   const items=ty.gen();
@@ -968,6 +972,7 @@ function arrive(){
   const delta=Math.round((S.refT||0)-(S.actT||0));
   if(delta){S.bonus=(S.bonus||0)+delta;
     S.toast={text:delta>0?'予定より'+delta+'秒早く着いた！ 営業 +'+delta+'秒':'到着が'+(-delta)+'秒遅れた… 営業 −'+(-delta)+'秒',t:0,life:3.5}}
+  sfx('arrive');
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];S.arrT=0;
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
 }
@@ -986,7 +991,7 @@ function startLeave(c,mad){const [x,y]=custPos(c);c.from=c.st;c.st='leave';c.mad
 function spawnCust(){
   if(waiting().length>=QMAX)return;
   const order=S.town.menu[rnd(S.town.menu.length)],max=(S.np===1?85:70)*S.up.pat;
-  S.cust.push({order,pat:max,max,hue:rnd(360),st:'wait',by:-1,tx:0,ty:0,t:0});
+  S.cust.push({order,pat:max,max,hue:rnd(360),st:'wait',by:-1,tx:0,ty:0,t:0});sfx('bell');
 }
 function clearKitchen(){
   // leftovers from this town are thrown away (planters keep growing)
@@ -1013,6 +1018,7 @@ function clearKitchen(){
   return lost;
 }
 function endStop(){
+  sfx('close');
   S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
@@ -1070,12 +1076,12 @@ function takeUpgrade(i){
   S.ovT=EQ_TIME;showEquipShop();
 }
 function gameOver(){
-  S.phase='over';
+  S.phase='over';sfx('over');
   showOv(`<div class="box"><h2>評判がなくなった…</h2><p>${S.stop+1}つ目の町でお店をたたむことになりました。<br>合計の売上 ${S.totalEarned+S.earned}G</p>
     <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
 }
 function showEnd(){
-  S.phase='end';
+  S.phase='end';sfx('finish');
   showOv(`<div class="box"><h2>旅の終わり</h2><p>${STOPS}つの町を回りきりました。</p>
     <p>合計の売上 <b>${S.totalEarned}G</b> ／ 提供 <b>${S.totalServed}皿</b> ／ 残った評判 ${'♥'.repeat(S.hearts)}</p>
     <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
@@ -1132,6 +1138,8 @@ function readyTick(dt){
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
+  if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
+  if(a!=='ready'&&a!=='pause')play('confirm');
   if(a==='dev'){cycleDev(+v);const r=document.getElementById('devRow');if(r){r.innerHTML=devRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='dev'&&b.dataset.v===String(v)));markSel()}return}
   if(NET.role==='guest'&&a!=='title'&&(NET.mirror||a==='ready'||a==='pause')){guestSend(a,v);return}
   ovAction(a,v);
@@ -1177,7 +1185,7 @@ function canPause(){
 function pauseGame(){
   if(!S||S.paused||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
-  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':keyName(0,'menu')+' でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}</div>`);
+  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':keyName(0,'menu')+' でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}</div>`);
 }
 function resumeGame(){
   if(!S)return;S.paused=false;
@@ -1194,6 +1202,7 @@ function showTitle(){
     <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td></tr></table>
     <p class="sub" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
+    ${sndRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
     <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
     <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
@@ -1247,7 +1256,7 @@ function overlayInput(){
   if(pressed.has('Space')||pressed.has('Enter')||(p0&&p0.edge('a')))ok=true;
   if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
   for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
-  if(mv){ovSel=wrap(ovSel+mv,b.length);markSel()}
+  if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
   if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
 }
 
@@ -1321,8 +1330,8 @@ function update(dt){
   // players
   S.players.forEach((p,i)=>{
     const inp=readInput(i);
-    if(p.menu){menuInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
-    if(p.mk){marketInput(p,inp,dt);if(p.msgT>0)p.msgT-=dt;return}
+    if(p.menu){const h0=p.hold,s0=p.menu.sel;menuInput(p,inp,dt);if(p.hold!==h0)sfx('pick');else if(p.menu&&p.menu.sel!==s0)sfx('tick');p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
+    if(p.mk){const c0=p.cur;marketInput(p,inp,dt);if(p.mk&&p.cur!==c0)sfx('tick');if(p.msgT>0)p.msgT-=dt;return}
     if(p.g){gatherInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     if(p.seat){seatInput(p,inp);p.prevAct=inp.act;if(p.msgT>0)p.msgT-=dt;return}
     if(inp.sw&&canSeat(p)){takeSeat(p);p.prevAct=inp.act;return}
@@ -1351,7 +1360,7 @@ function update(dt){
     if(inp.sw)p.cur++;
     if(!inp.act){p.lock=false;p.actT=0}
     if(c){
-      if(inp.pick)doPick(p,c,tx,ty);
+      if(inp.pick){const h0=p.hold,m0=p.msgT,n0=AU.n,mn0=!!(p.menu||p.mk||p.g);doPick(p,c,tx,ty);pickSnd(p,h0,m0,n0,mn0)}
       if(inp.act)doAct(p,c,tx,ty,dt);
     }
     if(p.msgT>0)p.msgT-=dt;
@@ -1365,7 +1374,7 @@ function update(dt){
     S.roadOff+=d;S.dist+=d;S.actT+=dt;
     S.refT+=d/(zone?WIN_SPEED:SPEEDS[1]);          // how long ふつう would have taken for the same stretch
     if(!zone&&S.fuel>0){S.fuel=Math.max(0,S.fuel-d*FUEL_RATE[S.speed]);
-      if(S.fuel<=0&&!S.gasWarn){S.gasWarn=true;S.toast={text:'⛽ ガス欠！ ゆっくりしか走れない',t:0,life:3}}}
+      if(S.fuel<=0&&!S.gasWarn){S.gasWarn=true;sfx('gaswarn');S.toast={text:'⛽ ガス欠！ ゆっくりしか走れない',t:0,life:3}}}
     for(const s of S.shops){
       s.x-=d;
       // once a shop has passed the back window it can't be bought from: fade it out quickly
@@ -1377,7 +1386,7 @@ function update(dt){
     S.timer-=dt;
     if(S.sub==='prep'){if(S.timer<=0){
       const b=S.bonus||0;
-      S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;
+      S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;sfx('service');
       if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
     else{
       S.spawnT-=dt;
@@ -1392,7 +1401,7 @@ function update(dt){
           continue}
         if(c.st==='eat'){c.t-=dt;if(c.t<=0)startLeave(c,false);continue}
         c.pat-=dt;
-        if(c.pat<=0){const [fx,fy]=custPos(c);startLeave(c,true);S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
+        if(c.pat<=0){const [fx,fy]=custPos(c);startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
       }
       if(S.timer<=0)endStop();
     }
@@ -2722,6 +2731,7 @@ function sendSnap(){
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
+  const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
   let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
   if(bytes>3800){d.fl=[];bytes=new TextEncoder().encode(JSON.stringify(d)).length}
   NET.snapBytes=bytes;
@@ -2731,6 +2741,7 @@ function sendSnap(){
 async function joinRoom(code){
   code=code.replace(/[^A-Z0-9]/g,'').slice(0,6);
   if(!NET.lobby||!code)return;
+  AU.fxSeen=0;
   Object.assign(NET,{role:'guest',code,pk:0,sw:0,ocSeq:0,seenSnap:-1,lastSnapAt:performance.now(),shownOv:-1,ovParts:{},hostPeer:null,wantOv:0,lastIn:''});
   S=null;NET.err='';guestLocalOv(NET.peer?'conn':'wait');
   try{
@@ -2852,6 +2863,10 @@ function applySnap(d){
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));
   S.toast=Array.isArray(d.to)?{text:String(d.to[0]||''),t:n(d.to[1])/10,life:n(d.to[2])/10}:null;
+  // the host's sound events since the last snapshot
+  const fresh=AU.fxSeen>0;
+  for(const e of Array.isArray(d.fx)?d.fx:[])if(Array.isArray(e)&&n(e[0])>AU.fxSeen){AU.fxSeen=n(e[0]);const k=SND_K[n(e[1])];if(k&&fresh)play(k)}
+  if(!AU.fxSeen)AU.fxSeen=0.5;   // synced: whatever comes next is new
   if(n(d.ot)>=0&&d.ot!==-1)for(const el of ov.querySelectorAll('.ovtime'))el.textContent=String(n(d.ot));
 }
 const decPlant=a=>Array.isArray(a)&&ING_K[a[0]]?{id:ING_K[a[0]],t:(+a[1]||0)/10,watered:!!a[2]}:null;
@@ -2931,6 +2946,196 @@ function peerGuest(name){
   });
 }
 
+// ---------- sound (Web Audio, everything synthesized: no sound files) ----------
+const LV=[0,0.22,0.45,0.7,1], SNDN=['オフ','小','中','大','特大'];
+const AU={ctx:null,bgm:null,se:null,vol:{bgm:2,se:3},nb:null,track:null,step:0,nextT:0,bgmLvl:-1,st:new Map(),chopT:0,warnT:0,popT:0,clock:-1,fxSeen:0,n:0,loop:{}};
+try{const v=JSON.parse(localStorage.getItem('kcr-snd')||'null');if(v&&typeof v==='object')for(const k of ['bgm','se'])if(Number.isInteger(v[k])&&v[k]>=0&&v[k]<=4)AU.vol[k]=v[k]}catch(_){}
+const mf=m=>440*Math.pow(2,(m-69)/12);
+function auInit(){
+  if(AU.ctx){if(AU.ctx.state==='suspended'&&!document.hidden)AU.ctx.resume().catch(()=>{});return}
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  let c;try{c=AU.ctx=new AC()}catch(_){return}
+  const comp=c.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(c.destination);
+  AU.bgm=c.createGain();AU.se=c.createGain();AU.bgm.gain.value=0;AU.bgm.connect(comp);AU.se.connect(comp);
+  const nb=AU.nb=c.createBuffer(1,c.sampleRate,c.sampleRate),d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  auVol();
+  // continuous sounds: sizzling stove, running blender, the truck's engine (their gains follow the game state)
+  const L=AU.loop,g=()=>{const x=c.createGain();x.gain.value=0;x.connect(AU.se);return x};
+  L.siz=g();{const s=c.createBufferSource();s.buffer=nb;s.loop=true;const f=c.createBiquadFilter();f.type='highpass';f.frequency.value=3200;s.connect(f);f.connect(L.siz);s.start()}
+  L.bl=g();{const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=900;f.connect(L.bl);
+    for(const [fr,ty] of [[96,'sawtooth'],[193,'square']]){const o=c.createOscillator();o.type=ty;o.frequency.value=fr;const lfo=c.createOscillator(),lg=c.createGain();lfo.frequency.value=6;lg.gain.value=fr*0.04;lfo.connect(lg);lg.connect(o.frequency);o.connect(f);o.start();lfo.start()}}
+  L.eng=g();{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=48;L.engOsc=o;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=260;
+    const amp=c.createGain();amp.gain.value=0.6;const lfo=c.createOscillator(),lg=c.createGain();lfo.type='square';lfo.frequency.value=9;L.engLfo=lfo;lg.gain.value=0.35;lfo.connect(lg);lg.connect(amp.gain);
+    o.connect(f);f.connect(amp);amp.connect(L.eng);o.start();lfo.start()}
+}
+function auVol(){if(!AU.ctx)return;AU.se.gain.setTargetAtTime(LV[AU.vol.se]*0.8,AU.ctx.currentTime,0.05)}
+addEventListener('pointerdown',auInit,true);addEventListener('keydown',auInit,true);
+document.addEventListener('visibilitychange',()=>{if(!AU.ctx)return;if(document.hidden)AU.ctx.suspend().catch(()=>{});else AU.ctx.resume().catch(()=>{})});
+const auOn=()=>AU.ctx&&AU.ctx.state==='running';
+function osc(t,f,d,type,v,dest,to,a){
+  const c=AU.ctx,o=c.createOscillator(),g=c.createGain(),A=a||0.005;
+  o.type=type||'square';o.frequency.setValueAtTime(f,t);if(to)o.frequency.exponentialRampToValueAtTime(to,t+d);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+A);g.gain.exponentialRampToValueAtTime(0.0001,t+Math.max(d,A+0.01));
+  o.connect(g);g.connect(dest||AU.se);o.start(t);o.stop(t+d+0.03);
+}
+function noise(t,d,v,ft,ff,q,dest,ffTo){
+  const c=AU.ctx,s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();
+  s.buffer=AU.nb;f.type=ft||'bandpass';f.frequency.setValueAtTime(ff||1000,t);if(ffTo)f.frequency.exponentialRampToValueAtTime(ffTo,t+d);f.Q.value=q||1;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+  s.connect(f);f.connect(g);g.connect(dest||AU.se);s.start(t,Math.random()*0.5);s.stop(t+d+0.03);
+}
+function arp(t,ms,st,type,v,last){ms.forEach((m,i)=>osc(t+i*st,mf(m),i===ms.length-1?(last||st*2.5):st*1.3,type,v))}
+const SFX={
+  pick:t=>osc(t,520,0.07,'triangle',.3,0,820),
+  put:t=>{osc(t,330,0.08,'triangle',.3,0,200);noise(t,0.04,.1,'lowpass',900)},
+  nope:t=>{osc(t,233,0.08,'square',.06,0,200);osc(t+0.09,185,0.1,'square',.06,0,160)},
+  plate:t=>{osc(t,1760,0.14,'sine',.14);osc(t,2637,0.1,'sine',.07)},
+  trash:t=>noise(t,0.28,.3,'lowpass',1400,1,0,200),
+  open:t=>{osc(t,660,0.06,'triangle',.2);osc(t+0.05,990,0.08,'triangle',.2)},
+  tick:t=>osc(t,1200,0.03,'square',.05),
+  water:t=>{for(let k=0;k<4;k++)osc(t+k*0.06,600+rnd(500),0.07,'sine',.18,0,1400)},
+  plant:t=>{noise(t,0.12,.18,'lowpass',600);osc(t+0.05,392,0.1,'triangle',.18,0,523)},
+  harvest:t=>arp(t,[72,76,79,84],0.06,'triangle',.2),
+  coin:t=>{osc(t,988,0.08,'square',.1);osc(t+0.08,1319,0.4,'square',.1);noise(t,0.05,.08,'highpass',6000)},
+  seat:t=>arp(t,[67,72],0.07,'triangle',.2),
+  follow:t=>arp(t,[64,67],0.06,'triangle',.18),
+  bell:t=>{osc(t,1568,0.5,'sine',.1);osc(t+0.13,1319,0.7,'sine',.09)},
+  angry:t=>{osc(t,300,0.25,'sawtooth',.1,0,120);osc(t+0.27,200,0.4,'sawtooth',.1,0,80)},
+  buy:t=>{osc(t,1047,0.06,'square',.09);osc(t+0.06,1568,0.22,'square',.09)},
+  fuel:t=>{for(let k=0;k<5;k++)osc(t+k*0.07,180+k*35,0.08,'sine',.25,0,120+k*35)},
+  mystery:t=>arp(t,[60,64,67,71,74,79],0.05,'square',.08),
+  bite:t=>{osc(t,1400,0.07,'square',.12);osc(t+0.1,1400,0.07,'square',.12)},
+  tap:t=>osc(t,700+rnd(200),0.04,'square',.08),
+  catch:t=>arp(t,[72,76,79,84,88],0.05,'triangle',.2),
+  miss:t=>osc(t,400,0.3,'triangle',.18,0,150),
+  lever:t=>{noise(t,0.05,.25,'bandpass',800,2);osc(t+0.03,180,0.08,'square',.1,0,120)},
+  horn:t=>{for(const f of [440,554]){osc(t,f,0.16,'sawtooth',.06);osc(t+0.22,f,0.34,'sawtooth',.06)}},
+  arrive:t=>arp(t,[67,72,76,79,84],0.09,'square',.08,0.5),
+  service:t=>{arp(t,[72,76,79,84],0.08,'square',.08,0.12);arp(t+0.42,[79,84],0.1,'square',.08,0.45)},
+  close:t=>arp(t,[84,79,76,72,67,72],0.12,'triangle',.2,0.6),
+  finish:t=>{arp(t,[72,72,72,76,79],0.11,'square',.08,0.2);arp(t+0.6,[77,81,84],0.1,'square',.08,0.8)},
+  over:t=>arp(t,[67,66,65,64],0.28,'triangle',.2,0.8),
+  ready:t=>arp(t,[72,79,84],0.07,'square',.08),
+  confirm:t=>{osc(t,880,0.05,'square',.07);osc(t+0.05,1320,0.1,'square',.07)},
+  gaswarn:t=>{osc(t,440,0.15,'square',.09);osc(t+0.2,440,0.15,'square',.09)},
+  // these come from what is on screen, so every device plays them itself
+  done:t=>{osc(t,1319,0.12,'sine',.2);osc(t+0.1,1760,0.3,'sine',.17)},
+  burnt:t=>{noise(t,0.6,.25,'highpass',2500,1,0,500);osc(t,330,0.4,'triangle',.12,0,165)},
+  warn:t=>osc(t,1050,0.06,'square',.06),
+  chop:t=>{noise(t,0.035,.3,'bandpass',2600,3);osc(t,170,0.05,'sine',.25,0,90)},
+  pop:t=>noise(t,0.02,.12,'highpass',4000+rnd(3000)),
+  clock:t=>osc(t,1568,0.05,'square',.06),
+};
+const SND_K=Object.keys(SFX);
+function play(n){if(!auOn()||!AU.vol.se)return;const f=SFX[n];if(f)try{f(AU.ctx.currentTime+0.005)}catch(_){}}
+// a game event: played here and sent to the guests with the next snapshot
+function sfx(n){AU.n++;if(NET.role==='host'){(NET.fx||(NET.fx=[])).push([NET.fxSeq=(NET.fxSeq||0)+1,SND_K.indexOf(n),performance.now()])}if(NET.role!=='guest')play(n)}
+function cycleSnd(k){if(!(k in AU.vol))return;AU.vol[k]=(AU.vol[k]+1)%5;try{localStorage.setItem('kcr-snd',JSON.stringify(AU.vol))}catch(_){}auVol();AU.bgmLvl=-1}
+const sndRowInner=()=>`<span style="align-self:center;min-width:9em">音量</span><button class="ovbtn" data-act="snd" data-v="bgm">BGM：${SNDN[AU.vol.bgm]}</button><button class="ovbtn" data-act="snd" data-v="se">効果音：${SNDN[AU.vol.se]}</button>`;
+const sndRow=()=>`<div class="row" id="sndRow">${sndRowInner()}</div>`;
+// after 持つ: a sound for whatever happened, unless that action already made its own
+function pickSnd(p,h0,m0,n0,mn0){
+  if(AU.n!==n0)return;
+  if(p.hold!==h0)sfx(p.hold?'pick':'put');
+  else if((p.menu||p.mk||p.g)&&!mn0)sfx('open');
+  else if(p.msgT>0&&p.msgT!==m0)sfx('nope');
+}
+// ----- music: a small step sequencer (8 steps per bar) -----
+const CHN={C:0,'C#':1,Db:1,D:2,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,Ab:8,A:9,Bb:10,B:11};
+const chordOf=s=>{const m=/^([A-G][#b]?)(m?)$/.exec(s);const r=48+CHN[m[1]];return [r,r+(m[2]?3:4),r+7]};
+const noteOf=s=>{const m=/^([A-G][#b]?)(\d)$/.exec(s);return m?(+m[2]+1)*12+CHN[m[1]]:null};
+const SONGS={
+  menu:{bpm:92,lead:'triangle',lv:.11,style:'pad',ch:'C Am F G C Am Dm G',
+    mel:'E5 . G5 . C6 . B5 A5|G5 . E5 . C5 . D5 E5|F5 . A5 . C6 . A5 F5|G5 . . . D5 . . -|E5 . G5 . C6 . D6 E6|D6 . C6 . A5 . G5 E5|F5 . A5 . G5 F5 E5 D5|D5 . B4 . G4 . - -'},
+  drive:{bpm:124,lead:'square',lv:.05,style:'stab',drums:1,ch:'F C Dm Bb F C Bb C',
+    mel:'C5 . F5 . A5 . G5 F5|E5 . G5 . C6 . . -|D5 . F5 . A5 . C6 A5|Bb5 . A5 . G5 . F5 G5|A5 . . C6 . A5 F5 .|G5 . E5 . C5 . E5 G5|F5 . G5 . A5 . Bb5 A5|G5 . . . C5 D5 E5 G5'},
+  service:{bpm:136,lead:'square',lv:.05,style:'doko',drums:2,ch:'G Em C D G Em Am D',
+    mel:'D5 G5 B5 G5 D6 . B5 .|E5 G5 B5 G5 E6 . B5 .|C6 . B5 A5 G5 . E5 .|F#5 . A5 . D6 . - -|B5 . D6 . B5 A5 G5 .|G5 . E5 . G5 A5 B5 .|C6 . A5 . E5 . A5 C6|D6 . . C6 B5 . A5 .'},
+};
+for(const s of Object.values(SONGS)){s.chords=s.ch.split(' ').map(chordOf);s.notes=s.mel.split('|').flatMap(b=>b.trim().split(/\s+/))}
+function bgmWant(){
+  if(!S)return 'menu';
+  if(S.phase==='drive')return 'drive';
+  if(S.phase==='stop')return S.arrT!=null&&S.arrT<ARRIVE_T?null:'service';
+  if(S.phase==='over'||S.phase==='end')return null;
+  return 'menu';
+}
+function tempoMul(){
+  if(!S||S.phase!=='stop'||S.sub!=='service')return 1;
+  return 1+0.025*S.cust.filter(c=>c.st==='wait').length+(S.timer<20?0.08:0);
+}
+function bgmStep(s,i,t,e8,quiet){
+  const bar=Math.floor(i/8),e=i%8,ch=s.chords[bar%s.chords.length],B=AU.bgm,root=ch[0]-12;
+  const tok=s.notes[i];const m=tok&&noteOf(tok);
+  if(m){let n=1;while(s.notes[i+n]==='.')n++;osc(t,mf(m),n*e8*0.92,s.lead,s.lv,B,0,0.012)}
+  if(s.style==='pad'){
+    if(e===0)for(const k of ch)osc(t,mf(k+12),e8*8*0.95,'sine',.035,B,0,0.12);
+    if(e===0||e===4)osc(t,mf(e===0?root:root+7),e8*3.6,'triangle',.2,B);
+  } else {
+    if(s.style==='doko')osc(t,mf(e%2?root+12:root),e8*0.85,'triangle',.2,B);           // ドコドコ: octave-bouncing bass
+    else if(e%2===0)osc(t,mf(e%4?root+7:root),e8*1.7,'triangle',.22,B);
+    if(e%2)for(const k of ch)osc(t,mf(k+12),e8*0.5,'triangle',.03,B);
+  }
+  if(s.drums&&!quiet){
+    if(e===0||e===4||(s.drums===2&&e===7))osc(t,150,0.13,'sine',.5,B,45);
+    if(e===2||e===6){noise(t,0.13,.16,'bandpass',1800,0.8,B);osc(t,210,0.06,'triangle',.1,B)}
+    noise(t,e%2&&s.drums===2?0.09:0.03,.05,'highpass',7500,1,B);
+  }
+}
+function auBgm(){
+  const c=AU.ctx,want=bgmWant();
+  const tgt=LV[AU.vol.bgm]*0.6*(S&&S.paused?0.35:1);
+  if(Math.abs(AU.bgmLvl-tgt)>1e-3){AU.bgmLvl=tgt;AU.bgm.gain.setTargetAtTime(tgt,c.currentTime,0.15)}
+  if(want!==AU.track){AU.track=want;AU.step=0;AU.nextT=c.currentTime+0.12}
+  if(!want||!AU.vol.bgm)return;
+  const s=SONGS[want],quiet=want==='service'&&S&&S.sub==='prep';
+  if(AU.nextT<c.currentTime-0.3)AU.nextT=c.currentTime+0.05;   // after a stall, skip instead of bursting
+  while(AU.nextT<c.currentTime+0.15){
+    const e8=60/(s.bpm*tempoMul())/2;
+    try{bgmStep(s,AU.step,AU.nextT,e8,quiet)}catch(_){}
+    AU.nextT+=e8;AU.step=(AU.step+1)%s.notes.length;
+  }
+}
+// sounds that follow the state: stove / blender / board, burning, last seconds, the engine
+const PROC_OF={board:'chop',stove:'cook',blender:'blend'};
+function auState(dt){
+  const L=AU.loop,c0=AU.ctx,now=c0.currentTime;
+  let siz=0,bl=0,chop=false,warn=false,eng=0;
+  const live=S&&!S.paused&&['drive','stop','layout'].includes(S.phase);
+  if(live)for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
+    const c=S.map[y][x];if(!c||!PROC_OF[c.t]){AU.st.delete(x+','+y);continue}
+    const it=c.item&&c.item.kind==='ing'?c.item:null,key=x+','+y;
+    const pv=AU.st.get(key)||{prog:0,proc:false,burnt:false,had:false,act:0};
+    const proc=!!it&&nextStep(it)===PROC_OF[c.t];
+    if(proc&&(c.prog||0)>pv.prog+1e-4)pv.act=0.25;else pv.act=Math.max(0,pv.act-dt);
+    if(c.t==='board'&&proc&&pv.act>0)chop=true;
+    if(c.t==='stove'&&it&&!it.burnt&&(proc||(isDone(it)&&ING[it.id].steps.at(-1)==='cook')))siz++;
+    if(c.t==='blender'&&proc&&pv.act>0)bl++;
+    if(pv.proc&&it&&!proc&&!it.burnt)play('done');
+    if(it&&it.burnt&&pv.had&&!pv.burnt)play('burnt');
+    if(it&&!it.burnt&&isDone(it)&&c.t!=='board'&&(c.burn||0)>burnT(c)*0.55)warn=true;
+    pv.prog=c.prog||0;pv.proc=proc;pv.burnt=!!(it&&it.burnt);pv.had=!!it;AU.st.set(key,pv);
+  }
+  if(chop){AU.chopT-=dt;if(AU.chopT<=0){play('chop');AU.chopT=0.21}}else AU.chopT=0;
+  if(warn){AU.warnT-=dt;if(AU.warnT<=0){play('warn');AU.warnT=0.45}}else AU.warnT=0;
+  if(siz){AU.popT-=dt;if(AU.popT<=0){play('pop');AU.popT=0.05+Math.random()*0.18}}
+  // the last 10 seconds of service tick
+  const sec=live&&S.phase==='stop'&&S.sub==='service'&&S.timer<=10&&S.timer>0?Math.ceil(S.timer):-1;
+  if(sec!==AU.clock){if(sec>0)play('clock');AU.clock=sec}
+  if(live&&S.phase==='drive'){
+    const zone=S.shops.some(inWindowZone),v=zone?WIN_SPEED:SPEEDS[S.fuel>0?S.speed:0];
+    eng=0.09;L.engOsc.frequency.setTargetAtTime(40+v*16,now,0.3);L.engLfo.frequency.setTargetAtTime(7+v*5,now,0.3);
+  }
+  L.siz.gain.setTargetAtTime(siz?0.05*Math.min(1.6,Math.sqrt(siz)):0,now,0.08);
+  L.bl.gain.setTargetAtTime(bl?0.07:0,now,0.06);
+  L.eng.gain.setTargetAtTime(eng,now,0.25);
+}
+function auFrame(dt){
+  if(!AU.ctx&&pads.some(q=>q&&(q.now.a||q.now.x||q.now.st)))auInit();
+  if(!auOn())return;
+  auBgm();auState(dt);
+}
+
 // ---------- loop ----------
 let last=performance.now();
 function frame(now){
@@ -2952,6 +3157,7 @@ function frame(now){
   }
   if(NET.role==='host')hostFrame(dt);
   if(!S)idleOff+=dt*1.2;
+  auFrame(dt);
   draw();
   hudT-=dt;if(hudT<=0){renderHud();hudT=0.1}
   pressed.clear();touch.pick=false;touch.sw=false;touch.pause=false;

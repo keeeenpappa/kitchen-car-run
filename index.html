@@ -2092,16 +2092,16 @@ function drawTableShape(X,Y){
   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fill();
   ctx.strokeStyle='rgba(60,30,10,.6)';ctx.lineWidth=1.5;ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,cy,R-3,ry-2,0,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
-  // the cloth: a square turned corner-wise, smaller than the top; the front corner hangs over the edge
-  const cw=R*0.66,ch=ry*0.78;
-  const pts=[[X,cy-ch],[X+cw,cy],[X,cy+ry+6],[X-cw,cy]];
+  // the cloth: a square turned corner-wise; all four corners reach past the edge and hang down
+  const hang=6,cw=R+hang,ch=ry+hang;
+  const pts=[[X,cy-ch+2],[X+cw,cy+7],[X,cy+ry+hang],[X-cw,cy+7]];
   ctx.save();ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();
   ctx.fillStyle='#f4f8fd';ctx.fill();ctx.clip();
   ctx.fillStyle='rgba(58,120,200,.5)';
-  for(let k=-cw;k<cw;k+=7)ctx.fillRect(X+k,cy-ch,3.5,ch+ry+8);
-  for(let k=-ch;k<ry+8;k+=5)ctx.fillRect(X-cw,cy+k,cw*2,2.5);
-  // the hanging part (below the table's front edge) is a little darker
-  ctx.fillStyle='rgba(20,50,90,.22)';ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,Math.PI);ctx.lineTo(X-R,cy+ry+10);ctx.lineTo(X+R,cy+ry+10);ctx.closePath();ctx.fill('evenodd');
+  for(let k=-cw;k<cw;k+=7)ctx.fillRect(X+k,cy-ch,3.5,ch+ry+hang+4);
+  for(let k=-ch;k<ry+hang+4;k+=5)ctx.fillRect(X-cw,cy+k,cw*2,2.5);
+  // the parts hanging over the edge are a little darker
+  ctx.fillStyle='rgba(20,50,90,.25)';ctx.beginPath();ctx.rect(X-cw-2,cy-ch-2,cw*2+4,ch+ry+hang+8);ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fill('evenodd');
   ctx.restore();
   ctx.strokeStyle='rgba(30,70,130,.6)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();ctx.stroke();
   // a little flower vase in the middle

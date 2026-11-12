@@ -579,12 +579,14 @@ function baseInput(i,keysOnly){
     const h=a=>a.some(c=>held.has(c)), p=a=>a.some(c=>pressed.has(c));
     if(h(k.up))my-=1; if(h(k.down))my+=1; if(h(k.left))mx-=1; if(h(k.right))mx+=1;
     pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw);
+    if(mx||my||pick||act||sw)LASTIN[i]='kb';
   }
   const ps=keysOnly?null:pads[i];
   if(ps){
     if(Math.abs(ps.ax)>0.3)mx+=ps.ax; if(Math.abs(ps.ay)>0.3)my+=ps.ay;
     if(ps.now.l)mx-=1; if(ps.now.r)mx+=1; if(ps.now.u)my-=1; if(ps.now.d)my+=1;
     pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw');
+    if(Math.abs(ps.ax)>0.3||Math.abs(ps.ay)>0.3||ps.now.a||ps.now.x||ps.now.sw||ps.now.l||ps.now.r||ps.now.u||ps.now.d)LASTIN[i]='pad';
   }
   return {mx,my,pick,act,sw};
 }
@@ -617,17 +619,53 @@ function bringInside(){
 function say(p,m){p.msg=m;p.msgT=1.6}
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
+const DEVK={
+  kb0:{pick:'Space',act:'F',sw:'Q',menu:'Esc',ready:'R',ok:'Space'},
+  kb1:{pick:'/',act:'.',sw:',',menu:'Esc',ready:'R',ok:'Space'},
+  xbox:{pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A'},
+  ns:{pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B'},
+  ps:{pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×'},
+};
+const DEVN={auto:'自動',kb:'キーボード',xbox:'Xbox',ns:'Switchプロコン',ps:'PlayStation'};
+let DEVPREF=['auto','auto','auto','auto'];
+try{const v=JSON.parse(localStorage.getItem('kcr-dev')||'null');if(Array.isArray(v))DEVPREF=DEVPREF.map((d,i)=>DEVN[v[i]]?v[i]:d)}catch(_){}
+const LASTIN=['kb','kb','pad','pad'];   // which of keyboard / pad this player used last (P1, P2 have both)
+function padKind(gp){const id=(gp&&gp.id)||'';
+  if(/054c|playstation|dualsense|dualshock|wireless controller/i.test(id))return 'ps';
+  if(/057e|nintendo|pro controller|switch|joy-con/i.test(id))return 'ns';
+  return 'xbox'}
+function devOf(slot){
+  const pref=DEVPREF[slot]||'auto';
+  if(pref!=='auto')return pref==='kb'&&slot>1?'xbox':pref;
+  let gp=null;try{gp=navigator.getGamepads?navigator.getGamepads()[slot]:null}catch(_){}
+  if(slot>1||!gp)return slot>1?padKind(gp):'kb';
+  return LASTIN[slot]==='pad'?padKind(gp):'kb';
+}
+function keyName(slot,k){const d=devOf(slot);return (d==='kb'?DEVK['kb'+Math.min(1,slot)]:DEVK[d])[k]}
+const devSlot=p=>NET.role!=='off'?0:(p?p.i:0);
+function cycleDev(i){
+  const order=i>1?['auto','xbox','ns','ps']:['auto','kb','xbox','ns','ps'];
+  DEVPREF[i]=order[(order.indexOf(DEVPREF[i])+1)%order.length];
+  try{localStorage.setItem('kcr-dev',JSON.stringify(DEVPREF))}catch(_){}
+}
+function devRowInner(){
+  const n=NET.role!=='off'?1:(S&&S.np?S.np:4);
+  return '<span style="align-self:center;min-width:9em">ボタンの表示</span>'+Array.from({length:n},(_,i)=>{
+    const pr=DEVPREF[i],cur=devOf(i);
+    return `<button class="ovbtn" data-act="dev" data-v="${i}">${NET.role!=='off'?'この端末':'P'+(i+1)}：${pr==='auto'?'自動（'+DEVN[cur==='kb'?'kb':cur]+'）':DEVN[pr]}</button>`}).join('');
+}
+const devRow=()=>`<div class="row" id="devRow">${devRowInner()}</div>`;
 const BTN_N={pick:'持つ',act:'作業',sw:'切替'};
 // action name first, then the key: 入れる（Space）, 購入（F長押し）
 function AL(p,k,label,hold){
-  const key=(isTouch&&(NET.role!=='off'||!p||p.i===0))?BTN_N[k]:KEYL[NET.role!=='off'?0:Math.min(2,p?p.i:0)][k];
+  const key=(isTouch&&(NET.role!=='off'||!p||p.i===0))?BTN_N[k]:keyName(devSlot(p),k);
   return label+'（'+key+(hold?'長押し':'')+'）';
 }
-const OVK=()=>isTouch?'長押し':'Space長押し';   // overlay cards / buttons
+const OVK=()=>isTouch?'長押し':keyName(0,'ok')+'長押し';   // overlay cards / buttons
 function BL(p,k){
   if(isTouch&&(NET.role!=='off'||!p||p.i===0))return BTN_N[k];
   const i=NET.role!=='off'?0:Math.min(2,p?p.i:0);
-  return BTN_N[k]+'（'+KEYL[i][k]+'）';
+  return BTN_N[k]+'（'+keyName(devSlot(p),k)+'）';
 }
 function float(x,y,text,col){S.floats.push({x,y,text,col:col||'#fff',t:0})}
 
@@ -1081,6 +1119,7 @@ function readyTick(dt){
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
+  if(a==='dev'){cycleDev(+v);const r=document.getElementById('devRow');if(r){r.innerHTML=devRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='dev'&&b.dataset.v===String(v)));markSel()}return}
   if(NET.role==='guest'&&a!=='title'&&(NET.mirror||a==='ready'||a==='pause')){guestSend(a,v);return}
   ovAction(a,v);
 }
@@ -1125,7 +1164,7 @@ function canPause(){
 function pauseGame(){
   if(!S||S.paused||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
-  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">Esc でもつづけられます。</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div></div>`);
+  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':keyName(0,'menu')+' でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}</div>`);
 }
 function resumeGame(){
   if(!S)return;S.paused=false;
@@ -1139,8 +1178,9 @@ function showTitle(){
     <table class="ctl"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th></tr>
     <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td></tr>
     <tr><td>P2</td><td>矢印キー</td><td><kbd>/</kbd> か <kbd>Enter</kbd></td><td><kbd>.</kbd></td><td><kbd>,</kbd></td></tr>
-    <tr><td>パッド</td><td>スティック</td><td>A</td><td>X</td><td>LB / RB</td></tr></table>
-    <p class="sub" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>で一時停止。</p>
+    <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td></tr></table>
+    <p class="sub" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
+    ${isTouch?'':devRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
     <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
     <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
@@ -1192,6 +1232,7 @@ function overlayInput(){
   if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r')))mv=1;
   if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l')))mv=-1;
   if(pressed.has('Space')||pressed.has('Enter')||(p0&&p0.edge('a')))ok=true;
+  if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
   for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel()}
   if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
@@ -2105,6 +2146,8 @@ function renderHud(){
   if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info+='<br><b style="color:#ffd84a">強化</b>　'+gl.join('　');
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
+  if(!isTouch){const rt='準備完了（'+keyName(0,'ready')+'長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
+    if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
   infoEl.innerHTML=info||'　';S.sideInfo=info;
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);

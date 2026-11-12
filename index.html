@@ -413,7 +413,7 @@ function finishLayout(){
   const miss=missingUnits();
   if(miss.length){S.toast={text:'トラックに置いていない：'+miss.map(reqName).join('・'),t:0,life:3.5};sfx('nope');return}
   const bad=unreachable();
-  if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：右から2列目までのどこかに通路をあける（赤い枠）',t:0,life:3};sfx('nope');return}
+  if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：レバーの前（右端の真ん中）をあけて通路をつなぐ（赤い枠）',t:0,life:3};sfx('nope');return}
   if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};sfx('nope');return}
   const left=layoutLeft();
   stashOutside();
@@ -467,7 +467,7 @@ function unreachable(){
     if(c.t==='floor'||c.t==='gap'||c.t==='counter')continue;
     if(!touchesFloor(ok,x,y))bad.push([x,y]);
   }
-  if(S.map[LEVER[1]][LEVER[0]].t==='lever'&&![...ok].some(k=>SEAT_COLS(+k.split(',')[0])))bad.push(LEVER);
+  if(S.map[LEVER[1]][LEVER[0]].t==='lever'&&!ok.has(LEVER_FRONT.join(',')))bad.push(LEVER);
   return bad;
 }
 const holdsFurn=p=>!!p.hold&&p.hold.kind==='station'&&FURN.includes(p.hold.st);
@@ -802,7 +802,9 @@ function doPick(p,c,tx,ty){
     case 'counter':case 'board':case 'stove':case 'blender':
       placeOrTake(p,c);return;
     case 'lever':
-      S.speed=S.speed===2?1:2;sfx('lever');say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）');return;
+      if(canSeat(p)){takeSeat(p);sfx('lever')}
+      else if(S.players.some(q=>q.seat))say(p,'運転席に人がいる');
+      return;
     case 'window':
       if(S.phase==='drive')say(p,shopAtWindow(tx)?AL(p,'sw','切替')+'　'+AL(p,'act','購入',1):'お店が来たら買える');
       return;
@@ -813,10 +815,9 @@ function doPick(p,c,tx,ty){
       startGather(p,c,tx,ty);return;
   }
 }
-// the driver's seat (where the lever is). Reached from anywhere in the two right-hand columns of the kitchen.
+// the driver's seat in the cab, next to the lever. Sit down by pressing 持つ while facing the lever from the tile in front of it.
 const SEAT=[16.95,3.05];
-const SEAT_COLS=x=>x>=14&&x<=15;
-const canSeat=p=>(S.phase==='drive'||S.phase==='stop')&&inTruck(Math.floor(p.x),Math.floor(p.y))&&SEAT_COLS(Math.floor(p.x))&&!S.players.some(q=>q.seat);
+const canSeat=p=>(S.phase==='drive'||S.phase==='stop')&&p.tx===LEVER[0]&&p.ty===LEVER[1]&&!S.players.some(q=>q.seat);
 function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1];p.dx=1;p.dy=0;p.tx=-9;p.ty=-9;p.actT=0}
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
 function seatInput(p,inp){
@@ -1268,14 +1269,17 @@ const MENU={
 function marketInput(p,inp,dt){
   const c=tile(p.tx,p.ty);
   if(S.phase!=='stop'||!c||c.t!=='market'||inp.sw){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
-  if(inp.pick){buy(S.market,p,null,p.tx,p.ty);p.prevAct=inp.act;return}
+  if(inp.pick){say(p,AL(p,'act','購入',1));sfx('nope')}
   const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0, dy=inp.my<-0.5?-1:0, key=dx+','+dy;
-  if(dy<0){p.mk=false;p.prevAct=inp.act;return}           // step back up: close the list
+  if(dy<0){p.mk=false;p.prevAct=inp.act;p.actT=0;return}           // step back up: close the list
   let move=false;
   if(dx){if(key!==p.menuLast){move=true;p.menuRep=0.32}else{p.menuRep-=dt;if(p.menuRep<=0){move=true;p.menuRep=0.11}}}
   p.menuLast=key;
   if(move){p.cur=wrap(p.cur,S.market.length)+dx;p.actT=0}
-  p.actT=0;p.prevAct=inp.act;
+  // buying is a long press of 作業, like the road shops
+  if(!inp.act){p.lock=false;p.actT=0}
+  else if(!p.lock&&!move){p.actT+=dt;if(p.actT>=BUY){p.actT=0;p.lock=true;buy(S.market,p,null,p.tx,p.ty)}}
+  p.prevAct=inp.act;
 }
 function menuInput(p,inp,dt){
   const M=MENU[p.menu.kind],list=M.list(),n=list.length,cols=M.cols;
@@ -1334,7 +1338,6 @@ function update(dt){
     if(p.mk){const c0=p.cur;marketInput(p,inp,dt);if(p.mk&&p.cur!==c0)sfx('tick');if(p.msgT>0)p.msgT-=dt;return}
     if(p.g){gatherInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     if(p.seat){seatInput(p,inp);p.prevAct=inp.act;if(p.msgT>0)p.msgT-=dt;return}
-    if(inp.sw&&canSeat(p)){takeSeat(p);p.prevAct=inp.act;return}
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
@@ -1470,7 +1473,9 @@ function drawItem(it,cx,cy,s,inHand){
     const cap=canCap(it);
     if(it.bonus)text('★',cx+s*0.36,cy-s*0.34,12,'#ff4fa3',800);
     if(upTotal(it))text('⬆'+upTotal(it),cx-s*0.34,cy-s*0.34,11,'#ffd84a',800);
-    for(let k=0;k<cap;k++){ctx.fillStyle=k<it.water?'#9fd8ff':'rgba(0,0,0,.45)';ctx.beginPath();ctx.arc(cx-s*0.06-(cap-1)*4+k*8,cy+s*0.36,3.2,0,7);ctx.fill()}
+    for(let k=0;k<cap;k++){const dx=cx-s*0.06-(cap-1)*4+k*8,dy=cy+s*0.36;
+      ctx.fillStyle=k<it.water?'#1565d8':'rgba(0,0,0,.45)';ctx.beginPath();ctx.arc(dx,dy,3.4,0,7);ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=1;ctx.stroke()}
     return;
   }
   if(it.kind==='seed'){
@@ -1743,6 +1748,25 @@ function unitBase(c,X,Y,loose){
       ctx.fillStyle=TCOL[c.t]||'#ccc';rr(X+2,Y+2,T-4,T-4,6);ctx.fill();
   }
 }
+// the driver's seat and steering wheel, seen through the cab window (the seated chef sits between the two)
+function drawCab(front){
+  ctx.save();ctx.beginPath();ctx.roundRect(16.25*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.clip();
+  if(!front){
+    ctx.fillStyle='rgba(40,70,80,.18)';ctx.fillRect(16.25*T,3.15*T,T*1.25,T*0.4);       // the dashboard shadow
+    ctx.fillStyle='#24605c';rr(16.33*T,2.55*T,T*0.3,T*1.05,9);ctx.fill();               // seat back
+    ctx.fillStyle='#3fa6a1';rr(16.37*T,2.61*T,T*0.18,T*0.88,7);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.35)';rr(16.39*T,2.65*T,3,T*0.6,1.5);ctx.fill();
+    ctx.fillStyle='#24605c';rr(16.4*T,3.33*T,T*0.75,T*0.3,7);ctx.fill();                // cushion
+  } else {
+    const cx=17.3*T,cy=3.0*T;
+    ctx.strokeStyle='#33393e';ctx.lineWidth=4;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(cx+2,cy+4);ctx.lineTo(cx+13,cy+22);ctx.stroke();           // column
+    ctx.lineWidth=4.5;ctx.beginPath();ctx.ellipse(cx,cy,4.5,13,-0.28,0,7);ctx.stroke();    // the wheel, seen from the side
+    ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(cx-1,cy,4.5,12,-0.28,Math.PI*0.9,Math.PI*1.4);ctx.stroke();
+    ctx.lineCap='butt';
+  }
+  ctx.restore();
+}
 let LEVA=-0.5;
 function drawLever(X,Y){
   const fast=S&&S.speed===2,target=fast?0.65:-0.5;
@@ -1803,7 +1827,7 @@ function drawTile(c,x,y){
     if(c.item&&nextStep(c.item)==='cook'){const g=ctx.createRadialGradient(b.cx,b.cy,2,b.cx,b.cy,17);g.addColorStop(0,'rgba(255,170,60,.85)');g.addColorStop(1,'rgba(255,90,20,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(b.cx,b.cy,17,0,7);ctx.fill()}
     if(!c.item)for(let k=0;k<8;k++){const a=k*Math.PI/4+S.t*0.5,fl=2.5+Math.sin(S.t*12+k)*0.8;ctx.fillStyle='rgba(90,170,255,.85)';ctx.beginPath();ctx.ellipse(b.cx+Math.cos(a)*7,b.cy+Math.sin(a)*7,1.6,fl,a+Math.PI/2,0,7);ctx.fill()}
   }
-  if(t==='sink')for(const p of S.players)if(p.tx===x&&p.ty===y&&p.actT>0&&p.hold&&p.hold.kind==='can')bar(X+6,Y+3,T-12,p.actT/(FILL*proMul(c)),'#4fb3ff');
+  if(t==='sink')for(const p of S.players)if(p.tx===x&&p.ty===y&&p.actT>0&&p.hold&&p.hold.kind==='can'){ctx.fillStyle='rgba(0,0,0,.35)';rr(X+3,Y-9,T-6,12,6);ctx.fill();bar(X+6,Y-6,T-12,p.actT/(FILL*proMul(c)),'#4fb3ff')}
   if(t==='planter'&&c.plant){const gg=ING[c.plant.id].grow,f=c.plant.t/gg;
     if(f>=1){emoji(ING[c.plant.id].e,b.cx,b.cy,24);const a=0.5+0.5*Math.sin(S.t*6);ctx.strokeStyle=`rgba(255,240,140,${a})`;ctx.lineWidth=3;rr(X+3,Y+3,T-6,T-6,6);ctx.stroke()}
     else{
@@ -2053,7 +2077,7 @@ function drawTown(){
   const mp=S.players.find(q=>q.mk);
   if(mp){const hx=(MKT[0]+1.2)*T,hy=(MKT[1]-0.45)*T-14;
     const mvk=isTouch&&(NET.role!=='off'||mp.i===0)?'スティック':keyName(devSlot(mp),'move');
-    ctx.font=`800 11px ${FNT}`;const msg='選ぶ（'+mvk+'）　'+AL(mp,'pick','購入')+'　'+AL(mp,'sw','閉じる'),w=ctx.measureText(msg).width+16;
+    ctx.font=`800 11px ${FNT}`;const msg='選ぶ（'+mvk+'）　'+AL(mp,'act','購入',1)+'　'+AL(mp,'sw','閉じる'),w=ctx.measureText(msg).width+16;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(hx-4,hy-10,w,20,8);ctx.fill();text(msg,hx+4,hy,11,'#ffe08a',800,'left')}
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
@@ -2086,16 +2110,19 @@ function drawTables(){
   }
 }
 function drawTableShape(X,Y){
-  softShadow(X+3,Y+T*0.38,T*0.52,9,.38);
+  softShadow(X+3,Y+T*0.46,T*0.52,9,.38);
   // stool behind the table (the customer sits here): blue cushion to match the cloth
   ctx.fillStyle='#6b4428';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
   {const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
    ctx.strokeStyle='rgba(20,50,90,.5)';ctx.lineWidth=1;ctx.stroke()}
-  // pedestal and foot
-  const lg=ctx.createLinearGradient(X-4,0,X+4,0);lg.addColorStop(0,'#9a6538');lg.addColorStop(1,'#5f3a1d');ctx.fillStyle=lg;ctx.fillRect(X-3.5,Y+6,7,T*0.28);
-  ctx.fillStyle='#4a2c16';ctx.beginPath();ctx.ellipse(X,Y+T*0.34,11,4,0,0,7);ctx.fill();
   // thick wooden top with a dark rim so it reads on any ground
   const R=T*0.46,ry=T*0.26,cy=Y+1;
+  // four legs: the back two (further away) are shorter and darker, the front two splay a little
+  const leg=(lx,top,bot,dark)=>{const lg=ctx.createLinearGradient(lx-2.5,0,lx+2.5,0);lg.addColorStop(0,dark?'#7a4c28':'#a46d3d');lg.addColorStop(1,dark?'#4a2c16':'#5f3a1d');
+    ctx.fillStyle='rgba(30,20,10,.3)';ctx.beginPath();ctx.ellipse(lx,bot,4,1.6,0,0,7);ctx.fill();
+    ctx.fillStyle=lg;rr(lx-2.5,top,5,bot-top,[0,0,2,2]);ctx.fill()};
+  leg(X-R*0.5,cy,Y+T*0.36,true);leg(X+R*0.5,cy,Y+T*0.36,true);
+  leg(X-R*0.66,cy+4,Y+T*0.53,false);leg(X+R*0.66,cy+4,Y+T*0.53,false);
   ctx.fillStyle='#6e4224';ctx.beginPath();ctx.ellipse(X,cy+5,R,ry,0,0,7);ctx.fill();
   const g=ctx.createRadialGradient(X-8,cy-5,2,X,cy,R);g.addColorStop(0,'#e8b47e');g.addColorStop(1,'#b97a45');
   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fill();
@@ -2197,7 +2224,7 @@ function layoutHint(p,c,tx,ty){
 function playHint(p,c){
   if(!c||p.menu||p.g||p.mk||p.seat)return '';
   const h=p.hold;
-  if(c.t==='sink'&&h&&h.kind==='can')return h.water>=canCap(h)?'':AL(p,'act','水を汲む',1);
+  if(c.t==='sink'&&h&&h.kind==='can')return h.water>=canCap(h)||p.actT>0?'':AL(p,'act','水を汲む',1);   // while filling, the meter shows instead
   if(c.t==='planter'&&c.plant&&h&&h.kind==='can'&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow)return h.water>0?AL(p,'pick','水をあげる'):'じょうろが空';
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop')return AL(p,'act','切る',1);
   return '';
@@ -2210,10 +2237,10 @@ function drawPlayers(){
     const c=tile(p.tx,p.ty);
     const furnSpot=c&&(((c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&p.hold.st!=='table'&&inTruck(p.tx,p.ty))||(c.t==='ground'&&!c.item&&p.hold&&p.hold.kind==='station'&&p.hold.st==='table'&&inTblZone(p.tx,p.ty)));
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
-    if(p.seat||(canSeat(p)&&!(c&&c.t==='window'))){
+    if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
-      if(me||p.seat){const msg=p.seat?AL(p,'pick','スピード切替')+'　'+AL(p,'sw','戻る'):AL(p,'sw','運転席へ');
-        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?16.6*T:X,hy=p.seat?1.55*T:Y+30;
+      if(me||p.seat){const msg=p.seat?AL(p,'pick','スピード切替')+'　'+AL(p,'sw','降りる'):AL(p,'pick','運転席に座る');
+        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?16.6*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     if(S.phase==='drive'||S.phase==='stop'){const msg=playHint(p,c);
       if(msg){ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
@@ -2428,7 +2455,9 @@ function draw(){
   ctx.restore();
   if(S.view==='road')drawShops();
   ctx.save();ctx.translate(0,-bounce);
+  drawCab(false);
   drawPlayers();
+  drawCab(true);
   ctx.restore();
   drawMenus();
   drawTopBar();

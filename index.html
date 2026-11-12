@@ -2078,31 +2078,32 @@ function drawTables(){
 }
 function drawTableShape(X,Y){
   softShadow(X+3,Y+T*0.38,T*0.52,9,.38);
-  // stool behind the table (the customer sits here): red cushion
+  // stool behind the table (the customer sits here): blue cushion to match the cloth
   ctx.fillStyle='#6b4428';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
-  {const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#f08a7c');g.addColorStop(1,'#c9483e');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
-   ctx.strokeStyle='rgba(90,30,30,.5)';ctx.lineWidth=1;ctx.stroke()}
+  {const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
+   ctx.strokeStyle='rgba(20,50,90,.5)';ctx.lineWidth=1;ctx.stroke()}
   // pedestal and foot
-  const lg=ctx.createLinearGradient(X-4,0,X+4,0);lg.addColorStop(0,'#9a6538');lg.addColorStop(1,'#5f3a1d');ctx.fillStyle=lg;ctx.fillRect(X-3.5,Y+8,7,T*0.26);
+  const lg=ctx.createLinearGradient(X-4,0,X+4,0);lg.addColorStop(0,'#9a6538');lg.addColorStop(1,'#5f3a1d');ctx.fillStyle=lg;ctx.fillRect(X-3.5,Y+6,7,T*0.28);
   ctx.fillStyle='#4a2c16';ctx.beginPath();ctx.ellipse(X,Y+T*0.34,11,4,0,0,7);ctx.fill();
-  // tablecloth
-  const R=T*0.47,ry=T*0.27,cy=Y+1,drop=10;
-  const hemY=dx=>cy+ry*Math.sqrt(Math.max(0,1-(dx/R)*(dx/R)))+drop;
-  ctx.save();
-  ctx.beginPath();ctx.moveTo(X-R,cy);ctx.lineTo(X-R+1,cy+drop-2);
-  const n=10;for(let i=0;i<n;i++){const x0=X-R+1+(2*R-2)*i/n,x1=X-R+1+(2*R-2)*(i+1)/n,xm=(x0+x1)/2;ctx.quadraticCurveTo(xm,hemY(xm-X)+3,x1,hemY(x1-X))}
-  ctx.lineTo(X+R,cy);ctx.ellipse(X,cy,R,ry,0,0,Math.PI);ctx.closePath();
-  const dg=ctx.createLinearGradient(0,cy,0,cy+ry+drop);dg.addColorStop(0,'#d24a44');dg.addColorStop(1,'#a8322e');ctx.fillStyle=dg;ctx.fill();
-  ctx.clip();ctx.fillStyle='rgba(255,245,235,.55)';for(let k=-R;k<R;k+=7)ctx.fillRect(X+k,cy,3.5,ry+drop+4);
+  // thick wooden top with a dark rim so it reads on any ground
+  const R=T*0.46,ry=T*0.26,cy=Y+1;
+  ctx.fillStyle='#6e4224';ctx.beginPath();ctx.ellipse(X,cy+5,R,ry,0,0,7);ctx.fill();
+  const g=ctx.createRadialGradient(X-8,cy-5,2,X,cy,R);g.addColorStop(0,'#e8b47e');g.addColorStop(1,'#b97a45');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(60,30,10,.6)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,cy,R-3,ry-2,0,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
+  // the cloth: a square turned corner-wise, smaller than the top; the front corner hangs over the edge
+  const cw=R*0.66,ch=ry*0.78;
+  const pts=[[X,cy-ch],[X+cw,cy],[X,cy+ry+6],[X-cw,cy]];
+  ctx.save();ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();
+  ctx.fillStyle='#f4f8fd';ctx.fill();ctx.clip();
+  ctx.fillStyle='rgba(58,120,200,.5)';
+  for(let k=-cw;k<cw;k+=7)ctx.fillRect(X+k,cy-ch,3.5,ch+ry+8);
+  for(let k=-ch;k<ry+8;k+=5)ctx.fillRect(X-cw,cy+k,cw*2,2.5);
+  // the hanging part (below the table's front edge) is a little darker
+  ctx.fillStyle='rgba(20,50,90,.22)';ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,Math.PI);ctx.lineTo(X-R,cy+ry+10);ctx.lineTo(X+R,cy+ry+10);ctx.closePath();ctx.fill('evenodd');
   ctx.restore();
-  // top: gingham
-  ctx.save();ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fillStyle='#fdf7ee';ctx.fill();ctx.clip();
-  ctx.fillStyle='rgba(214,70,64,.45)';
-  for(let k=-R;k<R;k+=8)ctx.fillRect(X+k,cy-ry,4,ry*2);
-  for(let k=-ry;k<ry;k+=6)ctx.fillRect(X-R,cy+k,R*2,3);
-  const sh=ctx.createRadialGradient(X-10,cy-6,2,X,cy,R);sh.addColorStop(0,'rgba(255,255,255,.35)');sh.addColorStop(1,'rgba(120,40,30,.18)');ctx.fillStyle=sh;ctx.fillRect(X-R,cy-ry,R*2,ry*2);
-  ctx.restore();
-  ctx.strokeStyle='rgba(90,30,30,.55)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.stroke();
+  ctx.strokeStyle='rgba(30,70,130,.6)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))ctx.lineTo(q[0],q[1]);ctx.closePath();ctx.stroke();
   // a little flower vase in the middle
   ctx.fillStyle='#8fc7e0';rr(X-3,cy-7,6,7,2);ctx.fill();ctx.fillStyle='#ff8fb1';ctx.beginPath();ctx.arc(X,cy-9,3,0,7);ctx.fill();ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(X,cy-9,1.2,0,7);ctx.fill();
 }

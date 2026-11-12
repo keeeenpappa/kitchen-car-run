@@ -1734,6 +1734,34 @@ function unitBase(c,X,Y,loose){
       ctx.fillStyle=TCOL[c.t]||'#ccc';rr(X+2,Y+2,T-4,T-4,6);ctx.fill();
   }
 }
+let LEVA=-0.5;
+function drawLever(X,Y){
+  const fast=S&&S.speed===2,target=fast?0.65:-0.5;
+  LEVA+=(target-LEVA)*0.25;
+  const cx=X+T/2+4;
+  softShadow(cx,Y+T-3,T*0.46,5,.35);
+  // console: teal top, darker front, cream trim
+  ctx.fillStyle='#22625f';rr(cx-T*0.44,Y+T*0.42,T*0.88,T*0.52,[4,4,9,9]);ctx.fill();
+  const g=ctx.createLinearGradient(0,Y+6,0,Y+T*0.62);g.addColorStop(0,'#7fd6d1');g.addColorStop(1,'#3fa6a1');
+  ctx.fillStyle=g;rr(cx-T*0.44,Y+6,T*0.88,T*0.56,10);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-T*0.32,Y+7);ctx.lineTo(cx+T*0.32,Y+7);ctx.stroke();
+  // the slot the lever moves in, with the two marks
+  const px=cx,py=Y+T*0.5,L=16;
+  ctx.strokeStyle='#1d4f4c';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.arc(px,py,L,-Math.PI/2-0.55,-Math.PI/2+0.7);ctx.stroke();
+  for(const [a,col] of [[-0.5,'#7fd893'],[0.65,'#ff6d6d']]){ctx.fillStyle=col;ctx.beginPath();ctx.arc(px+Math.sin(a)*(L+6),py-Math.cos(a)*(L+6),2.4,0,7);ctx.fill()}
+  // stick (chrome) and a big glossy knob
+  const kx=px+Math.sin(LEVA)*L,ky=py-Math.cos(LEVA)*L;
+  ctx.strokeStyle='#9aa4aa';ctx.lineWidth=4.5;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(kx,ky);ctx.stroke();
+  ctx.strokeStyle='#eef2f4';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px-1,py);ctx.lineTo(kx-1,ky);ctx.stroke();ctx.lineCap='butt';
+  ctx.fillStyle='#1d4f4c';ctx.beginPath();ctx.ellipse(px,py,6,3,0,0,7);ctx.fill();
+  const kg=ctx.createRadialGradient(kx-2.5,ky-2.5,1,kx,ky,8);kg.addColorStop(0,fast?'#ffb3a8':'#c9f5d3');kg.addColorStop(0.5,fast?'#ff5d5d':'#52c374');kg.addColorStop(1,fast?'#b52a2a':'#2b8a4a');
+  ctx.fillStyle=kg;ctx.beginPath();ctx.arc(kx,ky,7.5,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.ellipse(kx-2.5,ky-3,2.2,1.4,-0.6,0,7);ctx.fill();
+  // speed tag on the front
+  ctx.fillStyle=fast?'#d63b3b':'#2e7d4f';rr(cx-16,Y+T*0.74-7,32,14,7);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1;ctx.stroke();
+  text(fast?'急ぐ':'ふつう',cx,Y+T*0.74,9,'#fff',800);
+}
 function frontLabel(b,t,col){text(t,b.cx,b.fy+b.fh/2-0.5,8,col||'rgba(255,255,255,.9)',800)}
 function drawTile(c,x,y){
   const X=x*T,Y=y*T;
@@ -1750,16 +1778,7 @@ function drawTile(c,x,y){
     if(S.phase==='stop'||S.phase==='layout'){ctx.fillStyle='#ece3cf';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#bfa77a';ctx.fillRect(X,Y+T-6,T,6)}
     else{ctx.fillStyle='#c8862a';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#f6d36a';ctx.beginPath();ctx.arc(X+T*0.78,Y+T*0.5,3,0,7);ctx.fill()}
     text('ドア',X+T/2,Y+T*0.5,11,(S.phase==='stop'||S.phase==='layout')?'#8a7550':'#fff3d6');return}
-  if(c.t==='lever'){
-    ctx.fillStyle='#e9a92c';ctx.fillRect(X,Y,T,T);
-    ctx.fillStyle='#2f3a40';rr(X+5,Y+6,T-10,T-12,6);ctx.fill();
-    const fast=S&&S.speed===2,a=fast?0.75:-0.15;
-    ctx.strokeStyle='#cfd6da';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(X+T/2,Y+T*0.62);ctx.lineTo(X+T/2+Math.sin(a)*14,Y+T*0.62-Math.cos(a)*14);ctx.stroke();ctx.lineCap='butt';
-    ctx.fillStyle=fast?'#ff5d5d':'#7fd893';ctx.beginPath();ctx.arc(X+T/2+Math.sin(a)*14,Y+T*0.62-Math.cos(a)*14,5,0,7);ctx.fill();
-    ctx.fillStyle=fast?'#d63b3b':'#2e7d4f';rr(X+T/2-15,Y+T*0.84-7,30,14,7);ctx.fill();
-    text(fast?'急ぐ':'ふつう',X+T/2,Y+T*0.84,9,'#fff',800);
-    text('レバー',X+T/2,Y+11,8,'#cfd6da',800);
-    return}
+  if(c.t==='lever'){drawLever(X,Y);return}
   const col=TCOL[c.t]; if(!col)return;
   const loose=x<1;                        // drawn in someone's hands / as an item: no background
   const onFloor=!loose&&y<=5&&inTruck(x,y);
@@ -1836,18 +1855,27 @@ function drawTruckBody(){
   for(let k=0;k<30;k++){const x=T+22+k*(15.4*T-44)/29;ctx.fillStyle=k%2?'#fff3d6':'#d4561c';ctx.beginPath();ctx.arc(x,sy+2,7,0,Math.PI);ctx.fill();
     ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.arc(x,sy+2,7,0.2*Math.PI,0.8*Math.PI);ctx.fill()}
 }
+const WHEELS=[3.35,16.45], WHEEL_R=22;
 function drawWheels(){
-  const ang=S?S.roadOff*T/15:0;
-  for(const wx of [3.2,16.9]){
-    const cx=wx*T,cy=7*T+9;
-    ctx.fillStyle='rgba(60,30,0,.45)';ctx.beginPath();ctx.arc(cx,cy-2,18,Math.PI,0);ctx.fill();          // wheel arch
-    const tg=ctx.createRadialGradient(cx-4,cy-4,3,cx,cy,16);tg.addColorStop(0,'#4a5157');tg.addColorStop(1,'#16191c');
-    ctx.fillStyle=tg;ctx.beginPath();ctx.arc(cx,cy,15,0,7);ctx.fill();
-    ctx.fillStyle='#fff3d6';ctx.beginPath();ctx.arc(cx,cy,9.5,0,7);ctx.fill();
-    const hg=ctx.createRadialGradient(cx-3,cy-3,1,cx,cy,8);hg.addColorStop(0,'#dfe5e8');hg.addColorStop(1,'#7c868c');ctx.fillStyle=hg;ctx.beginPath();ctx.arc(cx,cy,8,0,7);ctx.fill();
-    ctx.strokeStyle='#4a5157';ctx.lineWidth=2.2;
-    for(let k=0;k<4;k++){const a=ang+k*Math.PI/2;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*2,cy+Math.sin(a)*2);ctx.lineTo(cx+Math.cos(a)*8,cy+Math.sin(a)*8);ctx.stroke()}
-    ctx.fillStyle='#c9d0d4';ctx.beginPath();ctx.arc(cx,cy,3,0,7);ctx.fill();
+  const ang=S?S.roadOff*T/(WHEEL_R*1.0):0;
+  for(const wx of WHEELS){
+    const cx=wx*T,cy=7*T+4,R=WHEEL_R;
+    // dark wheel arch cut into the skirt
+    ctx.fillStyle='#5a2a0c';ctx.beginPath();ctx.arc(cx,cy,R+4,Math.PI,0);ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.arc(cx,cy,R+2,Math.PI,0);ctx.fill();
+    // tyre with tread
+    const tg=ctx.createRadialGradient(cx-6,cy-6,4,cx,cy,R+1);tg.addColorStop(0,'#5a6268');tg.addColorStop(0.7,'#2a2f33');tg.addColorStop(1,'#111417');
+    ctx.fillStyle=tg;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.45)';
+    for(let k=0;k<14;k++){const a=ang+k*Math.PI*2/14;ctx.save();ctx.translate(cx+Math.cos(a)*(R-2),cy+Math.sin(a)*(R-2));ctx.rotate(a);ctx.fillRect(-2,-2.5,4,5);ctx.restore()}
+    ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,R-5,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
+    // rim + hub
+    ctx.fillStyle='#fff3d6';ctx.beginPath();ctx.arc(cx,cy,R*0.62,0,7);ctx.fill();
+    const hg=ctx.createRadialGradient(cx-4,cy-4,1,cx,cy,R*0.55);hg.addColorStop(0,'#f1f4f6');hg.addColorStop(1,'#8a949a');ctx.fillStyle=hg;ctx.beginPath();ctx.arc(cx,cy,R*0.52,0,7);ctx.fill();
+    ctx.fillStyle='#e9a92c';ctx.beginPath();ctx.arc(cx,cy,R*0.3,0,7);ctx.fill();
+    for(let k=0;k<5;k++){const a=ang+k*Math.PI*2/5;ctx.fillStyle='#5a646a';ctx.beginPath();ctx.arc(cx+Math.cos(a)*R*0.4,cy+Math.sin(a)*R*0.4,1.8,0,7);ctx.fill()}
+    ctx.fillStyle='#fff8e2';ctx.beginPath();ctx.arc(cx,cy,R*0.13,0,7);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(cx-R*0.22,cy-R*0.22,R*0.12,R*0.06,-0.8,0,7);ctx.fill();
   }
 }
 // exhaust puffs behind the truck while driving
@@ -2049,19 +2077,34 @@ function drawTables(){
   }
 }
 function drawTableShape(X,Y){
-  softShadow(X+3,Y+T*0.36,T*0.5,9,.35);
-  // stool behind the table (the customer sits here)
-  ctx.fillStyle='#7a5432';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
-  {const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.38);g.addColorStop(0,'#c28a55');g.addColorStop(1,'#9a6538');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9,4,0,0,7);ctx.fill()}
-  // pedestal
-  const lg=ctx.createLinearGradient(X-4,0,X+4,0);lg.addColorStop(0,'#9a6538');lg.addColorStop(1,'#5f3a1d');ctx.fillStyle=lg;ctx.fillRect(X-3.5,Y+4,7,T*0.3);
-  ctx.fillStyle='#5f3a1d';ctx.beginPath();ctx.ellipse(X,Y+T*0.34,10,3.5,0,0,7);ctx.fill();
-  // top: a thick round wooden top
-  ctx.fillStyle='#8a5530';ctx.beginPath();ctx.ellipse(X,Y+5,T*0.44,T*0.26,0,0,7);ctx.fill();
-  const g=ctx.createRadialGradient(X-8,Y-4,2,X,Y+1,T*0.46);g.addColorStop(0,'#e6b07a');g.addColorStop(1,'#b97a45');
-  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y+1,T*0.44,T*0.26,0,0,7);ctx.fill();
-  ctx.strokeStyle='rgba(120,70,30,.3)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(X,Y+1,T*0.3,T*0.17,0,0,7);ctx.stroke();
-  ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,Y+1,T*0.4,T*0.22,0,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
+  softShadow(X+3,Y+T*0.38,T*0.52,9,.38);
+  // stool behind the table (the customer sits here): red cushion
+  ctx.fillStyle='#6b4428';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
+  {const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#f08a7c');g.addColorStop(1,'#c9483e');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
+   ctx.strokeStyle='rgba(90,30,30,.5)';ctx.lineWidth=1;ctx.stroke()}
+  // pedestal and foot
+  const lg=ctx.createLinearGradient(X-4,0,X+4,0);lg.addColorStop(0,'#9a6538');lg.addColorStop(1,'#5f3a1d');ctx.fillStyle=lg;ctx.fillRect(X-3.5,Y+8,7,T*0.26);
+  ctx.fillStyle='#4a2c16';ctx.beginPath();ctx.ellipse(X,Y+T*0.34,11,4,0,0,7);ctx.fill();
+  // tablecloth
+  const R=T*0.47,ry=T*0.27,cy=Y+1,drop=10;
+  const hemY=dx=>cy+ry*Math.sqrt(Math.max(0,1-(dx/R)*(dx/R)))+drop;
+  ctx.save();
+  ctx.beginPath();ctx.moveTo(X-R,cy);ctx.lineTo(X-R+1,cy+drop-2);
+  const n=10;for(let i=0;i<n;i++){const x0=X-R+1+(2*R-2)*i/n,x1=X-R+1+(2*R-2)*(i+1)/n,xm=(x0+x1)/2;ctx.quadraticCurveTo(xm,hemY(xm-X)+3,x1,hemY(x1-X))}
+  ctx.lineTo(X+R,cy);ctx.ellipse(X,cy,R,ry,0,0,Math.PI);ctx.closePath();
+  const dg=ctx.createLinearGradient(0,cy,0,cy+ry+drop);dg.addColorStop(0,'#d24a44');dg.addColorStop(1,'#a8322e');ctx.fillStyle=dg;ctx.fill();
+  ctx.clip();ctx.fillStyle='rgba(255,245,235,.55)';for(let k=-R;k<R;k+=7)ctx.fillRect(X+k,cy,3.5,ry+drop+4);
+  ctx.restore();
+  // top: gingham
+  ctx.save();ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.fillStyle='#fdf7ee';ctx.fill();ctx.clip();
+  ctx.fillStyle='rgba(214,70,64,.45)';
+  for(let k=-R;k<R;k+=8)ctx.fillRect(X+k,cy-ry,4,ry*2);
+  for(let k=-ry;k<ry;k+=6)ctx.fillRect(X-R,cy+k,R*2,3);
+  const sh=ctx.createRadialGradient(X-10,cy-6,2,X,cy,R);sh.addColorStop(0,'rgba(255,255,255,.35)');sh.addColorStop(1,'rgba(120,40,30,.18)');ctx.fillStyle=sh;ctx.fillRect(X-R,cy-ry,R*2,ry*2);
+  ctx.restore();
+  ctx.strokeStyle='rgba(90,30,30,.55)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(X,cy,R,ry,0,0,7);ctx.stroke();
+  // a little flower vase in the middle
+  ctx.fillStyle='#8fc7e0';rr(X-3,cy-7,6,7,2);ctx.fill();ctx.fillStyle='#ff8fb1';ctx.beginPath();ctx.arc(X,cy-9,3,0,7);ctx.fill();ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(X,cy-9,1.2,0,7);ctx.fill();
 }
 function drawCustBody(X,Y,c){
   softShadow(X,Y+13,13,4.5,.3);

@@ -864,7 +864,6 @@ function doAct(p,c,tx,ty,dt){
   if(c.t==='window'&&S.phase==='drive'){
     const sh=shopAtWindow(tx); if(!sh)return;
     p.actT+=dt; if(p.actT>=BUY){p.actT=0;p.lock=true;buy(sh.items,p,sh,tx,ty)} return}
-  if(c.t==='market'&&S.phase==='stop'){p.actT+=dt;if(p.actT>=BUY){p.actT=0;p.lock=true;buy(S.market,p,null,tx,ty)}return}
 }
 function startGather(p,c,tx,ty){
   if(S.phase!=='stop')return;
@@ -1259,15 +1258,15 @@ const MENU={
 };
 function marketInput(p,inp,dt){
   const c=tile(p.tx,p.ty);
-  if(S.phase!=='stop'||!c||c.t!=='market'||inp.pick||inp.sw){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
+  if(S.phase!=='stop'||!c||c.t!=='market'||inp.sw){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
+  if(inp.pick){buy(S.market,p,null,p.tx,p.ty);p.prevAct=inp.act;return}
   const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0, dy=inp.my<-0.5?-1:0, key=dx+','+dy;
   if(dy<0){p.mk=false;p.prevAct=inp.act;return}           // step back up: close the list
   let move=false;
   if(dx){if(key!==p.menuLast){move=true;p.menuRep=0.32}else{p.menuRep-=dt;if(p.menuRep<=0){move=true;p.menuRep=0.11}}}
   p.menuLast=key;
   if(move){p.cur=wrap(p.cur,S.market.length)+dx;p.actT=0}
-  if(!inp.act){p.lock=false;p.actT=0}else doAct(p,c,p.tx,p.ty,dt);
-  p.prevAct=inp.act;
+  p.actT=0;p.prevAct=inp.act;
 }
 function menuInput(p,inp,dt){
   const M=MENU[p.menu.kind],list=M.list(),n=list.length,cols=M.cols;
@@ -1337,14 +1336,14 @@ function update(dt){
       // blocked going straight: if the next tile's middle (or the neighbour's) is open, ease sideways into line with it
       const sp=4.2*S.up.speed*dt;
       const ease=(pos,other,mv,alongX)=>{
-        const f=Math.floor(pos),fr=pos-f,cs=[f+0.5,fr<0.5?f-0.5:f+1.5];
+        const cs=[DOOR_FRONT[0]+0.5];   // only the door: elsewhere the player is never pushed sideways
+        if(!alongX||other<4.5||other>8.5)return 0;
         for(const c0 of cs){if(Math.abs(c0-pos)>0.8)continue;
           const free=alongX?!hit(c0,other+mv)&&!hit(c0,other):!hit(other+mv,c0)&&!hit(other,c0);if(!free)continue;
           const st=Math.sign(c0-pos)*Math.min(Math.abs(c0-pos),sp);
           if(alongX?!hit(pos+st,other):!hit(other,pos+st))return st;}
         return 0};
       if(!okY&&vy&&Math.abs(inp.mx)<0.3)p.x+=ease(p.x,p.y,vy,true);
-      if(!okX&&vx&&Math.abs(inp.my)<0.3)p.y+=ease(p.y,p.x,vx,false);
       if(Math.abs(inp.mx)>Math.abs(inp.my)){p.dx=Math.sign(inp.mx);p.dy=0}else{p.dx=0;p.dy=Math.sign(inp.my)}
     }
     const tx=Math.floor(p.x)+p.dx, ty=Math.floor(p.y)+p.dy, c=tile(tx,ty);
@@ -1674,11 +1673,14 @@ function drawOffer(items,cx,y,shop){
     const c=tile(p.tx,p.ty);
     if(!c)continue;
     if(shop&&c.t==='window'&&shopAtWindow(p.tx)===shop)on=true;
-    if(!shop&&c.t==='market')on=true;
+    if(!shop&&c.t==='market'&&p.mk)on=true;
     if(!on)continue;
     const k=wrap(p.cur,n),X=x0+k*w;
     ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=3;rr(X+2,y-1,w-4,T*1.15,6);ctx.stroke();
     if(p.actT>0)bar(X+4,y+T*1.18-8,w-8,p.actT/BUY,PCOL[p.i]);
+    // name of the item under the cursor (like the fridge)
+    {const it=items[k],nm=it.type==='mystery'?'あやしい袋':it.type==='fuel'?'ガソリン':it.type==='equip'?equipName(it.id,it.pro):ING[it.id].n+(it.type==='seed'?'の種':'');
+     ctx.font=`800 11px ${FNT}`;const nw=ctx.measureText(nm).width+12;ctx.fillStyle=PCOL[p.i];const ny=shop?y-22:y+T*1.25+2;rr(X+w/2-nw/2,ny,nw,17,8);ctx.fill();text(nm,X+w/2,ny+8.5,11,'#fff',800)}
     if(shop&&!hinted){hinted=true;
       const msg=AL(p,'sw','切替')+'　'+AL(p,'act','購入',1);ctx.font=`800 11px ${FNT}`;const hw=ctx.measureText(msg).width+16;
       const hy=y+T*1.25+2;ctx.fillStyle='rgba(16,26,30,.9)';rr(x0-4,hy,hw,20,8);ctx.fill();text(msg,x0+4,hy+10,11,'#ffe08a',800,'left')}
@@ -1731,7 +1733,8 @@ function drawTown(){
   drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
   const mp=S.players.find(q=>q.mk);
   if(mp){const hx=(MKT[0]+1.2)*T,hy=(MKT[1]-0.45)*T-14;
-    ctx.font=`800 11px ${FNT}`;const msg='選ぶ（←→）　'+AL(mp,'act','購入',1)+'　'+AL(mp,'pick','閉じる'),w=ctx.measureText(msg).width+16;
+    const mvk=isTouch&&(NET.role!=='off'||mp.i===0)?'スティック':keyName(devSlot(mp),'move');
+    ctx.font=`800 11px ${FNT}`;const msg='選ぶ（'+mvk+'）　'+AL(mp,'pick','購入')+'　'+AL(mp,'sw','閉じる'),w=ctx.measureText(msg).width+16;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(hx-4,hy-10,w,20,8);ctx.fill();text(msg,hx+4,hy,11,'#ffe08a',800,'left')}
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
@@ -1740,6 +1743,8 @@ function drawTown(){
     ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.5;ctx.stroke();
     emoji(O.e,X+T/2,Y+T*0.44,24);
     text(O.n,X+T/2,Y+T*0.86,10,'#fff',800);
+    {ctx.font=`800 11px ${FNT}`;const nm=O.items.map(id=>ING[id].n).join('・'),nw=ctx.measureText(nm).width+12;
+     ctx.fillStyle='rgba(16,26,30,.85)';rr(X+T/2-nw/2,Y-37,nw,16,8);ctx.fill();text(nm,X+T/2,Y-29,11,'#fff',800)}
     O.items.forEach((id,j,a)=>{const bx=X+T/2+(j-(a.length-1)/2)*25,by=Y-7;ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(bx,by,12,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1.5;ctx.stroke();emoji(ING[id].e,bx,by+1,17)});
   }
   drawQueueMat();

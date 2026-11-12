@@ -842,8 +842,9 @@ function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
 function seatInput(p,inp){
   p.tx=-9;p.ty=-9;
-  if(inp.sw||!(S.phase==='drive'||S.phase==='stop')){leaveSeat(p);return}
-  if(inp.pick||(inp.act&&!p.prevAct)){S.speed=S.speed===2?1:2;sfx('lever');say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）')}
+  // 持つ gets you in and out (切替 also gets you out); 作業 moves the lever
+  if(inp.pick||inp.sw||!(S.phase==='drive'||S.phase==='stop')){leaveSeat(p);return}
+  if(inp.act&&!p.prevAct){S.speed=S.speed===2?1:2;sfx('lever');say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）')}
 }
 const unseatAll=()=>{if(S)S.players.forEach(leaveSeat)};
 function waterPlant(p,c,tx,ty){
@@ -2296,7 +2297,7 @@ function drawPlayers(){
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
     if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
-      if(me||p.seat){const msg=p.seat?AL(p,'pick','スピード切替')+'　'+AL(p,'sw','降りる'):AL(p,'pick','運転席に座る');
+      if(me||p.seat){const msg=p.seat?AL(p,'act','スピード切替')+'　'+AL(p,'pick','降りる'):AL(p,'pick','運転席に座る');
         ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?16.6*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     if(S.phase==='drive'||S.phase==='stop'){const msg=playHint(p,c);

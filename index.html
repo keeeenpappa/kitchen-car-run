@@ -676,7 +676,7 @@ function AL(p,k,label,hold){
   const key=(isTouch&&(NET.role!=='off'||!p||p.i===0))?BTN_N[k]:keyName(devSlot(p),k);
   return label+'（'+key+(hold?'長押し':'')+'）';
 }
-const OVK=()=>isTouch?'長押し':keyName(0,'ok')+'長押し';   // overlay cards / buttons
+const OVK=()=>isTouch?'長押し':BTN_N.act+'（'+keyName(0,'act')+'）長押し';   // overlay cards / buttons: every long press is 作業
 function BL(p,k){
   if(isTouch&&(NET.role!=='off'||!p||p.i===0))return BTN_N[k];
   const i=NET.role!=='off'?0:Math.min(2,p?p.i:0);
@@ -1116,7 +1116,7 @@ ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if
 for(const ev of ['pointerup','pointercancel'])ov.addEventListener(ev,()=>{if(ovHold.src==='ptr')holdReset()});
 ov.addEventListener('contextmenu',e=>{if(e.target.closest('.ovbtn.hold'))e.preventDefault()});
 function ovHoldTick(dt){
-  const b=ovButtons()[ovSel],keyHeld=held.has('Space')||held.has('Enter')||!!(pads[0]&&pads[0].now.a);
+  const b=ovButtons()[ovSel],keyHeld=actHeldLocal();
   if(!keyHeld)ovHoldLock=false;
   if(ovHold.src!=='ptr'){
     if(b&&b.classList.contains('hold')&&keyHeld&&!ovHoldLock){if(ovHold.btn!==b){holdReset();ovHold={btn:b,t:0,src:'key'}}}
@@ -1125,17 +1125,20 @@ function ovHoldTick(dt){
   if(!ovHold.btn)return;
   if(!ovHold.btn.isConnected){ovHold={btn:null,t:0,src:null};return}
   ovHold.t+=dt;setP(ovHold.btn,ovHold.t/HOLD);
-  if(ovHold.t>=HOLD){const x=ovHold.btn;if(ovHold.src==='key')ovHoldLock=true;holdReset();doOv(x.dataset.act,x.dataset.v)}
+  if(ovHold.t>=HOLD){const x=ovHold.btn;if(ovHold.src==='key')ovHoldLock=true;readyLock=true;holdReset();doOv(x.dataset.act,x.dataset.v)}
 }
-// 準備完了: long-press the button, R, or the pad's Back button
+// 準備完了: long-press the button or 作業 (anyone's); R and the pad's Back button still work
+const ACTK=['KeyF','Period','ShiftRight'];
+const actHeldLocal=()=>ACTK.some(k=>held.has(k))||touch.act||pads.some(q=>q&&q.now.x);
+const actHeldAll=()=>actHeldLocal()||(NET.role==='host'&&NET.inputs.some((r,i)=>i>0&&r&&r[2]));
 let readyT=0,readyLock=false,readyPtr=false;
 function readyTick(dt){
   const on=S&&S.phase==='layout'&&ov.hidden;
-  const h=on&&(readyPtr||held.has('KeyR')||!!(pads[0]&&pads[0].now.back));
+  const h=on&&(readyPtr||held.has('KeyR')||!!(pads[0]&&pads[0].now.back)||actHeldAll());
   if(!h){readyT=0;readyLock=false;setP(readyBtn,0);return}
   if(readyLock)return;
   readyT+=dt;setP(readyBtn,readyT/READY_HOLD);
-  if(readyT>=READY_HOLD){readyT=0;readyLock=true;setP(readyBtn,0);doOv('ready')}
+  if(readyT>=READY_HOLD){readyT=0;readyLock=true;ovHoldLock=true;setP(readyBtn,0);doOv('ready')}
 }
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
@@ -1255,7 +1258,7 @@ function overlayInput(){
   let mv=0,ok=false;
   if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r')))mv=1;
   if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l')))mv=-1;
-  if(pressed.has('Space')||pressed.has('Enter')||(p0&&p0.edge('a')))ok=true;
+  if(pressed.has('Space')||pressed.has('Enter')||pressed.has('KeyF')||pressed.has('Period')||(p0&&(p0.edge('a')||p0.edge('x'))))ok=true;
   if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
   for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
@@ -2612,7 +2615,7 @@ function renderHud(){
   if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info='<b style="color:#ffd84a">強化</b>　'+gl.join('　')+'<br>'+info;
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
-  if(!isTouch){const rt='準備完了（'+keyName(0,'ready')+'長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
+  if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
   infoEl.innerHTML=info||'　';S.sideInfo=info;
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;

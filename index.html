@@ -286,6 +286,7 @@ function rnd(n){return Math.floor(Math.random()*n)}
 function pickN(a,n){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=rnd(i+1);[b[i],b[j]]=[b[j],b[i]]}return b.slice(0,n)}
 function weighted(list){let s=0;for(const x of list)s+=x.w;let r=Math.random()*s;for(const x of list){r-=x.w;if(r<=0)return x}return list[0]}
 const newIng=id=>({kind:'ing',id,step:0,burnt:false});
+const badW=it=>it&&it.id&&ING[it.id]&&ING[it.id].steps.at(-1)==='blend'?'ダメになっている':'焦げている';
 const nextStep=it=>it.kind==='ing'&&!it.burnt?ING[it.id].steps[it.step]:undefined;
 const isDone=it=>it.kind==='ing'&&it.step>=ING[it.id].steps.length;
 const fmtT=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
@@ -360,7 +361,8 @@ const emptyT=y=>y===6?'gap':'floor';
 const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 // spots outside for things handed over at layout time: first the row just outside the door (the door's own column stays free;
 // row 7 is reached from the walkway under it), then further out. Kept off the table plaza (rows 8-10, x1-17) and the waiting line
-const GROUND_SPOTS=[[5,7],[7,7],[4,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7],[14,7],[15,7],[6,11],[5,11],[7,11],[4,11],[8,11],[3,11],[9,11],[2,11],[10,11],[1,11],[11,11],[12,11],[13,11],[14,11],[15,11],[16,11],[17,11],[19,11],[21,11],[19,9],[21,9],[19,10],[21,10]];
+const TABLE_SPOT=[19,9];   // the table pile waits under the queue
+const GROUND_SPOTS=[[19,9],[5,7],[7,7],[5,9],[7,9],[9,7],[3,9],[9,9],[11,7],[11,9],[13,7],[13,9],[1,9],[15,7],[15,9],[17,9],[5,11],[7,11],[3,11],[9,11],[1,11],[11,11],[13,11],[15,11],[17,11],[19,11],[21,11],[21,9],[19,10],[21,10]];
 const storable=it=>!!it&&['station','can','basket','power'].includes(it.kind);
 // put objects on free spots outside; same-kind counters/planters join one pile
 function putOutside(objs){
@@ -369,7 +371,8 @@ function putOutside(objs){
       const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant&&!it.pro&&!upTotal(it));
       if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
     }
-    const s=GROUND_SPOTS.find(([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item);
+    const free=([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item;
+    const s=(o.kind==='station'&&o.st==='table'&&free(TABLE_SPOT))?TABLE_SPOT:GROUND_SPOTS.find(q=>!(q[0]===TABLE_SPOT[0]&&q[1]===TABLE_SPOT[1])&&free(q));
     if(s)S.map[s[1]][s[0]].item=o;
   }
 }
@@ -394,10 +397,21 @@ function setupLayout(){
   S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;
   hideOv();
 }
+const REQUIRED=['sink','planter','can','seedbox','fridge','board','stove','blender','plates','trash','basket'];
+const REQN={seedbox:'種箱',fridge:'冷蔵庫'};
+const reqName=id=>REQN[id]||(EQUIP[id]&&EQUIP[id].n)||id;
+function missingUnits(){
+  const have=new Set();
+  for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];have.add(c.t);if(c.item&&c.item.kind)have.add(c.item.kind)}
+  for(const q of S.players)if(q.hold){have.add(q.hold.kind);if(q.hold.st)have.add(q.hold.st)}
+  return REQUIRED.filter(id=>!have.has(id));
+}
 function finishLayout(){
   if(!S||S.phase!=='layout')return;
   if(S.players.some(q=>holdsFurn(q)||(q.hold&&q.hold.kind==='power'))){S.toast={text:'手に持っている物を置いてから',t:0,life:2.5};return}
   if(S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor'){S.toast={text:'ドアの前はあけておく',t:0,life:2.5};return}
+  const miss=missingUnits();
+  if(miss.length){S.toast={text:'トラックに置いていない：'+miss.map(reqName).join('・'),t:0,life:3.5};return}
   const bad=unreachable();
   if(bad.some(([x,y])=>x===LEVER[0]&&y===LEVER[1])){S.toast={text:'運転席に行けない：右から2列目までのどこかに通路をあける（赤い枠）',t:0,life:3};return}
   if(bad.length){S.toast={text:'手が届かない器具が '+bad.length+' 個ある（赤い枠）',t:0,life:2.5};return}
@@ -620,11 +634,11 @@ function say(p,m){p.msg=m;p.msgT=1.6}
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
 const DEVK={
-  kb0:{pick:'Space',act:'F',sw:'Q',menu:'Esc',ready:'R',ok:'Space'},
-  kb1:{pick:'/',act:'.',sw:',',menu:'Esc',ready:'R',ok:'Space'},
-  xbox:{pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A'},
-  ns:{pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B'},
-  ps:{pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×'},
+  kb0:{pick:'Space',act:'F',sw:'Q',menu:'Esc',ready:'R',ok:'Space',move:'WASD'},
+  kb1:{pick:'/',act:'.',sw:',',menu:'Esc',ready:'R',ok:'Space',move:'矢印'},
+  xbox:{pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A',move:'十字'},
+  ns:{pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B',move:'十字'},
+  ps:{pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×',move:'十字'},
 };
 const DEVN={auto:'自動',kb:'キーボード',xbox:'Xbox',ns:'Switchプロコン',ps:'PlayStation'};
 let DEVPREF=['auto','auto','auto','auto'];
@@ -702,14 +716,14 @@ function placeOrTake(p,c){
     if(c.t!=='counter'){
       // a finished item on a board / stove / blender can be scooped up with a plate or a prepared ingredient in hand
       if(!(it.kind==='ing'&&isDone(it))){say(p,'まだ調理中');return}
-      if(it.burnt){say(p,'焦げている');return}
+      if(it.burnt){say(p,badW(it));return}
       if(!ok(h)){say(p,'先に'+STEPN[nextStep(h)]);return}
       const all=items(h).concat([it]);
       if(all.length>3){say(p,'のせきれない');return}
       p.hold={kind:'plate',bare:!(h.kind==='plate'&&!h.bare),items:all};
       c.item=null;c.prog=0;c.burn=0;return}
-    if(!ok(h)){say(p,h.burnt?'焦げている':'先に'+STEPN[nextStep(h)]);return}
-    if(!ok(it)){say(p,it.burnt?'焦げている':'まだ下ごしらえ中');return}
+    if(!ok(h)){say(p,h.burnt?badW(h):'先に'+STEPN[nextStep(h)]);return}
+    if(!ok(it)){say(p,it.burnt?badW(it):'まだ下ごしらえ中');return}
     if(h.kind==='plate'&&it.kind==='plate'&&!h.bare&&!it.bare){say(p,'皿どうしは重ねられない');return}
     const all=items(it).concat(items(h));
     if(all.length>3){say(p,'のせきれない');return}
@@ -747,7 +761,7 @@ function doPick(p,c,tx,ty){
       // holding a finished stack or a prepared ingredient: take a plate with it on
       else if(p.hold.kind==='plate'&&p.hold.bare)p.hold.bare=false;
       else if(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)p.hold={kind:'plate',items:[p.hold]};
-      else if(p.hold.kind==='ing')say(p,p.hold.burnt?'焦げている':'先に'+STEPN[nextStep(p.hold)]);
+      else if(p.hold.kind==='ing')say(p,p.hold.burnt?badW(p.hold):'先に'+STEPN[nextStep(p.hold)]);
       else say(p,'皿には乗せられない');
       return;
     case 'trash':
@@ -1300,7 +1314,10 @@ function update(dt){
     if(c.t==='stove'){
       if(nextStep(it)==='cook'){c.prog+=dt;if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
-    } else if(c.t==='blender'&&nextStep(it)==='blend'){c.prog+=dt;if(c.prog>=blendT(c)){it.step++;c.prog=0}}
+    } else if(c.t==='blender'){
+      if(nextStep(it)==='blend'){c.prog+=dt;if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
+    }
   }
   // players
   S.players.forEach((p,i)=>{
@@ -1315,7 +1332,19 @@ function update(dt){
     if(len>0.1){
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*dt,vy=inp.my/k*4.2*S.up.speed*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
-      if(stuck||!hit(p.x+vx,p.y))p.x+=vx; if(stuck||!hit(p.x,p.y+vy))p.y+=vy;
+      const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);
+      if(okX)p.x+=vx; if(okY)p.y+=vy;
+      // blocked going straight: if the next tile's middle (or the neighbour's) is open, ease sideways into line with it
+      const sp=4.2*S.up.speed*dt;
+      const ease=(pos,other,mv,alongX)=>{
+        const f=Math.floor(pos),fr=pos-f,cs=[f+0.5,fr<0.5?f-0.5:f+1.5];
+        for(const c0 of cs){if(Math.abs(c0-pos)>0.8)continue;
+          const free=alongX?!hit(c0,other+mv)&&!hit(c0,other):!hit(other+mv,c0)&&!hit(other,c0);if(!free)continue;
+          const st=Math.sign(c0-pos)*Math.min(Math.abs(c0-pos),sp);
+          if(alongX?!hit(pos+st,other):!hit(other,pos+st))return st;}
+        return 0};
+      if(!okY&&vy&&Math.abs(inp.mx)<0.3)p.x+=ease(p.x,p.y,vy,true);
+      if(!okX&&vx&&Math.abs(inp.my)<0.3)p.y+=ease(p.y,p.x,vx,false);
       if(Math.abs(inp.mx)>Math.abs(inp.my)){p.dx=Math.sign(inp.mx);p.dy=0}else{p.dx=0;p.dy=Math.sign(inp.my)}
     }
     const tx=Math.floor(p.x)+p.dx, ty=Math.floor(p.y)+p.dy, c=tile(tx,ty);
@@ -1510,7 +1539,7 @@ function drawTile(c,x,y){
     drawItem(c.item,X+T/2,Y+T/2,T*0.8);
     if((c.t==='board'||c.t==='blender'||c.t==='stove')&&c.prog>0){
       const tot=c.t==='board'?chopT(c):c.t==='stove'?cookT(c):blendT(c);bar(X+6,Y+T-10,T-12,c.prog/tot,'#ffd25a')}
-    if(c.t==='stove'&&c.burn>0&&!c.item.burnt){
+    if((c.t==='stove'||c.t==='blender')&&c.burn>0&&!c.item.burnt){
       const bt=burnT(c);
       bar(X+6,Y+3,T-12,c.burn/bt,'#ff6d6d');
       if(c.burn>bt*0.45&&Math.sin(S.t*14)>0)emoji('⚠️',X+T-8,Y+10,14);
@@ -1711,7 +1740,7 @@ function drawTown(){
     ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.5;ctx.stroke();
     emoji(O.e,X+T/2,Y+T*0.44,24);
     text(O.n,X+T/2,Y+T*0.86,10,'#fff',800);
-    O.items.forEach((id,j)=>{ctx.fillStyle='rgba(255,255,255,.9)';ctx.beginPath();ctx.arc(X+T-8-j*13,Y+8,6.5,0,7);ctx.fill();emoji(ING[id].e,X+T-8-j*13,Y+8.5,9)});
+    O.items.forEach((id,j,a)=>{const bx=X+T/2+(j-(a.length-1)/2)*25,by=Y-7;ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(bx,by,12,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1.5;ctx.stroke();emoji(ING[id].e,bx,by+1,17)});
   }
   drawQueueMat();
   drawTables();
@@ -1805,6 +1834,14 @@ function layoutHint(p,c,tx,ty){
   if(c.t==='ground'){if(!h&&c.item)return '拾う';if(h&&!c.item&&storable(h))return '置く'}
   return '';
 }
+function playHint(p,c){
+  if(!c||p.menu||p.g||p.mk||p.seat)return '';
+  const h=p.hold;
+  if(c.t==='sink'&&h&&h.kind==='can')return h.water>=canCap(h)?'':AL(p,'act','水を汲む',1);
+  if(c.t==='planter'&&c.plant&&h&&h.kind==='can'&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow)return h.water>0?AL(p,'pick','水をあげる'):'じょうろが空';
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop')return AL(p,'act','切る',1);
+  return '';
+}
 function drawPlayers(){
   for(const p of S.players){
     // the chef is drawn a little lower so the body sits on its own tile and the dotted target frame looks right next to it
@@ -1817,6 +1854,9 @@ function drawPlayers(){
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me||p.seat){const msg=p.seat?AL(p,'pick','スピード切替')+'　'+AL(p,'sw','戻る'):AL(p,'sw','運転席へ');
         ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?16.6*T:X,hy=p.seat?1.55*T:Y+30;
+        ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
+    if(S.phase==='drive'||S.phase==='stop'){const msg=playHint(p,c);
+      if(msg){ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     if(S.phase==='layout'){const lb=layoutHint(p,c,p.tx,p.ty);
       if(lb&&lb!=='置く'){const msg=AL(p,'pick',lb);ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
@@ -1981,7 +2021,10 @@ function drawMenus(){
     ctx.fillStyle='rgba(16,26,30,.94)';rr(x,y,w,h,10);ctx.fill();
     ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.stroke();
     text(M.title,x+10,y+14,12,'#fff',800,'left');
-    text(AL(p,'pick','取る')+'　'+AL(p,'sw','閉じる'),x+w-10,y+14,10,'#9db3b4',700,'right');
+    {const keys=isTouch&&(NET.role!=='off'||p.i===0)?'スティック':keyName(devSlot(p),'move');
+     const msg='選ぶ（'+keys+'）　'+AL(p,'pick','取る')+'　'+AL(p,'sw','閉じる');ctx.font=`800 11px ${FNT}`;const hw=ctx.measureText(msg).width+16;
+     const hy=y+h+4,hx=Math.max(4,Math.min(GW*T-hw-4,x+w/2-hw/2));
+     ctx.fillStyle='rgba(16,26,30,.94)';rr(hx,hy,hw,20,8);ctx.fill();ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=1.5;ctx.stroke();text(msg,hx+8,hy+10,11,'#ffe08a',800,'left')}
     list.forEach((id,k)=>{
       const cx=x+8+(k%cols)*cw+cw/2,cy=y+30+Math.floor(k/cols)*cw+cw/2,n=M.count(id);
       ctx.globalAlpha=n>0?1:0.3;
@@ -2137,13 +2180,13 @@ function renderHud(){
   if(S.phase==='layout'){
     const left=layoutLeft(), bad=unreachable().length, door=S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor';
     info=`<b>キッチンのレイアウト</b>　調理器具・台（カウンター）・菜園はトラックの床に、じょうろとカゴは台の上に、テーブルは外の広場に置きます。置いた物も持ち直せます。<br>`+
-      (door?`<span class="ng">ドアの前はあけておく</span>`:bad?`<span class="ng">手が届かない器具 ${bad}個（赤い枠）</span>`:`<span class="ok">「準備完了」で出発できます</span>`)+
+      (door?`<span class="ng">ドアの前はあけておく</span>`:missingUnits().length?`<span class="ng">まだ置いていない：${missingUnits().map(reqName).join('・')}</span>`:bad?`<span class="ng">手が届かない器具 ${bad}個（赤い枠）</span>`:`<span class="ok">「準備完了」で出発できます</span>`)+
       (left?`　<span class="dim">外に置いたままの ${left}個は持って行かず、次の配置のときにまた外に出ます</span>`:'')+
       upInfo()+
       `　<span class="dim">｜残り時間は次の町の営業時間にプラス（0になっても続けられます）</span>`;
   }
   const gl=UPS.filter(u=>!u.tgt&&u.id!=='heart'&&u.id!=='plot'&&S.upCount&&S.upCount[u.id]).map(u=>u.e+u.d+(S.upCount[u.id]>1?' ×'+S.upCount[u.id]:''));
-  if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info+='<br><b style="color:#ffd84a">強化</b>　'+gl.join('　');
+  if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info='<b style="color:#ffd84a">強化</b>　'+gl.join('　')+'<br>'+info;
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
   if(!isTouch){const rt='準備完了（'+keyName(0,'ready')+'長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';

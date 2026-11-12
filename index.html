@@ -34,7 +34,7 @@
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px}
-#app{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+#app{max-width:min(1500px,calc((100dvh - 150px) * 1.714));margin:0 auto;display:flex;flex-direction:column;gap:10px}
 header{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
 h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);margin:0;color:var(--truck);letter-spacing:.03em}
 #hud{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-variant-numeric:tabular-nums;font-weight:700;min-width:0}
@@ -42,7 +42,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,3vw,28px);mar
 #info{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:22px;line-height:1.6;font-variant-numeric:tabular-nums}
 #info .ok{color:var(--good)} #info .ng{color:var(--bad)} #info .dim{color:var(--muted)}
 .stage{position:relative;border-radius:14px;overflow:hidden;background:#0d1519;border:1px solid var(--line)}
-canvas{display:block;width:100%;height:auto;aspect-ratio:18/12}
+canvas{display:block;width:100%;height:auto;aspect-ratio:24/14}
 #ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--scrim);padding:16px;overflow:auto}
 #ov[hidden]{display:none}
 #readyBtn{position:absolute;top:9%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
@@ -105,7 +105,7 @@ body.touch .narrow{display:none}
   body.touch{padding-block:4px}
   body.touch #app{gap:4px}
   body.touch #info{font-size:11px;padding:3px 8px;line-height:1.4}
-  body.touch .stage{width:100%;max-width:calc((100dvh - 64px) * 1.5);margin:0 auto}
+  body.touch .stage{width:100%;max-width:calc((100dvh - 64px) * 1.714);margin:0 auto}
   body.touch #stock{font-size:11px;gap:4px;min-height:0}
 }
 </style>
@@ -134,7 +134,7 @@ body.touch .narrow{display:none}
   </div>
   <div class="help">
     <div><b>1回の流れ</b><br>次の町を選ぶ → 走行中に窓口でお店から買う → 町で準備（15秒）→ 営業（2分）。これを4回くり返します。評判の♥が0になると終わりです。</div>
-    <div><b>料理の作り方</b><br>冷蔵庫から食材を出す → 切る／焼く／ミキサー → 皿に乗せる → 受取口で客に渡す。焼きすぎると焦げます。</div>
+    <div><b>料理の作り方</b><br>並んでいるお客さんを「持つ」で空いているテーブルへ案内 → 冷蔵庫から食材を出す → 切る／焼く／ミキサー → 皿に乗せる → ドアから出てテーブルへ運ぶ。焼きすぎると焦げます。</div>
     <div><b>食材の集め方</b><br>窓口で買う（店は通り過ぎたら戻りません）。種は走行中の「種屋」か町の市場で買い、種箱から出して菜園に植えます。植えたらじょうろで1回水をあげると育ちます（じょうろは3回で空になるので、シンクで作業ボタン長押しで汲み直す）。評判の♥が多いほどチップが増えます。町の外の5つの採取場所（釣り堀・木・原木・畜舎・畑）で採る（タダ。カゴを持って行き「持つ」で始める。採った物は冷蔵庫で「持つ」を押してしまう）。</div>
   </div>
 </div>
@@ -142,7 +142,13 @@ body.touch .narrow{display:none}
 <script>
 'use strict';
 // ---------- constants ----------
-const T=48, GW=18, GH=12;
+const T=48, GW=24, GH=14; // 16:9-ish field: truck top-left, town below and to the right
+const MKT=[21,12], GROW=12;  // market spot and the row of gathering spots
+// customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
+const QX=18, QY=8, QMAX=5, EAT_T=4;              // waiting line x18..22 on row 8; eating time at the table
+const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the plaza under the truck)
+const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
+const PRESET_TABLES=[[4,9],[9,9],[14,9]];
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const DRIVE=65, PREP=15, SERVICE=120, SPEED=0.45, STOPS=4, WMARGIN=0.6;
@@ -172,11 +178,11 @@ const STEPN={chop:'切る',cook:'焼く',blend:'ミキサー'};
 //  timing: stop the moving marker (middle = 2) / arrows: input the 2 shown directions
 // Spots with two possible items give a random one, then you choose to keep it (持つ) or put it back (切替).
 const GOBJ={
-  pond:{n:'釣り堀',e:'🎣',items:['fish','shrimp'],act:'fish',x:8,col:'#3d8ab3'},
-  tree:{n:'木',e:'🌳',items:['apple'],act:'mash',x:10,col:'#4f7a36'},
-  log:{n:'原木',e:'🪵',items:['mushroom'],act:'timing',x:12,col:'#6b4a2f'},
-  barn:{n:'畜舎',e:'🐄',items:['milk','egg'],act:'arrows',x:14,col:'#b8834f'},
-  field:{n:'畑',e:'🌱',items:['potato','strawberry'],act:'mash',x:16,col:'#7a5a34'},
+  pond:{n:'釣り堀',e:'🎣',items:['fish','shrimp'],act:'fish',x:3,col:'#3d8ab3'},
+  tree:{n:'木',e:'🌳',items:['apple'],act:'mash',x:6,col:'#4f7a36'},
+  log:{n:'原木',e:'🪵',items:['mushroom'],act:'timing',x:9,col:'#6b4a2f'},
+  barn:{n:'畜舎',e:'🐄',items:['milk','egg'],act:'arrows',x:12,col:'#b8834f'},
+  field:{n:'畑',e:'🌱',items:['potato','strawberry'],act:'mash',x:15,col:'#7a5a34'},
 };
 const GOBJ_K=Object.keys(GOBJ);
 const GATHERABLE=new Set(Object.values(GOBJ).flatMap(o=>o.items));
@@ -230,6 +236,7 @@ const EQUIP={
   plates:{n:'皿置き場',e:'🍽️',price:15},
   sink:{n:'シンク',e:'🚰',price:20,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10},
+  table:{n:'テーブル',e:'🪑',price:12,outside:true},
   can:{n:'じょうろ',e:'💧',price:12,tool:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
   basket:{n:'カゴ',e:'🧺',price:12,tool:true,pro:{n:'大きなカゴ',d:'入る数 +2'}},
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
@@ -290,11 +297,12 @@ function buildMap(){
   for(let y=3;y<=5;y++){set(2,y,'planter',{plant:null});set(15,y,'counter')}
   set(15,4,'floor');set(16,4,'lever');
   for(let x=7;x<=9;x++)set(x,4,'counter');
-  const bot=['counter','window','counter','counter','door','counter','serve','serve','counter','counter','counter','window','counter','counter'];
+  const bot=['counter','window','counter','counter','door','counter','counter','counter','counter','counter','counter','window','counter','counter'];
   bot.forEach((t,i)=>set(2+i,6,t));
   m[6][3].win='後'; m[6][13].win='前';
-  set(3,10,'market'); for(const k of GOBJ_K)set(GOBJ[k].x,10,'gather',{obj:k});
-  for(let x=8;x<=13;x++)set(x,8,'queue',{slot:x-8});
+  set(MKT[0],MKT[1],'market'); for(const k of GOBJ_K)set(GOBJ[k].x,GROW,'gather',{obj:k});
+  for(let k=0;k<QMAX;k++)set(QX+k,QY,'queue',{slot:k});
+  for(const [x,y] of PRESET_TABLES)set(x,y,'table');
   return m;
 }
 
@@ -326,12 +334,13 @@ const inTruck=(x,y)=>x>=2&&x<=15&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
 // only tools (watering can, basket) and food go on top of a counter.
 const FIXED=new Set(['door','window','serve']);
-const FURN=['counter','planter',...MOVABLE];
-const PILE=['counter','planter'];          // these come stacked in one pile outside
+const FURN=['counter','planter','table',...MOVABLE];
+const PILE=['counter','planter','table'];          // these come stacked in one pile outside
 const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_FRONT=[6,5];
 const emptyT=y=>y===6?'gap':'floor';
 const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
-const GROUND_SPOTS=[[1,9],[3,9],[5,9],[7,9],[9,9],[11,9],[13,9],[15,9],[5,10],[7,10],[9,10],[11,10],[13,10],[15,10],[1,10],[3,8],[5,8],[1,8],[7,8],[15,8]];
+// spots outside for things handed over at layout time: kept off the table plaza (rows 8-10, x1-17) and the waiting line
+const GROUND_SPOTS=[[1,11],[3,11],[5,11],[7,11],[9,11],[11,11],[13,11],[15,11],[17,11],[19,11],[21,11],[19,9],[21,9],[19,10],[21,10],[10,7],[12,7],[14,7],[16,7],[1,7],[3,7]];
 const storable=it=>!!it&&['station','can','basket','power'].includes(it.kind);
 // put objects on free spots outside; same-kind counters/planters join one pile
 function putOutside(objs){
@@ -357,6 +366,9 @@ function setupLayout(){
     if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))objs.push(c.item);
     if(!FIXED.has(c.t))S.map[y][x]=blankTile(y);
   }
+  let tb=0;
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table'){tb++;S.map[y][x]={t:'ground',item:null,prog:0,burn:0}}
+  if(tb)objs.push({kind:'station',st:'table',n:tb});
   putOutside(objs);
   rebuildStations();
   S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;
@@ -382,7 +394,7 @@ function showEquipShop(){
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
   if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP),3).map(id=>equipOffer(id,1,0.15));
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
-    const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':'器具（床に置く）');
+    const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span>
@@ -437,15 +449,21 @@ function furnPick(p,c,tx,ty){
       p.hold=null;float(tx+.5,ty,'⬆ '+U.n+'！','#ffe08a');return true}
     if(!(c.t==='ground'&&!c.item)){say(p,(TGTN[tg]||'器具')+'に重ねる');return true}
   }
+  // tables: set down / pick up on the plaza (layout time)
+  if(lay&&h&&h.kind==='station'&&h.st==='table'){
+    if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
+    if(inTruck(tx,ty)){say(p,'テーブルは外の広場に置く');return true}
+  }
+  if(lay&&!h&&c.t==='table'){p.hold={kind:'station',st:'table'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
-  if(holdsFurn(p)&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
+  if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
     if(tx===LEVER_FRONT[0]&&ty===LEVER_FRONT[1]){say(p,'レバーの前はあけておく');return true}
     S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
   // (in layout anything; otherwise cooking equipment for cooking equipment). Tools on counters are never swapped.
-  if(holdsFurn(p)&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
+  if(holdsFurn(p)&&h.st!=='table'&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
     if(c.item){say(p,'上の物をどけてから');return true}
     const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null};
     S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};
@@ -467,7 +485,7 @@ function furnPick(p,c,tx,ty){
     if(h&&!it){if(!storable(h)){say(p,'外には置けない');return true}c.item=h;p.hold=null;return true}
     if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant&&!h.pro&&!it.pro&&!upTotal(h)&&!upTotal(it)){it.n=(it.n||1)+1;p.hold=null;return true}
   }
-  if(holdsFurn(p)){say(p,'トラックの床に置く');return true}
+  if(holdsFurn(p)){say(p,h.st==='table'?'テーブルは外の広場に置く':'トラックの床に置く');return true}
   return false;
 }
 
@@ -561,7 +579,7 @@ function solid(x,y){
     case 'ground':return !out||y>=GH-1||x<=0||x>=GW-1||!!c.item;
     case 'gather':if(!out)return true;return !lay;
     case 'market':return !lay;
-    case 'queue':if(!out)return true;if(lay)return false;return !!S.cust[c.slot]; // only the spot where a customer stands blocks
+    case 'queue':if(!out)return true;if(lay)return false;return !!waiting()[c.slot]; // only the spot where a customer stands blocks
     default:return true;
   }
 }
@@ -682,10 +700,24 @@ function doPick(p,c,tx,ty){
       else if(p.hold&&p.hold.kind==='can')say(p,'先に種を植える');
       else say(p,'種を持ってくる');
       return;
-    case 'serve':
-      if(p.hold&&p.hold.kind==='plate')serve(p,tx,ty);
-      else if(p.hold&&p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt){const tmp=p.hold;p.hold={kind:'plate',bare:true,items:[tmp]};serve(p,tx,ty);if(p.hold&&p.hold.bare&&p.hold.items.length===1)p.hold=tmp}
-      return;
+    case 'queue':{
+      if(S.phase!=='stop'||S.sub!=='service')return;
+      const w=waiting()[c.slot];if(!w)return;
+      if(follower(p)){say(p,'もう1人案内している');return}
+      w.st='follow';w.by=p.i;say(p,'空いているテーブルへ案内');return}
+    case 'table':{
+      if(S.phase!=='stop')return;
+      const g=guestAt(tx,ty),f=follower(p);
+      if(!g){
+        if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,RECIPES[f.order].e+' ご注文','#fff')}
+        else say(p,S.sub==='service'?'並んでいるお客さんを案内してくる':'まだ営業前');
+        return}
+      if(g.st==='eat'){say(p,'食事中');return}
+      if(f){say(p,'このテーブルはうまっている');return}
+      if(p.hold&&p.hold.kind==='plate')serve(p,tx,ty,g);
+      else if(p.hold&&p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt){const tmp=p.hold;p.hold={kind:'plate',bare:true,items:[tmp]};serve(p,tx,ty,g);if(p.hold&&p.hold.bare&&p.hold.items.length===1)p.hold=tmp}
+      else say(p,'注文は '+RECIPES[g.order].e+RECIPES[g.order].n);
+      return}
     case 'counter':case 'board':case 'stove':case 'blender':
       placeOrTake(p,c);return;
     case 'lever':
@@ -798,16 +830,14 @@ function matchRecipe(items){
 }
 // reputation sets the tip: ♥5 ×1.5, ♥4 ×1.25, ♥3 ×1.0, ♥2 ×0.75, ♥1 ×0.5
 function tipRate(){return 0.25+0.25*Math.max(0,Math.min(5,S.hearts))}
-function serve(p,tx,ty){
-  if(S.phase!=='stop'||S.sub!=='service'){say(p,'まだ営業前');return}
+function serve(p,tx,ty,c){
   const rid=matchRecipe(p.hold.items);
   if(!rid){say(p,'料理になっていない');return}
-  const ci=S.cust.findIndex(c=>c.order===rid);
-  if(ci<0){say(p,'その注文の客がいない');return}
-  const c=S.cust[ci],R=RECIPES[rid];
+  if(rid!==c.order){say(p,'注文は '+RECIPES[c.order].e+RECIPES[c.order].n);return}
+  const R=RECIPES[rid];
   const pay=Math.round(R.price*S.town.pay*S.up.pay), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate());
-  S.money+=pay+tip;S.earned+=pay+tip;S.served++;S.cust.splice(ci,1);p.hold=null;
-  float(tx+.5,ty+1,'+'+(pay+tip)+'G','#ffe08a');
+  S.money+=pay+tip;S.earned+=pay+tip;S.served++;c.st='eat';c.t=EAT_T;p.hold=null;
+  float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a');
 }
 
 // ---------- phases ----------
@@ -851,10 +881,19 @@ function arrive(){
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
 }
 function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
+// st: wait (in line) -> follow (led by player `by`) -> seat (at table tx,ty, order shown) -> eat (paid, leaves after EAT_T)
+const waiting=()=>S.cust.filter(c=>c.st==='wait');
+const follower=p=>S.cust.find(c=>c.st==='follow'&&c.by===p.i);
+const guestAt=(x,y)=>S.cust.find(c=>(c.st==='seat'||c.st==='eat')&&c.tx===x&&c.ty===y);
+function custPos(c){
+  if(c.st==='wait'){const i=waiting().indexOf(c);return [QX+i+0.5,QY+0.5]}
+  if(c.st==='follow'){const p=S.players[c.by];if(p)return [p.x-(p.dx||0)*0.7,p.y-(p.dy||0)*0.7]}
+  return [c.tx+0.5,c.ty+0.5];
+}
 function spawnCust(){
-  if(S.cust.length>=6)return;
+  if(waiting().length>=QMAX)return;
   const order=S.town.menu[rnd(S.town.menu.length)],max=(S.np===1?85:70)*S.up.pat;
-  S.cust.push({order,pat:max,max,hue:rnd(360)});
+  S.cust.push({order,pat:max,max,hue:rnd(360),st:'wait',by:-1,tx:0,ty:0,t:0});
 }
 function clearKitchen(){
   // leftovers from this town are thrown away (planters keep growing)
@@ -1194,10 +1233,12 @@ function update(dt){
       if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
     else{
       S.spawnT-=dt;
-      if(S.spawnT<=0){if(S.cust.length<6)spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
+      if(S.spawnT<=0){spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
       for(let k=S.cust.length-1;k>=0;k--){
-        const c=S.cust[k];c.pat-=dt;
-        if(c.pat<=0){S.cust.splice(k,1);S.hearts--;S.missed++;float(8.5+k,7.2,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
+        const c=S.cust[k];
+        if(c.st==='eat'){c.t-=dt;if(c.t<=0)S.cust.splice(k,1);continue}
+        c.pat-=dt;
+        if(c.pat<=0){const [fx,fy]=custPos(c);S.cust.splice(k,1);S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
       }
       if(S.timer<=0)endStop();
     }
@@ -1375,7 +1416,7 @@ function drawRoad(){
   // road band behind truck bottom
   ctx.fillStyle='#3a4248';ctx.fillRect(0,6.6*T,GW*T,0.6*T);
   ctx.fillStyle='#7c8a82';ctx.fillRect(0,7.2*T,GW*T,1.9*T); // roadside
-  ctx.fillStyle='#4f7044';ctx.fillRect(0,9.1*T,GW*T,2.9*T);
+  ctx.fillStyle='#4f7044';ctx.fillRect(0,9.1*T,GW*T,(GH-9.1)*T);
   const ro=S?S.roadOff:0, wrapX=(x,span)=>((x%span)+span)%span;
   // road dashes, curb blocks, grass tufts, trees: nearer things slide faster
   ctx.fillStyle='#e8e2c8';
@@ -1383,7 +1424,8 @@ function drawRoad(){
   for(let x=-1;x<GW+1;x++){ctx.fillStyle=x%2?'#c9cfcb':'#9aa49e';ctx.fillRect((x-ro%2+ (x%2?0:0))*T,9.0*T,T,5)}
   ctx.fillStyle='#5f8352';
   for(let k=0;k<22;k++){const x=wrapX(k*1.37-ro*2,GW+2)-1;ctx.beginPath();ctx.ellipse(x*T,9.9*T+(k%3)*0.35*T,8,3,0,0,7);ctx.fill()}
-  for(let k=0;k<12;k++){const x=wrapX(k*3.7-ro*3,GW+4)-2;emoji(k%3?'🌳':'🌲',x*T,11.3*T,26)}
+  for(let k=0;k<14;k++){const x=wrapX(k*3.7-ro*3,GW+4)-2;emoji(k%3?'🌳':'🌲',x*T,11.3*T,26)}
+  for(let k=0;k<14;k++){const x=wrapX(k*3.1+1.6-ro*3.6,GW+4)-2;emoji(k%4?'🌳':'🌲',x*T,13.1*T,30)}
 }
 function drawShops(){
   for(const s of S.shops){
@@ -1435,45 +1477,79 @@ function drawOffer(items,cx,y,shop){
 function drawTown(){
   const t=S.town;
   ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,7*T);
-  ctx.fillStyle=t.ground;ctx.fillRect(0,6.6*T,GW*T,5.4*T);
-  ctx.fillStyle=t.deco;ctx.fillRect(0,11*T,GW*T,T);
+  ctx.fillStyle=t.ground;ctx.fillRect(0,6.6*T,GW*T,(GH-6.6)*T);
+  ctx.fillStyle=t.deco;ctx.fillRect(0,(GH-1)*T,GW*T,T);
   // market
-  const mx=3*T,my=10*T;
+  const mx=MKT[0]*T,my=MKT[1]*T;
   ctx.fillStyle='#8f5a3a';rr(mx+2,my+2,T-4,T-4,6);ctx.fill();
   for(let k=0;k<4;k++){ctx.fillStyle=k%2?'#fff':'#d4561c';ctx.fillRect(mx+2+k*(T-4)/4,my+2,(T-4)/4,9)}
   emoji('🏪',mx+T/2,my+T*0.58,22);
-  text('市場（種もある）',mx+T*1.6,my+T*0.5,11,'#2a2018',800,'left');
+  text('市場（種もある）',mx-6,my+T*0.5,11,'#2a2018',800,'right');
   drawGroundItems();
-  drawOffer(S.market,4*T,8.05*T,null);
+  drawOffer(S.market,(MKT[0]+0.5)*T,(MKT[1]-1.95)*T,null);
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
-    const O=GOBJ[k],X=O.x*T,Y=10*T;
+    const O=GOBJ[k],X=O.x*T,Y=GROW*T;
     ctx.fillStyle=O.col;rr(X+2,Y+2,T-4,T-4,10);ctx.fill();
     ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.5;ctx.stroke();
     emoji(O.e,X+T/2,Y+T*0.44,24);
     text(O.n,X+T/2,Y+T*0.86,10,'#fff',800);
     O.items.forEach((id,j)=>{ctx.fillStyle='rgba(255,255,255,.9)';ctx.beginPath();ctx.arc(X+T-8-j*13,Y+8,6.5,0,7);ctx.fill();emoji(ING[id].e,X+T-8-j*13,Y+8.5,9)});
   }
-  // customers
-  S.cust.forEach((c,k)=>{
-    // order bubble: just the dish
-    const R=RECIPES[c.order],X=(8+k)*T+T/2,top=7.3*T,bh=38;
-    ctx.fillStyle='#fff';rr(X-21,top,42,bh,9);ctx.fill();
-    ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
-    emoji(R.e,X,top+bh/2,26);
-    const Y=top+bh+24;
-    ctx.fillStyle=`hsl(${c.hue} 45% 62%)`;ctx.beginPath();ctx.arc(X,Y,13,0,7);ctx.fill();
-    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(X-5,Y-3,2,0,7);ctx.arc(X+5,Y-3,2,0,7);ctx.fill();
-    const f=c.pat/c.max;bar(X-17,Y+15,34,f,f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d');
-  });
-  if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,10.95*T+T/2,13,'#1d2a20',800);
+  drawQueueMat();
+  drawTables();
+  drawCustomers();
+  if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(GH-0.5)*T,13,'#1d2a20',800);
+}
+function drawQueueMat(){
+  ctx.fillStyle='rgba(255,255,255,.18)';rr(QX*T+2,QY*T+4,QMAX*T-4,T-8,10);ctx.fill();
+  text('待ち列',(QX+QMAX/2)*T,QY*T-6,11,'#1d2a20',800);
+  text('入口 ←',(GW-0.2)*T,(QY+1.25)*T,11,'#1d2a20',800,'right');
+}
+function drawTables(){
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){
+    if(S.map[y][x].t!=='table')continue;
+    const X=x*T+T/2,Y=y*T+T/2;
+    ctx.fillStyle='rgba(0,0,0,.15)';ctx.beginPath();ctx.ellipse(X,Y+T*0.36,T*0.42,7,0,0,7);ctx.fill();
+    ctx.fillStyle='#8a5a34';ctx.fillRect(X-3,Y+2,6,T*0.34);
+    ctx.fillStyle='#c98b52';ctx.beginPath();ctx.ellipse(X,Y+2,T*0.44,T*0.26,0,0,7);ctx.fill();
+    ctx.strokeStyle='#8a5a34';ctx.lineWidth=2;ctx.stroke();
+  }
+}
+function drawCustBody(X,Y,c){
+  ctx.fillStyle=`hsl(${c.hue} 45% 62%)`;ctx.beginPath();ctx.arc(X,Y,13,0,7);ctx.fill();
+  ctx.fillStyle='#222';ctx.beginPath();ctx.arc(X-5,Y-3,2,0,7);ctx.arc(X+5,Y-3,2,0,7);ctx.fill();
+}
+function drawCustomers(){
+  for(const c of S.cust){
+    const [px,py]=custPos(c),X=px*T,f=c.pat/c.max,col=f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d';
+    if(c.st==='seat'||c.st==='eat'){
+      const Y=py*T-T*0.42;
+      drawCustBody(X,Y,c);
+      // order bubble above the table (a happy face while eating)
+      const top=Y-58,bh=36;
+      ctx.fillStyle='#fff';rr(X-20,top,40,bh,9);ctx.fill();
+      ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
+      emoji(c.st==='eat'?'😋':RECIPES[c.order].e,X,top+bh/2,24);
+      if(c.st==='seat')bar(X-17,Y+15,34,f,col);
+      continue}
+    const Y=py*T;
+    drawCustBody(X,Y,c);
+    bar(X-17,Y+15,34,f,col);
+  }
 }
 function drawLayoutGround(){
   ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,7*T);
-  ctx.fillStyle='#a7b77f';ctx.fillRect(0,6.6*T,GW*T,5.4*T);
-  ctx.fillStyle='#7f9460';ctx.fillRect(0,11*T,GW*T,T);
+  ctx.fillStyle='#a7b77f';ctx.fillRect(0,6.6*T,GW*T,(GH-6.6)*T);
+  ctx.fillStyle='#7f9460';ctx.fillRect(0,(GH-1)*T,GW*T,T);
+  // the plaza where tables can go
+  ctx.strokeStyle='rgba(29,42,32,.35)';ctx.lineWidth=2;ctx.setLineDash([6,5]);
+  rr(TBL_ZONE.x0*T+2,TBL_ZONE.y0*T+2,(TBL_ZONE.x1-TBL_ZONE.x0+1)*T-4,(TBL_ZONE.y1-TBL_ZONE.y0+1)*T-4,12);ctx.stroke();ctx.setLineDash([]);
+  text('テーブル置き場',(TBL_ZONE.x0+0.2)*T,TBL_ZONE.y0*T+14,11,'rgba(29,42,32,.6)',800,'left');
+  drawQueueMat();
+  drawTables();
   drawGroundItems();
-  text(S.timer>0?'器具・台・菜園は床に、じょうろとカゴは台の上に。いらない物は外に置いておける':'時間切れ。置き終わったら準備完了',GW*T/2,11.5*T,13,'#1d2a20',800);
+  text(S.timer>0?'器具・台・菜園は床に、じょうろとカゴは台の上に、テーブルは広場に。いらない物は外に置いておける':'時間切れ。置き終わったら準備完了',GW*T/2,(GH-0.5)*T,13,'#1d2a20',800);
 }
 function drawGroundItems(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){
@@ -1676,7 +1752,7 @@ let idleOff=0;
 function drawRoadIdle(){
   ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,GH*T);
   ctx.fillStyle='#3a4248';ctx.fillRect(0,6.6*T,GW*T,0.6*T);
-  ctx.fillStyle='#4f7044';ctx.fillRect(0,7.2*T,GW*T,4.8*T);
+  ctx.fillStyle='#4f7044';ctx.fillRect(0,7.2*T,GW*T,(GH-7.2)*T);
   ctx.fillStyle='#e8e2c8';const off=idleOff%2;for(let x=-2;x<GW+2;x+=2)ctx.fillRect((x-off)*T,6.85*T,T*0.9,4);
   ctx.fillStyle='#e9a92c';rr(T,T,15*T,6*T-10,12);ctx.fill();
   drawTruckShell();
@@ -1728,7 +1804,7 @@ function renderHud(){
     const stepTxt=i=>ING[i].e+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
     info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>RECIPES[r].e+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${ING[id].e}${n}</span>`}).join(' ');
-    if(S.phase==='stop'&&S.cust.length)info+='　<b>注文：</b>'+S.cust.map(c=>RECIPES[c.order].e).join(' ');
+    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>RECIPES[c.order].e).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
     if(S.phase==='drive'){
       const ahead=S.shops.filter(s=>s.x+2+WMARGIN>3.5);
       info+=`　<span class="dim">｜この先のお店 あと${ahead.length}軒</span>`;
@@ -1737,7 +1813,7 @@ function renderHud(){
   }
   if(S.phase==='layout'){
     const left=layoutLeft(), bad=unreachable().length, door=S.map[DOOR_FRONT[1]][DOOR_FRONT[0]].t!=='floor';
-    info=`<b>キッチンのレイアウト</b>　調理器具・台（カウンター）・菜園はトラックの床に、じょうろとカゴは台の上に置きます。置いた物も持ち直せます。<br>`+
+    info=`<b>キッチンのレイアウト</b>　調理器具・台（カウンター）・菜園はトラックの床に、じょうろとカゴは台の上に、テーブルは外の広場に置きます。置いた物も持ち直せます。<br>`+
       (door?`<span class="ng">ドアの前はあけておく</span>`:bad?`<span class="ng">手が届かない器具 ${bad}個（赤い枠）</span>`:`<span class="ok">「準備完了」で出発できます</span>`)+
       (left?`　<span class="dim">外に置いたままの ${left}個は持って行かず、次の配置のときにまた外に出ます</span>`:'')+
       upInfo()+
@@ -1755,7 +1831,7 @@ const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:
   mySlot:0,seq:0,ovId:0,ovHtml:'',ovSentAt:0,snapT:0,mirror:false,hostPeer:null,wantOv:0,ovParts:{},shownOv:-1,
   pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
 const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
-const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve'];
+const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table'];
 const OFFER_K=['pack','seed','mystery','equip','fuel'];
 const r2=v=>Math.round(v*100)/100;
 (async function initNet(){
@@ -1888,6 +1964,8 @@ function encItem(it){
   return 0;
 }
 const encOffer=o=>[OFFER_K.indexOf(o.type),o.type==='equip'?EQ_K.indexOf(o.id):o.id?ING_K.indexOf(o.id):-1,o.qty||0,o.price,o.sold?1:0,o.pro||0];
+const CST_K=['wait','follow','seat','eat'];
+function tablesList(){const a=[];for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table')a.push([x,y]);return a}
 function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
@@ -1904,11 +1982,11 @@ function sendSnap(){
     tw:S.town?[S.town.id,Math.round(S.town.pay*100)]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100)]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap].map(r2),
     sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,
-    mp:tiles,gr:ground,
+    mp:tiles,gr:ground,tb:tablesList(),
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0]),
-    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue]),
+    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
@@ -2029,7 +2107,8 @@ function applySnap(d){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
     S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6])};
   }
-  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='ground')S.map[y][x].item=null;
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
+  for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:null}}
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
   S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,4).map((a,i)=>{
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
@@ -2038,7 +2117,7 @@ function applySnap(d){
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
-  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2])}));
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6])}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));

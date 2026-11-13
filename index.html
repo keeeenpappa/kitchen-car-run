@@ -113,7 +113,9 @@ body.touch .narrow{display:none}
 #bPick{width:76px;height:76px;font-size:15px}
 #bAct{width:76px;height:76px;font-size:15px}
 #bSw{width:56px;height:56px;font-size:13px;justify-self:end}
-#bSkill{width:56px;height:56px;font-size:12px;justify-self:end;border-color:rgba(255,216,74,.7)}
+#bSkill{width:56px;height:56px;font-size:22px;justify-self:end;border:3px solid transparent;background:linear-gradient(rgba(33,52,60,.75),rgba(33,52,60,.75)) padding-box,conic-gradient(#ffd84a var(--f,100%),rgba(157,179,180,.35) 0) border-box}
+#bSkill.act{background:linear-gradient(rgba(243,183,58,.75),rgba(243,183,58,.75)) padding-box,conic-gradient(#fff var(--f,100%),rgba(255,255,255,.25) 0) border-box}
+#bSkill.cd{opacity:.6}
 #bPause{width:44px;height:44px;font-size:14px;justify-self:end}
 @media (pointer:coarse) and (orientation:landscape){
   body.touch header,body.touch .help{display:none}
@@ -666,9 +668,9 @@ const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd
 const skillOf=p=>SKILLS.knife;
 function useSkill(p){
   const K=skillOf(p);if(!K)return;
-  if((p.skT||0)>0){say(p,K.n+'：発動中');return}
+  if((p.skT||0)>0)return;
   if((p.skCD||0)>0){say(p,'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
-  p.skT=K.dur;p.skCD=K.cd;say(p,K.e+' '+K.n+'！ '+K.d+'（'+K.dur+'秒）');sfx('skill');
+  p.skT=K.dur;p.skCD=K.cd;sfx('skill');
 }
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
@@ -2418,7 +2420,7 @@ function drawPlayers(){
     ctx.font=`800 10px ${FNT}`;const lw=ctx.measureText(lab).width+10;
     ctx.fillStyle=PCOL[p.i];rr(X-lw/2,Y-45,lw,14,7);ctx.fill();
     text(lab,X,Y-38,10,'#fff',800);
-    drawSkillBadge(p,X+lw/2+11,Y-38);
+    if(!phoneView())drawSkillBadge(p,X+lw/2+11,Y-38);
     if(p.hold&&p.hold.kind==='basket'&&!(p.msgT>0)&&!p.seat){
       // what is in the basket, large, above the name tag (it does not cover the chef)
       const b=p.hold,cap=basketCap(b),ic=b.items.slice(0,6),t2=b.items.length+'/'+cap;
@@ -2604,7 +2606,9 @@ function updateCam(dt){
 // phone: the camera doesn't show the road ahead, so the next shops (and what they sell) are listed at the top while driving
 function drawUpcomingPhone(){
   if(S.phase!=='drive')return;
-  const lp=localP();if(lp){const c=tile(lp.tx,lp.ty);if(c&&c.t==='window'&&shopAtWindow(lp.tx))return}   // the big list is up instead
+  const lp=localP();if(!lp)return;{const c=tile(lp.tx,lp.ty);if(c&&c.t==='window'&&shopAtWindow(lp.tx))return}   // the big list is up instead
+  // only near a window (shopping), so they never cover the stations while cooking
+  if(lp.seat||!nearWindow(lp))return;
   // the same shops, for the same time, as the full view shows on the road: from when one comes into sight until it is gone,
   // left to right in road order (so the first one is the one at the back)
   const list=S.shops.filter(s=>!s.fade&&s.x*T<=GW*T+4&&(s.x+2)*T>=-4).sort((a,b)=>a.x-b.x).slice(0,3);
@@ -2625,6 +2629,7 @@ function drawUpcomingPhone(){
     x+=w+8;
   }
 }
+const nearWindow=p=>{for(let y=1;y<=7;y++)for(let x=1;x<=16;x++)if(S.map[y][x].t==='window'&&Math.abs(x+0.5-p.x)<=2.6&&Math.abs(y+0.5-p.y)<=1.6)return true;return false};
 // a tiny roadside stall: striped awning in the shop's colour over a counter with its sign
 function miniStall(x,y,col,icon){
   const w=28;
@@ -2922,6 +2927,9 @@ function renderHud(){
   if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info='<b style="color:#ffd84a">強化</b>　'+gl.join('　')+'<br>'+info;
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
+  {const lp=localP(),K=lp&&skillOf(lp),bs=document.getElementById('bSkill');if(bs&&K){const act=(lp.skT||0)>0,cd=(lp.skCD||0)>0&&!act;
+    bs.textContent=K.e;bs.classList.toggle('act',act);bs.classList.toggle('cd',cd);
+    bs.style.setProperty('--f',act?Math.round(lp.skT/K.dur*100)+'%':cd?Math.round((1-lp.skCD/K.cd)*100)+'%':'100%')}}
   infoBtn.hidden=!(phoneView()&&ov.hidden);infoBtn.classList.toggle('on',PHONE_INFO);
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}

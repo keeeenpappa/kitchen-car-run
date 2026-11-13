@@ -51,6 +51,11 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 #readyBtn{position:absolute;bottom:4%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
   background-image:linear-gradient(90deg,rgba(255,255,255,.65) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
 .money{display:flex;align-items:baseline;justify-content:center;gap:.4em;margin:.2em 0 .5em;font-weight:800;color:#ffe08a}.money .mk{font-size:1em;color:#cfe0e2}.money .mv{font-size:2.4em;line-height:1;text-shadow:0 2px 0 rgba(0,0,0,.35)}.money .mx{font-size:1em;color:#ff9c9c;margin-left:.8em}
+.skl-lab{align-self:flex-start;min-width:9em;padding-top:10px}
+.skl-col{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.skl-btn{display:grid;grid-template-columns:3.2em 8.5em minmax(0,1fr);align-items:center;gap:8px;text-align:left;width:100%;padding:8px 12px}
+.skl-btn .skl-n{white-space:nowrap}
+.skl-btn .skl-d{font-weight:400;font-size:.88em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
 #readyBtn[hidden]{display:none}
@@ -683,8 +688,9 @@ try{const v=JSON.parse(localStorage.getItem('kcr-skill')||'null');if(Array.isArr
 function cycleSkill(i){PSKILL[i]=SKILL_K[(SKILL_K.indexOf(PSKILL[i])+1)%SKILL_K.length];try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
 function skillRowInner(){
   const n=NET.role!=='off'?1:4;
-  return '<span style="align-self:center;min-width:9em">スキル</span>'+Array.from({length:n},(_,i)=>{const K=SKILLS[PSKILL[i]];
-    return `<button class="ovbtn" data-act="skl" data-v="${i}">${NET.role!=='off'?'この端末':'P'+(i+1)}：${K.e}${K.n}（${K.d}）</button>`}).join('');
+  // one player per line, all the same width, so the button never moves when the text changes
+  return '<span class="skl-lab">スキル</span><div class="skl-col">'+Array.from({length:n},(_,i)=>{const K=SKILLS[PSKILL[i]];
+    return `<button class="ovbtn skl-btn" data-act="skl" data-v="${i}"><b>${NET.role!=='off'?'この端末':'P'+(i+1)}</b><span class="skl-n">${K.e} ${K.n}</span><span class="skl-d">${K.d}</span></button>`}).join('')+'</div>';
 }
 const skillRow=()=>`<div class="row" id="skillRow">${skillRowInner()}</div>`;
 // instant skills; returns false when it would do nothing (the skill is kept)
@@ -3654,7 +3660,7 @@ function auState(dt){
     eng=0.09;L.engOsc.frequency.setTargetAtTime(40+v*16,now,0.3);L.engLfo.frequency.setTargetAtTime(7+v*5,now,0.3);
   }
   L.siz.gain.setTargetAtTime(siz?0.05*Math.min(1.6,Math.sqrt(siz)):0,now,0.08);
-  L.bl.gain.setTargetAtTime(bl?0.07:0,now,0.06);
+  L.bl.gain.setTargetAtTime(bl?0.035:0,now,0.06);
   L.eng.gain.setTargetAtTime(eng,now,0.25);
 }
 function auFrame(dt){

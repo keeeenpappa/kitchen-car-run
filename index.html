@@ -667,7 +667,8 @@ function say(p,m){p.msg=m;p.msgT=1.6}
 const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
   grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45},
   dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
-  wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40}};
+  wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
+  smile:{n:'看板娘',e:'💖',d:'列で待っているお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -680,10 +681,20 @@ function skillRowInner(){
     return `<button class="ovbtn" data-act="skl" data-v="${i}">${NET.role!=='off'?'この端末':'P'+(i+1)}：${K.e}${K.n}（${K.d}）</button>`}).join('');
 }
 const skillRow=()=>`<div class="row" id="skillRow">${skillRowInner()}</div>`;
-function useSkill(p){
+// instant skills; returns false when it would do nothing (the skill is kept)
+function skillNow(p,K){
+  if(K===SKILLS.smile){
+    const w=S.phase==='stop'?waiting():[];
+    if(!w.length){say(p,'列で待っているお客さんがいない');return false}
+    for(const c of w){c.pat=c.max;const [x,y]=custPos(c);float(x,y-0.7,'💖','#ffb3c8')}
+    return true}
+  return true;
+}function useSkill(p){
   const K=skillOf(p);if(!K)return;
   if((p.skT||0)>0)return;
   if((p.skCD||0)>0){say(p,'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
+  // an instant skill: works at once (and is not used up when there is nothing to do)
+  if(K.now&&!skillNow(p,K))return;
   p.skT=K.dur;p.skCD=K.cd;sfx('skill');
 }
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons

@@ -364,7 +364,7 @@ function newRun(np,mode){
 }
 function rebuildStations(){
   S.stations=[];
-  S.map.forEach(r=>r.forEach(c=>{if(['stove','blender','planter'].includes(c.t))S.stations.push(c)}));
+  S.map.forEach((r,y)=>r.forEach((c,x)=>{if(['stove','blender','planter'].includes(c.t)){c._x=x;c._y=y;S.stations.push(c)}}));
 }
 // ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
 const MOVABLE=['fridge','seedbox','sink','board','stove','blender','plates','trash'];
@@ -665,7 +665,7 @@ function bringInside(){
 function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
 const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
-  grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45},
+  grow:{n:'畑のおばあちゃん',e:'🌱',d:'自分のまわり2マスの菜園で苗の育つ速さ2倍',dur:15,cd:45},
   dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
   wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
   smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
@@ -1454,11 +1454,13 @@ function update(dt){
     const e=Math.min(1,S.arrT/1.8);S.roadOff+=SPEEDS[1]*(1-e)*(1-e)*dt;S.arrT+=dt;
     for(const f of S.floats)f.t+=dt;return}
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
-  const growBoost=S.players.some(q=>(q.skT||0)>0&&q.skill==='grow')?2:1;
+  // only planters within 2 tiles (across, down or diagonally) of a grandma with her skill working
+  const growers=S.players.filter(q=>(q.skT||0)>0&&q.skill==='grow');
+  const growBoost=c=>growers.some(q=>Math.max(Math.abs(Math.floor(q.x)-c._x),Math.abs(Math.floor(q.y)-c._y))<=2)?2:1;
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     const it=c.item; if(!it||it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){

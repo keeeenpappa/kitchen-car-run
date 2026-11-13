@@ -113,6 +113,7 @@ body.touch .narrow{display:none}
 #bPick{width:76px;height:76px;font-size:15px}
 #bAct{width:76px;height:76px;font-size:15px}
 #bSw{width:56px;height:56px;font-size:13px;justify-self:end}
+#bSkill{width:56px;height:56px;font-size:12px;justify-self:end;border-color:rgba(255,216,74,.7)}
 #bPause{width:44px;height:44px;font-size:14px;justify-self:end}
 @media (pointer:coarse) and (orientation:landscape){
   body.touch header,body.touch .help{display:none}
@@ -148,6 +149,7 @@ body.touch .pconly{display:none}
     <div id="joy" class="tc" aria-label="移動スティック"><div id="knob"></div></div>
     <div id="btns" class="tc">
       <button id="bPause" class="tb" type="button" aria-label="一時停止">⏸</button>
+      <button id="bSkill" class="tb" type="button">スキル</button>
       <button id="bSw" class="tb" type="button">切替</button>
       <button id="bAct" class="tb" type="button">作業</button>
       <button id="bPick" class="tb" type="button">持つ</button>
@@ -545,8 +547,8 @@ function furnPick(p,c,tx,ty){
 // ---------- input ----------
 const held=new Set(), pressed=new Set();
 const KB=[
-  {up:['KeyW'],down:['KeyS'],left:['KeyA'],right:['KeyD'],pick:['Space','KeyE'],act:['KeyF'],sw:['KeyQ']},
-  {up:['ArrowUp'],down:['ArrowDown'],left:['ArrowLeft'],right:['ArrowRight'],pick:['Slash','Enter'],act:['Period','ShiftRight'],sw:['Comma']},
+  {up:['KeyW'],down:['KeyS'],left:['KeyA'],right:['KeyD'],pick:['Space','KeyE'],act:['KeyF'],sw:['KeyQ'],sk:['KeyR']},
+  {up:['ArrowUp'],down:['ArrowDown'],left:['ArrowLeft'],right:['ArrowRight'],pick:['Slash','Enter'],act:['Period','ShiftRight'],sw:['Comma'],sk:['Semicolon']},
 ];
 const GAMEKEYS=new Set(KB.flatMap(k=>Object.values(k).flat()).concat(['Escape','KeyP']));
 addEventListener('keydown',e=>{
@@ -566,7 +568,7 @@ function pollPads(){
   for(let i=0;i<4;i++){
     const gp=PADGP[i]; if(!gp){pads[i]=null;continue}
     const b=k=>!!(gp.buttons[k]&&gp.buttons[k].pressed);
-    const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(5)||b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
+    const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(3),sk:b(5),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
     const prev=padPrev[gp.index]||{};
     pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0,gp};
     padPrev[gp.index]=now;
@@ -579,7 +581,7 @@ function pollPads(){
   }
 }
 // touch (drives P1)
-const touch={mx:0,my:0,pick:false,act:false,sw:false,pause:false};
+const touch={mx:0,my:0,pick:false,act:false,sw:false,sk:false,pause:false};
 const isTouch=('ontouchstart' in window)||(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
 if(isTouch)document.body.classList.add('touch');
 (function setupTouch(){
@@ -601,6 +603,7 @@ if(isTouch)document.body.classList.add('touch');
   btn('bPick',()=>touch.pick=true);
   btn('bAct',()=>touch.act=true,()=>touch.act=false);
   btn('bSw',()=>touch.sw=true);
+  btn('bSkill',()=>touch.sk=true);
   btn('bPause',()=>touch.pause=true);
 })();
 // online: this device is one player, so both key sets drive it; remote players come from the room
@@ -610,26 +613,26 @@ function readInput(i){
 }
 function deviceInput(){
   const a=baseInput(0),b=baseInput(1,true);
-  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw};
+  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw,sk:a.sk||b.sk};
 }
 function baseInput(i,keysOnly){
-  let mx=0,my=0,pick=false,act=false,sw=false;
-  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw}
+  let mx=0,my=0,pick=false,act=false,sw=false,sk=false;
+  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw;sk=touch.sk}
   const k=KB[i];
   if(k){
     const h=a=>a.some(c=>held.has(c)), p=a=>a.some(c=>pressed.has(c));
     if(h(k.up))my-=1; if(h(k.down))my+=1; if(h(k.left))mx-=1; if(h(k.right))mx+=1;
-    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw);
+    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw); sk=sk||p(k.sk);
     if(mx||my||pick||act||sw)LASTIN[i]='kb';
   }
   const ps=keysOnly?null:pads[i];
   if(ps){
     if(Math.abs(ps.ax)>0.3)mx+=ps.ax; if(Math.abs(ps.ay)>0.3)my+=ps.ay;
     if(ps.now.l)mx-=1; if(ps.now.r)mx+=1; if(ps.now.u)my-=1; if(ps.now.d)my+=1;
-    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw');
+    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw'); sk=sk||ps.edge('sk');
     if(Math.abs(ps.ax)>0.3||Math.abs(ps.ay)>0.3||ps.now.a||ps.now.x||ps.now.sw||ps.now.l||ps.now.r||ps.now.u||ps.now.d)LASTIN[i]='pad';
   }
-  return {mx,my,pick,act,sw};
+  return {mx,my,pick,act,sw,sk};
 }
 
 // ---------- collision ----------
@@ -658,14 +661,23 @@ function bringInside(){
 
 // ---------- feedback ----------
 function say(p,m){p.msg=m;p.msgT=1.6}
+// ---------- skills (test version: every chef is 包丁職人) ----------
+const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40}};
+const skillOf=p=>SKILLS.knife;
+function useSkill(p){
+  const K=skillOf(p);if(!K)return;
+  if((p.skT||0)>0){say(p,K.n+'：発動中');return}
+  if((p.skCD||0)>0){say(p,'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
+  p.skT=K.dur;p.skCD=K.cd;say(p,K.e+' '+K.n+'！ '+K.d+'（'+K.dur+'秒）');sfx('skill');
+}
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
 const DEVK={
-  kb0:{pick:'Space',act:'F',sw:'Q',menu:'Esc',ready:'R',ok:'Space',move:'WASD'},
-  kb1:{pick:'/',act:'.',sw:',',menu:'Esc',ready:'R',ok:'Space',move:'矢印'},
-  xbox:{pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A',move:'十字'},
-  ns:{pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B',move:'十字'},
-  ps:{pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×',move:'十字'},
+  kb0:{sk:'R',pick:'Space',act:'F',sw:'Q',menu:'Esc',ready:'R',ok:'Space',move:'WASD'},
+  kb1:{sk:';',pick:'/',act:'.',sw:',',menu:'Esc',ready:'R',ok:'Space',move:'矢印'},
+  xbox:{sk:'RB',pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A',move:'十字'},
+  ns:{sk:'R',pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B',move:'十字'},
+  ps:{sk:'R1',pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×',move:'十字'},
 };
 const DEVN={auto:'自動',kb:'キーボード',xbox:'Xbox',ns:'Switchプロコン',ps:'PlayStation'};
 let DEVPREF=['auto','auto','auto','auto'];
@@ -696,7 +708,7 @@ function devRowInner(){
     return `<button class="ovbtn" data-act="dev" data-v="${i}">${NET.role!=='off'?'この端末':'P'+(i+1)}：${pr==='auto'?'自動（'+DEVN[cur==='kb'?'kb':cur]+'）':DEVN[pr]}</button>`}).join('');
 }
 const devRow=()=>`<div class="row" id="devRow">${devRowInner()}</div>`;
-const BTN_N={pick:'持つ',act:'作業',sw:'切替'};
+const BTN_N={pick:'持つ',act:'作業',sw:'切替',sk:'スキル'};
 // action name first, then the key: 入れる（Space）, 購入（F長押し）
 function AL(p,k,label,hold){
   const key=(isTouch&&(NET.role!=='off'||!p||p.i===0))?BTN_N[k]:keyName(devSlot(p),k);
@@ -915,7 +927,7 @@ function doAct(p,c,tx,ty,dt){
   const key=tx+','+ty;
   if(p.actKey!==key){p.actKey=key;p.actT=0}
   if(p.lock)return;
-  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1);if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
     p.actT+=dt;if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
@@ -1274,10 +1286,10 @@ function showTitle(){
   S=null;
   showOv(`<div class="box"><h2>ドコドコ・キッチンカー</h2>
     <p>キッチンカーで町から町へ。走っている間は窓口で通りすがりのお店から仕入れ、町に着いたら料理を出して稼ぎます。4つの町を回りきれば完走です。</p>
-    <table class="ctl pconly"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th></tr>
-    <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td></tr>
-    <tr><td>P2</td><td>矢印キー</td><td><kbd>/</kbd> か <kbd>Enter</kbd></td><td><kbd>.</kbd></td><td><kbd>,</kbd></td></tr>
-    <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td></tr></table>
+    <table class="ctl pconly"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th><th>スキル</th></tr>
+    <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td><td><kbd>R</kbd></td></tr>
+    <tr><td>P2</td><td>矢印キー</td><td><kbd>/</kbd> か <kbd>Enter</kbd></td><td><kbd>.</kbd></td><td><kbd>,</kbd></td><td><kbd>;</kbd></td></tr>
+    <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td><td>RB ／ R1 ／ R</td></tr></table>
     <p class="sub pconly" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
     ${sndRow()}
@@ -1412,6 +1424,8 @@ function update(dt){
   // players
   S.players.forEach((p,i)=>{
     const inp=readInput(i);
+    p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);
+    if(inp.sk&&(S.phase==='drive'||S.phase==='stop'))useSkill(p);
     if(p.menu){const h0=p.hold,s0=p.menu.sel;menuInput(p,inp,dt);if(p.hold!==h0)sfx('pick');else if(p.menu&&p.menu.sel!==s0)sfx('tick');p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     if(p.mk){const c0=p.cur;marketInput(p,inp,dt);if(p.mk&&p.cur!==c0)sfx('tick');if(p.msgT>0)p.msgT-=dt;return}
     if(p.g){gatherInput(p,inp,dt);p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
@@ -2404,6 +2418,7 @@ function drawPlayers(){
     ctx.font=`800 10px ${FNT}`;const lw=ctx.measureText(lab).width+10;
     ctx.fillStyle=PCOL[p.i];rr(X-lw/2,Y-45,lw,14,7);ctx.fill();
     text(lab,X,Y-38,10,'#fff',800);
+    drawSkillBadge(p,X+lw/2+11,Y-38);
     if(p.hold&&p.hold.kind==='basket'&&!(p.msgT>0)&&!p.seat){
       // what is in the basket, large, above the name tag (it does not cover the chef)
       const b=p.hold,cap=basketCap(b),ic=b.items.slice(0,6),t2=b.items.length+'/'+cap;
@@ -2435,6 +2450,16 @@ function drawClosing(){
     ctx.fillStyle=n<=3?'#ff4d4d':'#fff';ctx.fillText(String(n),0,0);
     ctx.restore();
   }
+}
+// the skill next to the name tag: lit and ringed while it works, a filling clock while it recharges, bright when ready
+function drawSkillBadge(p,x,y){
+  const K=skillOf(p);if(!K)return;
+  const act=(p.skT||0)>0,cd=(p.skCD||0)>0&&!act,r=9;
+  ctx.fillStyle=act?'#ffd84a':cd?'rgba(30,40,46,.9)':'rgba(16,26,30,.9)';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+  if(act){const a=(S.t*6)%(Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r+2.5,a,a+Math.PI*2*(p.skT/K.dur));ctx.stroke()}
+  else if(cd){const f=1-p.skCD/K.cd;ctx.fillStyle='rgba(255,216,74,.45)';ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*f);ctx.closePath();ctx.fill()}
+  else{ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.stroke()}
+  ctx.globalAlpha=cd?0.5:1;emoji(K.e,x,y+0.5,11);ctx.globalAlpha=1;
 }
 // online: friends who joined mid-game wait here (small chefs) until the town's service is over
 function drawWaiting(){
@@ -3006,7 +3031,7 @@ function bindSlot(p,k){
   const pr=p.presence||{};
   for(const peer in NET.slots)if(NET.slots[peer]===k)delete NET.slots[peer];
   NET.slots[p.peer]=k;if(typeof pr.uid==='string')NET.uidSlot[pr.uid]=k;
-  NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0;
+  NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;(NET.lastSk=NET.lastSk||[])[k]=pr.in?+pr.in[5]||0:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0;
 }
 // a free spot on the truck floor near the slot's start position
 function spawnSpot(k){
@@ -3040,11 +3065,12 @@ function hostRoster(){
   S.waitN=Math.min(NET.waiting.length,4-S.players.length);
 }
 function remoteInput(i){
-  const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false};
-  const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i];
-  NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];
+  const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false,sk:false};
+  NET.lastSk=NET.lastSk||[];
+  const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i], sk=(+r[5]||0)!==(NET.lastSk[i]||0);
+  NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];NET.lastSk[i]=+r[5]||0;
   const cl=v=>Math.max(-1,Math.min(1,+v||0));
-  return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw};
+  return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk};
 }
 const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
 function guestAction(a,v){
@@ -3064,7 +3090,7 @@ function hostFrame(dt){
     if(Array.isArray(pr.oc)&&pr.oc[0]!==NET.lastOc[p.peer]){NET.lastOc[p.peer]=pr.oc[0];guestAction(String(pr.oc[1]),pr.oc[2])}
   }
   // presses made while a screen was up are dropped
-  if(!ov.hidden||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4]}});
+  if(!ov.hidden||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];(NET.lastSk=NET.lastSk||[])[i]=+r[5]||0}});
   if(!S)return;
   hostRoster();
   NET.snapT-=dt; if(NET.snapT<=0){NET.snapT=1/15;sendSnap()}
@@ -3115,7 +3141,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10)]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -3170,7 +3196,8 @@ function guestFrame(dt){
     else overlayInput();
   }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw]:[0,0,0,NET.pk,NET.sw];
+  if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0]:[0,0,0,NET.pk,NET.sw,NET.sk||0];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state
@@ -3257,7 +3284,7 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));
@@ -3430,6 +3457,7 @@ const SFX={
   clock:t=>osc(t,1568,0.05,'square',.06),
   scrub:t=>{noise(t,0.07,.16,'bandpass',1800+rnd(1400),2.5);noise(t+0.02,0.05,.05,'highpass',6000)},
   washed:t=>{for(let k=0;k<3;k++)osc(t+k*0.05,700+rnd(400),0.06,'sine',.14,0,1500);osc(t+0.17,2200,0.08,'sine',.12,0,3000);osc(t+0.25,3100,0.12,'sine',.1)},
+  skill:t=>{arp(t,[67,74,79,86],0.05,'square',.09,0.3);noise(t,0.25,.12,'highpass',5000,1,0,9000)},
   clock3:t=>{osc(t,2093,0.09,'square',.09);osc(t,1047,0.09,'triangle',.12)},
 };
 const SND_K=Object.keys(SFX);
@@ -3570,7 +3598,7 @@ function frame(now){
   if(S)updateCam(dt);
   draw();
   hudT-=dt;if(hudT<=0){renderHud();hudT=0.1}
-  pressed.clear();touch.pick=false;touch.sw=false;touch.pause=false;
+  pressed.clear();touch.pick=false;touch.sw=false;touch.sk=false;touch.pause=false;
   requestAnimationFrame(frame);
 }
 showTitle();

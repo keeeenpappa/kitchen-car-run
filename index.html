@@ -665,7 +665,8 @@ function bringInside(){
 function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
 const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
-  grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45}};
+  grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45},
+  dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -1450,12 +1451,13 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*dt,vy=inp.my/k*4.2*S.up.speed*dt;
+      const run=(p.skT||0)>0&&p.skill==='dash'?1.5:1;   // はやあし's skill
+      const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);
       if(okX)p.x+=vx; if(okY)p.y+=vy;
       // blocked going straight: if the next tile's middle (or the neighbour's) is open, ease sideways into line with it
-      const sp=4.2*S.up.speed*dt;
+      const sp=4.2*S.up.speed*run*dt;
       const ease=(pos,other,mv,alongX)=>{
         const cs=[DOOR_FRONT[0]+0.5];   // only the door: elsewhere the player is never pushed sideways
         if(!alongX||other<4.5||other>8.5)return 0;

@@ -509,7 +509,7 @@ function furnPick(p,c,tx,ty){
     if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){if(!tableOK(tx,ty)){say(p,'となりにテーブルがある（お客さんが座る場所）');return true}S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
     if(inTruck(tx,ty)){say(p,'テーブルは外の広場に置く');return true}
   }
-  if(lay&&c.t==='table'&&c.item&&c.item.kind==='dirty'){if(!h){p.hold={kind:'dirty',cnt:1};c.item=null;sfx('pick')}else say(p,'手を空けて汚れた皿を持つ');return true}
+  if(lay&&c.t==='table'&&c.item&&c.item.kind==='dirty'){if(!h){p.hold=c.item;c.item=null;sfx('pick')}else if(h.kind==='dirty'){c.item.cnt=(c.item.cnt||1)+(h.cnt||1);p.hold=null;sfx('put')}else say(p,'手を空けて汚れた皿を持つ');return true}
   if(lay&&!h&&c.t==='table'){p.hold={kind:'station',st:'table'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
@@ -671,6 +671,7 @@ const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd
   smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
   forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
   haggle:{n:'値切り上手',e:'💰',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45},
+  tray:{n:'お盆じょうず',e:'🍱',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   boost:{n:'ひとっ走り',e:'🚀',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
@@ -788,6 +789,8 @@ function accepts(c,h){
   if(c.t==='blender')return nextStep(h)==='blend';
   return false;
 }
+const isDish=x=>!!x&&x.kind==='plate'&&!x.bare&&x.items.length>0;
+const canTray=p=>(p.skT||0)>0&&p.skill==='tray';
 const emptyPlate=x=>!!x&&x.kind==='plate'&&!x.bare&&!x.items.length;
 const canAdd=(pl,it)=>it.kind==='ing'&&isDone(it)&&!it.burnt&&pl.items.length<3;
 function placeOrTake(p,c){
@@ -795,7 +798,10 @@ function placeOrTake(p,c){
   // a counter holds one plate: empty plates only stack on the plate stand
   if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&it&&emptyPlate(h)&&emptyPlate(it)){say(p,'台には1枚だけ（重ねるのは皿置き場）');return}
+  if(h&&it&&h.kind==='dirty'&&it.kind==='dirty'){it.cnt=(it.cnt||1)+(h.cnt||1);p.hold=null;return}   // dirty plates stack (and are carried as a pile)
   if(h&&it&&(h.kind==='dirty'||it.kind==='dirty')){say(p,h.kind==='dirty'?'汚れた皿はシンクへ':'汚れた皿がある');return}
+  // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
+  if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
     if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0}
     else if(c.t==='board')say(p,'切らなくていい');
@@ -899,13 +905,16 @@ function doPick(p,c,tx,ty){
       if(!g){
         // a dirty plate left by the last customer: carry it away (one at a time) before anyone sits here
         if(c.item&&c.item.kind==='dirty'){
-          if(!p.hold){p.hold={kind:'dirty',cnt:1};if((c.item.cnt||1)>1)c.item.cnt--;else c.item=null;sfx('pick');return}
+          if(!p.hold){p.hold=c.item;c.item=null;sfx('pick');return}              // the whole pile
+          if(p.hold.kind==='dirty'){c.item.cnt=(c.item.cnt||1)+(p.hold.cnt||1);p.hold=null;sfx('put');return}   // stack onto it
           say(p,f?'先に汚れた皿を片付ける':'手を空けて汚れた皿を持つ');return}
+        if(p.hold&&p.hold.kind==='dirty'&&!f){c.item=p.hold;p.hold=null;sfx('put');return}
         if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,RECIPES[f.order].e+' ご注文','#fff');sfx('seat')}
         else say(p,S.sub==='service'?'並んでいるお客さんを案内してくる':'まだ営業前');
         return}
       if(g.st==='eat'){say(p,'食事中');return}
       if(f){say(p,'このテーブルはうまっている');return}
+      if(p.hold2&&isDish(p.hold)&&matchRecipe(p.hold.items)!==g.order&&matchRecipe(p.hold2.items)===g.order){const a=p.hold;p.hold=p.hold2;p.hold2=a}
       if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare&&p.hold.items.length)serve(p,tx,ty,g);
       else if(p.hold&&((p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)))say(p,'お皿にのせて出す');
       else say(p,'注文は '+RECIPES[g.order].e+RECIPES[g.order].n);
@@ -1129,6 +1138,9 @@ function clearKitchen(){
     if(emptyPlate(c.item)||c.item.kind==='dirty')continue;
     if(c.item.kind==='plate'&&!c.item.bare){lost++;c.item={kind:'dirty',cnt:1};continue}
     lost++;c.item=null;c.prog=0;c.burn=0}
+  // a second dish (お盆じょうず) is left as a dirty plate: on the pile in hand, or in a sink
+  for(const p of S.players){if(!p.hold2)continue;const h2=p.hold2;p.hold2=null;if(!(isDish(h2)||emptyPlate(h2)||h2.kind==='dirty'))continue;if(isDish(h2))lost++;
+    if(p.hold&&p.hold.kind==='dirty')p.hold.cnt=(p.hold.cnt||1)+1;else if(isDish(p.hold)){p.hold={kind:'dirty',cnt:2};lost++}else{const sk=S.map.flat().find(t=>t.t==='sink');if(sk)sk.dirty=(sk.dirty||0)+1}}
   for(const p of S.players){
     if(p.hold&&(emptyPlate(p.hold)||p.hold.kind==='dirty'))continue;
     if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare){lost++;p.hold={kind:'dirty',cnt:1};continue}
@@ -1515,6 +1527,7 @@ function update(dt){
       if(inp.pick){const h0=p.hold,m0=p.msgT,n0=AU.n,mn0=!!(p.menu||p.mk||p.g);doPick(p,c,tx,ty);pickSnd(p,h0,m0,n0,mn0)}
       if(inp.act)doAct(p,c,tx,ty,dt);
     }
+    if(!p.hold&&p.hold2){p.hold=p.hold2;p.hold2=null}   // the second dish moves into the hands
     if(p.msgT>0)p.msgT-=dt;
   });
   // phase
@@ -2473,7 +2486,7 @@ function drawPlayers(){
       if(lb&&lb!=='置く'){const msg=AL(p,'pick',lb);ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     // held item goes behind the chef when facing away, in front otherwise
-    const holdAt=()=>{if(p.hold)drawItem(p.hold,X+p.dx*16,Y+p.dy*14-4,T*0.62,true)};
+    const holdAt=()=>{if(p.hold2)drawItem(p.hold2,X+p.dx*16-(p.dx?0:9),Y+p.dy*14-4+(p.dx?-9:0),T*0.62,true);if(p.hold)drawItem(p.hold,X+p.dx*16+(p.hold2&&!p.dx?9:0),Y+p.dy*14-4+(p.hold2&&p.dx?5:0),T*0.62,true)};
     if(p.dy===-1)holdAt();
     drawChef(p,X,Y);
     if(p.dy!==-1)holdAt();
@@ -3214,7 +3227,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill)]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2)]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -3357,7 +3370,7 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife'});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17])});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));

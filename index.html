@@ -114,9 +114,14 @@ body.touch .narrow{display:none}
   body.touch{padding-block:4px}
   body.touch #app{gap:4px}
   body.touch #info{font-size:11px;padding:3px 8px;line-height:1.4}
-  body.touch .stage{width:100%;max-width:calc((100dvh - 64px) * 1.7778);margin:0 auto}
-  body.touch #stock{font-size:11px;gap:4px;min-height:0}
+  /* phones: the stock strip (also shown in the panel on the right of the game) would sit under the buttons, so the game gets the whole height */
+  body.touch #stock{display:none}
+  body.touch #app{max-width:100%}
+  body.touch .stage{width:100%;max-width:calc((100dvh - 10px) * 1.7778);margin:0 auto}
+  /* 準備完了 goes over the (empty during layout) waiting line on the right, above the 作業 / 持つ buttons */
+  body.touch #readyBtn{bottom:auto;top:53%;right:8px;font-size:13px;padding:8px 14px}
 }
+body.touch .pconly{display:none}
 </style>
 
 <div id="app">
@@ -266,7 +271,8 @@ function equipOffer(id,priceMul,proChance){
 // a rare version is stored as a number: 1 = first variant, 2 = second (the planter has two)
 const proList=id=>EQUIP[id]?(EQUIP[id].pros||(EQUIP[id].pro?[EQUIP[id].pro]:[])):[];
 const proInfo=(id,pro)=>proList(id)[(pro||1)-1]||{n:'',d:''};
-const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n;
+const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n+(id==='plates'?'（皿5枚つき）':'');
+const PLATES_PER_STAND=5;   // a plate stand bought from a shop comes with 5 more plates (added to the clean pool)
 function makeEquip(id,pro){
   if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
   if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
@@ -438,7 +444,7 @@ function showEquipShop(){
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
-    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（←→で選んで <b>${OVK()}</b> で購入）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
+    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
     <div class="cards">${cards}</div>
     <div class="row"><button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
@@ -891,7 +897,7 @@ function buy(list,p,shop,tx,ty){
     if(S.fuel>=FUEL_MAX){say(p,'もう満タン');return}
     S.money-=it.price;S.fuel=Math.min(FUEL_MAX,S.fuel+it.qty);float(tx+.5,ty,'⛽ +'+it.qty+(S.fuel>=FUEL_MAX?'（満タン）':''),'#ffd0c0');return}
   S.money-=it.price;
-  if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
+  if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);if(it.id==='plates')S.cleanPlates+=PLATES_PER_STAND;float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
   if(it.type==='pack'){S.stock[it.id]=(S.stock[it.id]||0)+it.qty;float(tx+.5,ty,'+'+it.qty+' '+ING[it.id].e)}
   else if(it.type==='seed'){S.seeds[it.id]=(S.seeds[it.id]||0)+it.qty;float(tx+.5,ty,'種+'+it.qty+' '+ING[it.id].e)}
   else{const ids=pickN(Object.keys(ING),2);for(const id of ids)S.stock[id]=(S.stock[id]||0)+2;
@@ -906,7 +912,7 @@ function doAct(p,c,tx,ty,dt){
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt;if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('water');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
+    p.actT+=dt;if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
@@ -1121,7 +1127,7 @@ function showUpgrade(){
       <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
       <span class="needs">${u.tgt?`<span class="pay">⬆ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
-    <p>無料で1つもらえます。←→で選んで <b>${OVK()}</b> で決定。</p>${moneyBig()}
+    <p>無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>${moneyBig()}
     <div class="cards">${cards}</div>
     <div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G）</button></div>
     ${owned?`<p class="mut">持っている強化：${owned}</p>`:''}</div>`);
@@ -1217,7 +1223,7 @@ function ovAction(a,v){
     if(S.eqBought!=null)return;
     const o=S.eqOffers[+v];if(!o)return;
     if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
-    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});S.eqBought=+v;showEquipShop();
+    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showEquipShop();
   }
   else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();
@@ -1261,11 +1267,11 @@ function showTitle(){
   S=null;
   showOv(`<div class="box"><h2>ドコドコ・キッチンカー</h2>
     <p>キッチンカーで町から町へ。走っている間は窓口で通りすがりのお店から仕入れ、町に着いたら料理を出して稼ぎます。4つの町を回りきれば完走です。</p>
-    <table class="ctl"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th></tr>
+    <table class="ctl pconly"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th></tr>
     <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td></tr>
     <tr><td>P2</td><td>矢印キー</td><td><kbd>/</kbd> か <kbd>Enter</kbd></td><td><kbd>.</kbd></td><td><kbd>,</kbd></td></tr>
     <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td></tr></table>
-    <p class="sub" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
+    <p class="sub pconly" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
     ${sndRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
@@ -1309,7 +1315,7 @@ function showChoose(){
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
     ${S.stop>0?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
     <div class="cards">${cards}</div>
-    <p class="mut">←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定</p></div>`);
+    <p class="mut">${isTouch?'カードを長押しで決定':`←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定`}</p></div>`);
 }
 function overlayInput(){
   const b=ovButtons(); if(!b.length||guestLocked())return;
@@ -1938,6 +1944,9 @@ function drawTile(c,x,y){
     if(c.item&&nextStep(c.item)==='cook'){const g=ctx.createRadialGradient(b.cx,b.cy,2,b.cx,b.cy,17);g.addColorStop(0,'rgba(255,170,60,.85)');g.addColorStop(1,'rgba(255,90,20,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(b.cx,b.cy,17,0,7);ctx.fill()}
     if(!c.item)for(let k=0;k<8;k++){const a=k*Math.PI/4+S.t*0.5,fl=2.5+Math.sin(S.t*12+k)*0.8;ctx.fillStyle='rgba(90,170,255,.85)';ctx.beginPath();ctx.ellipse(b.cx+Math.cos(a)*7,b.cy+Math.sin(a)*7,1.6,fl,a+Math.PI/2,0,7);ctx.fill()}
   }
+  if(t==='plates'&&(S.cleanPlates||0)>0){   // how many clean plates are on the stand
+    ctx.fillStyle='rgba(30,110,170,.95)';rr(X+T-25,Y+T-18,24,15,7.5);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
+    text('×'+S.cleanPlates,X+T-13,Y+T-10.5,10,'#fff',800)}
   if(t==='sink'){
     // dirty plates soak in the basin; washed ones stand on the right edge
     const nd=Math.min(4,c.dirty||0),nc=Math.min(5,c.clean||0);
@@ -3303,6 +3312,8 @@ const SFX={
   chop:t=>{noise(t,0.035,.3,'bandpass',2600,3);osc(t,170,0.05,'sine',.25,0,90)},
   pop:t=>noise(t,0.02,.12,'highpass',4000+rnd(3000)),
   clock:t=>osc(t,1568,0.05,'square',.06),
+  scrub:t=>{noise(t,0.07,.16,'bandpass',1800+rnd(1400),2.5);noise(t+0.02,0.05,.05,'highpass',6000)},
+  washed:t=>{for(let k=0;k<3;k++)osc(t+k*0.05,700+rnd(400),0.06,'sine',.14,0,1500);osc(t+0.17,2200,0.08,'sine',.12,0,3000);osc(t+0.25,3100,0.12,'sine',.1)},
   clock3:t=>{osc(t,2093,0.09,'square',.09);osc(t,1047,0.09,'triangle',.12)},
 };
 const SND_K=Object.keys(SFX);
@@ -3395,6 +3406,9 @@ function auState(dt){
     if(it&&!it.burnt&&isDone(it)&&c.t!=='board'&&(c.burn||0)>burnT(c)*0.55)warn=true;
     pv.prog=c.prog||0;pv.proc=proc;pv.burnt=!!(it&&it.burnt);pv.had=!!it;AU.st.set(key,pv);
   }
+  // scrubbing at a sink (作業 held, hands empty, dirty plates in it)
+  const scrub=live&&S.players.some(p=>{const c=tile(p.tx,p.ty);return c&&c.t==='sink'&&!p.hold&&(c.dirty||0)>0&&p.actT>0});
+  if(scrub){AU.scrubT=(AU.scrubT||0)-dt;if(AU.scrubT<=0){play('scrub');AU.scrubT=0.13+Math.random()*0.06}}
   if(chop){AU.chopT-=dt;if(AU.chopT<=0){play('chop');AU.chopT=0.21}}else AU.chopT=0;
   if(warn){AU.warnT-=dt;if(AU.warnT<=0){play('warn');AU.warnT=0.45}}else AU.warnT=0;
   if(siz){AU.popT-=dt;if(AU.popT<=0){play('pop');AU.popT=0.05+Math.random()*0.18}}

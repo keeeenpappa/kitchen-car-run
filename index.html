@@ -665,7 +665,7 @@ function bringInside(){
 function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
 const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
-  grow:{n:'畑のおばあちゃん',e:'🌱',d:'自分のまわり2マスの菜園で苗の育つ速さ2倍',dur:15,cd:45},
+  grow:{n:'畑のおばあちゃん',e:'🌱',d:'使ったときにまわり2マスにある菜園の苗が、15秒間2倍の速さで育つ',dur:15,cd:45,now:true},
   dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
   wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
   smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
@@ -686,6 +686,12 @@ function skillRowInner(){
 const skillRow=()=>`<div class="row" id="skillRow">${skillRowInner()}</div>`;
 // instant skills; returns false when it would do nothing (the skill is kept)
 function skillNow(p,K){
+  if(K===SKILLS.grow){
+    const px=Math.floor(p.x),py=Math.floor(p.y);
+    const pls=S.stations.filter(c=>c.t==='planter'&&Math.max(Math.abs(px-c._x),Math.abs(py-c._y))<=2);
+    if(!pls.length){say(p,'まわり2マスに菜園がない');return false}
+    for(const c of pls){c.boostT=K.dur;float(c._x+.5,c._y,'🌱✨','#bff2c6')}
+    return true}
   if(K===SKILLS.boost){
     if(S.phase!=='drive'){say(p,'走行中に使う');return false}
     S.boostN=2;S.prevZone=S.shops.some(inWindowZone);S.toast={text:'🚀 ひとっ走り！ 次の2区間は燃料なしで急ぐ',t:0,life:2.5};
@@ -1454,9 +1460,9 @@ function update(dt){
     const e=Math.min(1,S.arrT/1.8);S.roadOff+=SPEEDS[1]*(1-e)*(1-e)*dt;S.arrT+=dt;
     for(const f of S.floats)f.t+=dt;return}
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
-  // only planters within 2 tiles (across, down or diagonally) of a grandma with her skill working
-  const growers=S.players.filter(q=>(q.skT||0)>0&&q.skill==='grow');
-  const growBoost=c=>growers.some(q=>Math.max(Math.abs(Math.floor(q.x)-c._x),Math.abs(Math.floor(q.y)-c._y))<=2)?2:1;
+  // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
+  const growBoost=c=>(c.boostT||0)>0?2:1;
+  for(const c of S.stations)if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
@@ -2037,6 +2043,9 @@ function drawTile(c,x,y){
       const full=p.hold?FILL*proMul(c):WASH*proMul(c);
       ctx.fillStyle='rgba(0,0,0,.35)';rr(X+3,Y-9,T-6,12,6);ctx.fill();bar(X+6,Y-6,T-12,p.actT/full,p.hold?'#4fb3ff':'#9be7c4')}
   }
+  if(t==='planter'&&(c.boostT||0)>0){   // 畑のおばあちゃん's skill on this planter: a soft green shimmer
+    const a=0.45+0.35*Math.sin(S.t*6);ctx.strokeStyle=`rgba(140,240,150,${a})`;ctx.lineWidth=3;rr(X+2,Y+2,T-4,T-4,7);ctx.stroke();
+    for(let k=0;k<3;k++){const ph=(S.t*0.8+k/3)%1;ctx.globalAlpha=1-ph;emoji('✨',X+10+k*14,Y+T-8-ph*22,10);ctx.globalAlpha=1}}
   if(t==='planter'&&c.plant){const gg=ING[c.plant.id].grow,f=c.plant.t/gg;
     if(f>=1){emoji(ING[c.plant.id].e,b.cx,b.cy,24);const a=0.5+0.5*Math.sin(S.t*6);ctx.strokeStyle=`rgba(255,240,140,${a})`;ctx.lineWidth=3;rr(X+3,Y+3,T-6,T-6,6);ctx.stroke()}
     else{
@@ -3190,7 +3199,7 @@ function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -3338,7 +3347,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0};
   }
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}

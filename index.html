@@ -2580,24 +2580,34 @@ function updateCam(dt){
 function drawUpcomingPhone(){
   if(S.phase!=='drive')return;
   const lp=localP();if(lp){const c=tile(lp.tx,lp.ty);if(c&&c.t==='window'&&shopAtWindow(lp.tx))return}   // the big list is up instead
-  const list=S.shops.filter(s=>!s.fade&&s.x+2+WMARGIN>=3.5).sort((a,b)=>a.x-b.x).slice(0,2);
+  // the same shops, for the same time, as the full view shows on the road: from when one comes into sight until it is gone,
+  // left to right in road order (so the first one is the one at the back)
+  const list=S.shops.filter(s=>!s.fade&&s.x*T<=GW*T+4&&(s.x+2)*T>=-4).sort((a,b)=>a.x-b.x).slice(0,3);
   let x=10;const y=63;
   for(const s of list){
-    const atF=inWindowZone(s)&&s.x+1>8,atB=inWindowZone(s)&&!atF;
-    const tag=atF?'前の窓口で買える':atB?'後ろの窓口で買える':'あと'+kmTxt(Math.max(0.25,s.x-WMARGIN-13.5))+'km';
-    // compact: name and when on one line, then each item with its price beside it
-    const items=s.items,iw=60,title=s.type.e+' '+s.type.n;
-    ctx.font=`800 13px ${FNT}`;const tw=ctx.measureText(title).width;ctx.font=`800 11px ${FNT}`;const gw=ctx.measureText(tag).width;
-    const w=Math.max(tw+gw+30,items.length*iw+12),h=48;
-    ctx.fillStyle='rgba(16,26,30,.86)';rr(x,y,w,h,9);ctx.fill();
-    ctx.strokeStyle=atF||atB?'#ffe27a':'#4f6c74';ctx.lineWidth=atF||atB?2.5:1.2;ctx.stroke();
-    text(title,x+8,y+11,13,'#fff',800,'left');text(tag,x+w-8,y+11,11,atF||atB?'#ffe27a':'#9db3b4',800,'right');
-    items.forEach((it,i)=>{const cx=x+6+i*iw+14,cy=y+33;ctx.globalAlpha=it.sold?0.35:1;
-      if(it.type==='mystery')emoji('🎁',cx,cy,17);else if(it.type==='fuel')emoji('⛽',cx,cy,17);
-      else if(it.type==='equip')drawItem(makeEquip(it.id,it.pro),cx,cy,22);else{emoji(ING[it.id].e,cx,cy,17);if(it.type==='seed')text('種',cx+10,cy-8,9,'#bff2c6',800)}
-      text(it.price+'G',cx+13,cy+1,11,S.money>=it.price?'#ffe08a':'#ff9c9c',800,'left');ctx.globalAlpha=1});
-    x+=w+10;
+    const items=s.items,iw=52,sw=38,title=s.type.n;
+    ctx.font=`800 12px ${FNT}`;const tw=ctx.measureText(title).width;
+    const w=sw+Math.max(tw+14,items.length*iw+8),h=48;
+    ctx.globalAlpha=s.fade?Math.max(0,1-s.fade/0.3):1;
+    ctx.fillStyle='rgba(16,26,30,.86)';rr(x,y,w,h,9);ctx.fill();ctx.strokeStyle='#4f6c74';ctx.lineWidth=1.2;ctx.stroke();
+    miniStall(x+6,y+6,s.type.c,s.type.e);
+    text(title,x+sw+4,y+11,12,'#fff',800,'left');
+    items.forEach((it,i)=>{const cx=x+sw+2+i*iw+12,cy=y+33;const a0=ctx.globalAlpha;ctx.globalAlpha=a0*(it.sold?0.35:1);
+      if(it.type==='mystery')emoji('🎁',cx,cy,16);else if(it.type==='fuel')emoji('⛽',cx,cy,16);
+      else if(it.type==='equip')drawItem(makeEquip(it.id,it.pro),cx,cy,20);else{emoji(ING[it.id].e,cx,cy,16);if(it.type==='seed')text('種',cx+9,cy-8,9,'#bff2c6',800)}
+      text(it.price+'G',cx+12,cy+1,11,S.money>=it.price?'#ffe08a':'#ff9c9c',800,'left');ctx.globalAlpha=a0});
+    ctx.globalAlpha=1;
+    x+=w+8;
   }
+}
+// a tiny roadside stall: striped awning in the shop's colour over a counter with its sign
+function miniStall(x,y,col,icon){
+  const w=28;
+  ctx.fillStyle='#f1e4c6';rr(x+2,y+12,w-4,22,3);ctx.fill();ctx.fillStyle='rgba(0,0,0,.15)';ctx.fillRect(x+2,y+30,w-4,4);
+  for(let k=0;k<4;k++){ctx.fillStyle=k%2?'#fff4e0':col;ctx.fillRect(x+k*w/4,y+2,w/4,9)}
+  for(let k=0;k<4;k++){ctx.fillStyle=k%2?'#fff4e0':col;ctx.beginPath();ctx.arc(x+k*w/4+w/8,y+11,w/8,0,Math.PI);ctx.fill()}
+  ctx.fillStyle=shade(col,-0.25);ctx.fillRect(x,y,w,3);
+  emoji(icon,x+w/2,y+24,13);
 }// phone: what the shop at my window (or the open market) sells, big, at the top of the screen,
 // so it is never under the stick / buttons or off the camera
 function drawShopPanelPhone(){

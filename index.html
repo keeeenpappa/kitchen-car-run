@@ -670,7 +670,8 @@ const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd
   wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
   smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
   forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
-  haggle:{n:'値切り上手',e:'💰',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45}};
+  haggle:{n:'値切り上手',e:'💰',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45},
+  boost:{n:'ひとっ走り',e:'🚀',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -685,6 +686,10 @@ function skillRowInner(){
 const skillRow=()=>`<div class="row" id="skillRow">${skillRowInner()}</div>`;
 // instant skills; returns false when it would do nothing (the skill is kept)
 function skillNow(p,K){
+  if(K===SKILLS.boost){
+    if(S.phase!=='drive'){say(p,'走行中に使う');return false}
+    S.boostN=2;S.prevZone=S.shops.some(inWindowZone);S.toast={text:'🚀 ひとっ走り！ 次の2区間は燃料なしで急ぐ',t:0,life:2.5};
+    return true}
   if(K===SKILLS.smile){
     const w=S.phase==='stop'?waiting():[];
     if(!w.length){say(p,'列で待っているお客さんがいない');return false}
@@ -698,7 +703,7 @@ function skillNow(p,K){
 }function useSkill(p){
   const K=skillOf(p);if(!K)return;
   if((p.skT||0)>0)return;
-  if((p.skCD||0)>0){say(p,'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
+  if((p.skCD||0)>0){say(p,K.perTown?'次の町への走行でまた使える':'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
   // an instant skill: works at once (and is not used up when there is nothing to do)
   if(K.now&&!skillNow(p,K))return;
   p.skT=K.dur;p.skCD=K.cd;sfx('skill');
@@ -1052,7 +1057,9 @@ function startDrive(){
   if(Math.random()<MYSTERY_CHANCE)list.splice(1+rnd(n),0,MYSTERY_SHOP);  // a bonus stall, never first
   list.push(GAS_SHOP);
   S.shops=list.map((ty,k)=>({x:FIRST_SHOP_X+k*SHOP_GAP,type:ty,items:genShopItems(ty)}));
-  S.dist=0;S.refT=0;S.actT=0;S.gasWarn=false;
+  S.dist=0;S.refT=0;S.actT=0;S.gasWarn=false;S.boostN=0;S.prevZone=false;
+  // ひとっ走り can be used once on each drive
+  for(const q of S.players)if(skillOf(q).perTown){q.skCD=0;q.skT=0}
   S.route=S.shops[S.shops.length-1].x+3;   // arrive once the gas station has gone past the back window
   bringInside();hideOv();sfx('horn');
 }
@@ -1082,6 +1089,7 @@ function arrive(){
   if(delta){S.bonus=(S.bonus||0)+delta;
     S.toast={text:delta>0?'予定より'+delta+'秒早く着いた！ 営業 +'+delta+'秒':'到着が'+(-delta)+'秒遅れた… 営業 −'+(-delta)+'秒',t:0,life:3.5}}
   sfx('arrive');
+  S.boostN=0;for(const q of S.players)if(skillOf(q).perTown)q.skT=0;
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];S.arrT=0;
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
 }
@@ -1506,10 +1514,14 @@ function update(dt){
   else if(S.phase==='drive'){
     const zone=S.shops.some(inWindowZone);
     const lev=S.fuel>0?S.speed:0;
-    const v=zone?WIN_SPEED:SPEEDS[lev],d=v*dt;
+    // ひとっ走り: the next stretches between shops at 急ぐ speed, without fuel (each stretch ends where a shop reaches a window)
+    if(S.boostN>0&&zone&&!S.prevZone){S.boostN--;if(!S.boostN)for(const q of S.players)if(skillOf(q).perTown)q.skT=0}
+    S.prevZone=zone;
+    const boost=S.boostN>0&&!zone;
+    const v=zone?WIN_SPEED:boost?SPEEDS[2]:SPEEDS[lev],d=v*dt;
     S.roadOff+=d;S.dist+=d;S.actT+=dt;
     S.refT+=d/(zone?WIN_SPEED:SPEEDS[1]);          // how long ふつう would have taken for the same stretch
-    if(!zone&&S.fuel>0){S.fuel=Math.max(0,S.fuel-d*FUEL_RATE[S.speed]);
+    if(!zone&&!boost&&S.fuel>0){S.fuel=Math.max(0,S.fuel-d*FUEL_RATE[S.speed]);
       if(S.fuel<=0&&!S.gasWarn){S.gasWarn=true;sfx('gaswarn');S.toast={text:'⛽ ガス欠！ ゆっくりしか走れない',t:0,life:3}}}
     for(const s of S.shops){
       s.x-=d;

@@ -666,7 +666,8 @@ function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
 const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
   grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45},
-  dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35}};
+  dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
+  wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -945,7 +946,7 @@ function doAct(p,c,tx,ty,dt){
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1);if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt;if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
+    p.actT+=dt*((p.skT||0)>0&&p.skill==='wash'?2:1);if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}

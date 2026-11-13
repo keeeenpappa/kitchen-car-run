@@ -56,6 +56,10 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 .stage{container-type:inline-size}
 #pauseBtn{position:absolute;left:68.5%;top:1.05%;height:5.3%;z-index:6;font-size:1.05cqw;padding:0 .9cqw;border-radius:.7cqw;display:flex;align-items:center;background:#2c4650}
 #pauseBtn[hidden]{display:none}
+#infoBtn{position:absolute;left:8px;top:14%;z-index:6;font-size:13px;padding:6px 10px;background:rgba(44,70,80,.9)}
+#infoBtn.on{border-color:var(--truck)}
+body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px));z-index:21;border-radius:999px}
+#infoBtn[hidden]{display:none}
 body.touch #pauseBtn{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
 .box.big{zoom:var(--ovz,1)}
@@ -135,6 +139,7 @@ body.touch .pconly{display:none}
     <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（R長押し）</button>
     <div id="ov"></div>
     <button id="pauseBtn" class="ovbtn" type="button" hidden>⏸ 中断（Esc）</button>
+    <button id="infoBtn" class="ovbtn" type="button" hidden>📋 情報</button>
   </div>
   <div id="stock"></div>
   <p class="narrow">キーボードかゲームパッドで遊ぶ試作版です。PCでの操作をおすすめします。</p>
@@ -1208,6 +1213,7 @@ function readyTick(dt){
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
+  if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
   if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a!=='dev'&&a!=='title'&&guestLocked())return;   // the host's choice screens: a guest only watches
   if(a!=='ready'&&a!=='pause')play('confirm');
@@ -1256,7 +1262,7 @@ function canPause(){
 function pauseGame(){
   if(!S||S.paused||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
-  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}</div>`);
+  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}${viewRow()}</div>`);
 }
 function resumeGame(){
   if(!S)return;S.paused=false;
@@ -1274,6 +1280,7 @@ function showTitle(){
     <p class="sub pconly" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
     ${sndRow()}
+    ${viewRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
     <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
     <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
@@ -1600,7 +1607,7 @@ function groundPat(col){
 // static layers (ground, roadside) are painted once into an offscreen canvas at the screen's resolution and then just copied
 const LAYER={};
 function cachedRect(key,x,y,w,h,paint){
-  const sc=cv.width/(GW*T),k=key+'|'+cv.width;
+  const zz=phoneView()?PZ:1,sc=cv.width/(GW*T)*zz,k=key+'|'+cv.width+'|'+zz;
   let c=LAYER[k];
   if(!c){c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(h*sc));
     const g=c.getContext('2d');g.scale(sc,sc);g.translate(-x,-y);const o=ctx;ctx=g;try{paint(g)}finally{ctx=o}LAYER[k]=c;
@@ -1610,7 +1617,7 @@ function cachedRect(key,x,y,w,h,paint){
 // a small cached picture (house, stall…) drawn at (x,y) with size w×h; paint() draws it with its top-left at 0,0
 const SPR=new Map();
 function sprite(key,x,y,w,h,paint){
-  const sc=cv.width/(GW*T),k=key+'|'+cv.width;let c=SPR.get(k);
+  const zz=phoneView()?PZ:1,sc=cv.width/(GW*T)*zz,k=key+'|'+cv.width+'|'+zz;let c=SPR.get(k);
   if(!c){c=document.createElement('canvas');c.width=Math.max(1,Math.ceil(w*sc));c.height=Math.max(1,Math.ceil(h*sc));
     const g=c.getContext('2d');g.scale(sc,sc);const o=ctx;ctx=g;try{paint()}finally{ctx=o}
     SPR.set(k,c);if(SPR.size>160)SPR.delete(SPR.keys().next().value)}
@@ -2544,6 +2551,55 @@ function drawArrive(){
   text(S.town.menu.map(r=>RECIPES[r].e+' '+RECIPES[r].n).join('　'),cx,cy+0.5*T*pop,14*pop,'#e8f0ee',700);
   ctx.restore();
 }
+// ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
+// and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
+// does not move the picture -----
+const PZ=1.5, UZ=1.45, PVW=GW/PZ, PVH=VH/PZ;      // 16 x 9 tiles on screen
+const CAM={x:0,y:0,ok:false};
+let VIEW='auto', PHONE_INFO=false;
+try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}
+const phoneView=()=>!!S&&(VIEW==='phone'||(VIEW==='auto'&&isTouch));
+const VIEWN={auto:'自動',pc:'PC（全体）',phone:'スマホ（大きく）'};
+function cycleView(){VIEW=VIEW==='auto'?'phone':VIEW==='phone'?'pc':'auto';try{localStorage.setItem('kcr-view',VIEW)}catch(_){}CAM.ok=false}
+const viewRowInner=()=>`<span style="align-self:center;min-width:9em">画面の表示</span><button class="ovbtn" data-act="view">${VIEWN[VIEW]}${VIEW==='auto'?'（今は'+(isTouch?'スマホ':'PC')+'）':''}</button>`;
+const viewRow=()=>`<div class="row" id="viewRow">${viewRowInner()}</div>`;
+function updateCam(dt){
+  if(!phoneView()){CAM.ok=false;return}
+  const p=localP();if(!p)return;
+  const mx=4.6,myT=2.4,myB=2.2;                   // the chef can roam this far inside the screen before it slides
+  let tx=CAM.x,ty=CAM.y;
+  if(p.x<CAM.x+mx)tx=p.x-mx;else if(p.x>CAM.x+PVW-mx)tx=p.x-PVW+mx;
+  if(p.y<CAM.y+myT)ty=p.y-myT;else if(p.y>CAM.y+PVH-myB)ty=p.y-PVH+myB;
+  tx=Math.max(0,Math.min(GW-PVW,tx));ty=Math.max(0,Math.min(VH-PVH,ty));
+  if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
+  const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
+}
+// the bar on a phone: fewer things, bigger (drawn at UZ)
+function drawTopBarPhone(){
+  const W=GW*T/UZ,y=22;
+  ctx.fillStyle='rgba(16,26,30,.88)';rr(6,4,W-12,36,10);ctx.fill();
+  emoji('🪙',22,y,17);text(S.money+'G',34,y,18,'#ffe08a',800,'left');
+  for(let k=0;k<HEART_MAX;k++)text('♥',112+k*17,y,16,k<S.hearts?'#ff6d6d':'#3b5059',800);
+  const tw=S.phase==='stop'?S.town:(S.phase==='drive'||(S.phase==='layout'&&S.stop>0))?S.next:null;
+  if(tw){const nm=(S.phase==='stop'?'':'→ ')+tw.e+' '+tw.n;ctx.font=`800 15px ${FNT}`;const nw=ctx.measureText(nm).width+20;
+    ctx.fillStyle='#2f6f6a';rr(170,9,nw,26,13);ctx.fill();text(nm,180,y,15,'#fff',800,'left')}
+  let ph='';
+  if(S.phase==='layout')ph=S.timer>0?'配置 '+fmtT(S.timer):'時間切れ';
+  else if(S.phase==='drive')ph=kmTxt(Math.min(S.dist,S.route))+'/'+kmTxt(S.route)+'km';
+  else if(S.phase==='stop')ph=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
+  if(closing()){const on=Math.floor(S.t*(S.timer<=10?4:2))%2===0;ctx.font=`800 19px ${FNT}`;const pw=ctx.measureText(ph).width+18;
+    ctx.fillStyle=on?'#d63b3b':'#fff';rr(W-14-pw,9,pw,26,13);ctx.fill();text(ph,W-23,y,19,on?'#fff':'#d63b3b',800,'right')}
+  else text(ph,W-16,y,18,'#f4eedf',800,'right');
+  // a small second line: the waiting line while open, fuel and the lever on the road
+  const y2=50;
+  if(S.phase==='stop'&&S.sub==='service'){const n=waiting().length;if(n){const s='待ち '+n+'人';ctx.font=`800 13px ${FNT}`;const w=ctx.measureText(s).width+16;
+    ctx.fillStyle=n>=QMAX-1?'#d63b3b':'rgba(16,26,30,.85)';rr(W-12-w,y2-11,w,22,11);ctx.fill();text(s,W-20,y2,13,'#fff',800,'right')}}
+  if(S.phase==='drive'){const fx=W-178;ctx.fillStyle='rgba(16,26,30,.85)';rr(fx,y2-11,166,22,9);ctx.fill();emoji('⛽',fx+12,y2,12);
+    for(let k=0;k<FUEL_MAX;k++){const f=Math.max(0,Math.min(1,S.fuel-k));ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(fx+24+k*8,y2-6,6,12);
+      if(f>0){ctx.fillStyle=S.fuel<=2?'#ff6d6d':'#ffb347';ctx.fillRect(fx+24+k*8,y2-6+12*(1-f),6,12*f)}}
+    const lv=S.fuel>0?S.speed:0;text(SPEED_N[lv],fx+158,y2,12,lv===2?'#ff9c9c':'#c9f2d2',800,'right')}
+  if(NET.role!=='off'&&NET.code)text('部屋 '+NET.code,14,y2,12,'#ffe08a',800,'left');
+}
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
 function drawTopBar(){
   const y=T*0.48;
@@ -2627,6 +2683,25 @@ function draw(){
   ctx.clearRect(0,0,GW*T,GH*T);
   if(!S){drawRoadIdle();return}
   const arr=S.view==='town'&&S.town&&S.arrT!=null&&S.arrT<ARRIVE_T;
+  // phone view: the world is drawn 1.5x around the camera; the bars and panels stay on the screen
+  const ph=phoneView();
+  if(ph){ctx.save();ctx.scale(PZ,PZ);ctx.translate(-CAM.x*T,-CAM.y*T)}
+  drawWorld(arr);
+  if(ph)ctx.restore();
+  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
+  else{drawTopBar();drawSidePanel()}
+  drawWaiting();
+  drawClosing();
+  if(arr)drawArrive();
+  if(S.toast){
+    const a=Math.min(1,(S.toast.life-S.toast.t)*2);ctx.globalAlpha=a;
+    ctx.font=`800 18px ${FNT}`;const w=ctx.measureText(S.toast.text).width+40;
+    ctx.fillStyle='rgba(60,36,96,.95)';rr(GW*T/2-w/2,T*1.05,w,40,12);ctx.fill();
+    ctx.strokeStyle='#e2c9ff';ctx.lineWidth=2;ctx.stroke();
+    text(S.toast.text,GW*T/2,T*1.05+20,18,'#fff',800);ctx.globalAlpha=1;
+  }
+}
+function drawWorld(arr){
   if(S.view==='layout')drawLayoutGround();
   else if(arr){
     // the road keeps rolling (slower and slower) while the town comes in from the right
@@ -2656,26 +2731,14 @@ function draw(){
   drawCab(true);
   ctx.restore();
   drawMenus();
-  drawTopBar();
-  drawSidePanel();
-  drawWaiting();
-  drawClosing();
-  if(arr)drawArrive();
-  if(S.toast){
-    const a=Math.min(1,(S.toast.life-S.toast.t)*2);ctx.globalAlpha=a;
-    ctx.font=`800 18px ${FNT}`;const w=ctx.measureText(S.toast.text).width+40;
-    ctx.fillStyle='rgba(60,36,96,.95)';rr(GW*T/2-w/2,T*1.05,w,40,12);ctx.fill();
-    ctx.strokeStyle='#e2c9ff';ctx.lineWidth=2;ctx.stroke();
-    text(S.toast.text,GW*T/2,T*1.05+20,18,'#fff',800);ctx.globalAlpha=1;
-  }
   for(const f of S.floats){ctx.globalAlpha=1-f.t/1.4;ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.textAlign='center';const fy=(f.y-f.t*0.8)*T;ctx.strokeText(f.text,f.x*T,fy);ctx.fillStyle=f.col;ctx.fillText(f.text,f.x*T,fy);ctx.globalAlpha=1}
 }
 // the old info strip, drawn in the space right of the truck: <br> / 　 / ｜ start a new line, long lines wrap
 const GRAPH=(typeof Intl!=='undefined'&&Intl.Segmenter)?new Intl.Segmenter('ja',{granularity:'grapheme'}):null;
 const graphemes=t=>GRAPH?Array.from(GRAPH.segment(t),g=>g.segment):Array.from(t);
-function drawSidePanel(){
+function drawSidePanel(px,py,pw,phh){
   const html=S.sideInfo||'';if(!html.replace(/<[^>]*>|　/g,'').trim())return;
-  const x0=18.2*T,y0=2.25*T,w=GW*T-x0-8,h=6.85*T-y0,pad=9;
+  const x0=px!=null?px:18.2*T,y0=py!=null?py:2.25*T,w=pw!=null?pw:GW*T-x0-8,h=phh!=null?phh:6.85*T-y0,pad=9;
   ctx.save();
   ctx.fillStyle='rgba(16,26,30,.86)';rr(x0,y0,w,h,10);ctx.fill();
   ctx.beginPath();ctx.rect(x0,y0,w,h);ctx.clip();
@@ -2741,6 +2804,8 @@ function upInfo(){
 const readyBtn=document.getElementById('readyBtn');
 const pauseBtn=document.getElementById('pauseBtn');
 pauseBtn.addEventListener('click',()=>doOv('pause'));
+const infoBtn=document.getElementById('infoBtn');
+infoBtn.addEventListener('click',()=>{PHONE_INFO=!PHONE_INFO;infoBtn.classList.toggle('on',PHONE_INFO)});
 if(isTouch)readyBtn.textContent='準備完了（長押し）';
 readyBtn.addEventListener('pointerdown',e=>{e.preventDefault();readyPtr=true;try{readyBtn.setPointerCapture(e.pointerId)}catch(_){}});
 for(const ev of ['pointerup','pointercancel'])readyBtn.addEventListener(ev,()=>{readyPtr=false});
@@ -2748,7 +2813,7 @@ readyBtn.addEventListener('contextmenu',e=>e.preventDefault());
 const hudEl=document.getElementById('hud'),infoEl=document.getElementById('info'),stockEl=document.getElementById('stock');
 let hudT=0;
 function renderHud(){
-  if(!S){hudEl.innerHTML='';infoEl.innerHTML='人数を選んでスタート';stockEl.innerHTML='';readyBtn.hidden=true;pauseBtn.hidden=true;return}
+  if(!S){hudEl.innerHTML='';infoEl.innerHTML='人数を選んでスタート';stockEl.innerHTML='';readyBtn.hidden=true;pauseBtn.hidden=true;infoBtn.hidden=true;return}
   let phase='';
   if(S.phase==='layout')phase=S.timer>0?`レイアウト ${fmtT(S.timer)}`:'時間切れ';
   else if(S.phase==='drive')phase=`走行中 ${kmTxt(Math.min(S.dist,S.route))} / ${kmTxt(S.route)} km`;
@@ -2782,6 +2847,7 @@ function renderHud(){
   if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info='<b style="color:#ffd84a">強化</b>　'+gl.join('　')+'<br>'+info;
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
+  infoBtn.hidden=!(phoneView()&&ov.hidden);infoBtn.classList.toggle('on',PHONE_INFO);
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
   infoEl.innerHTML=info||'　';S.sideInfo=info;
@@ -3451,6 +3517,7 @@ function frame(now){
   if(NET.role==='host')hostFrame(dt);
   if(!S)idleOff+=dt*1.2;
   auFrame(dt);
+  if(S)updateCam(dt);
   draw();
   hudT-=dt;if(hudT<=0){renderHud();hudT=0.1}
   pressed.clear();touch.pick=false;touch.sw=false;touch.pause=false;

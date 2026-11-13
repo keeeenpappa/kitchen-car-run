@@ -2135,12 +2135,13 @@ function drawShops(){
     ctx.restore();
   }
 }
-function drawOffer(items,cx,y,shop){
+function drawOffer(items,cx,y,shop,fx){
   if(!items||!items.length)return;
   const n=items.length,w=0.95*T,tot=n*w;let x0=cx-tot/2;
   // the market's list is kept on screen; a road shop's list moves with the shop
   if(!shop)x0=Math.max(4,Math.min(GW*T-tot-4,x0));
   else x0=shop.x*T+4; // left-aligned with the stall, so both enter the frame together
+  if(fx!=null)x0=fx;   // phone: the list is shown at a fixed place on the screen
   ctx.fillStyle='rgba(16,26,30,.82)';rr(x0-4,y-4,tot+8,T*1.25,8);ctx.fill();
   items.forEach((it,i)=>{
     const X=x0+i*w,cxx=X+w/2;
@@ -2575,7 +2576,23 @@ function updateCam(dt){
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
   const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
 }
-// the bar on a phone: fewer things, bigger (drawn at UZ)
+// phone: what the shop at my window (or the open market) sells, big, at the top of the screen,
+// so it is never under the stick / buttons or off the camera
+function drawShopPanelPhone(){
+  const lp=localP();if(!lp||lp.seat)return;
+  let items=null,shop=null,title='';
+  const c=tile(lp.tx,lp.ty);
+  if(S.phase==='drive'&&c&&c.t==='window'){shop=shopAtWindow(lp.tx);if(shop&&!shop.fade){items=shop.items;title=shop.type.e+' '+shop.type.n}}
+  else if(S.phase==='stop'&&lp.mk){items=S.market;title='🏪 市場'}
+  if(!items||!items.length)return;
+  const W=GW*T/UZ,tot=items.length*0.95*T,fx=Math.max(8,(W-tot)/2),y=114;
+  ctx.font=`800 14px ${FNT}`;const tw=ctx.measureText(title).width+20;
+  ctx.fillStyle='rgba(16,26,30,.92)';rr(fx-4,y-54,tw,24,12);ctx.fill();text(title,fx+6,y-42,14,'#ffe08a',800,'left');
+  drawOffer(items,0,y,shop,fx);
+  if(!shop){const mvk=isTouch?'スティック':keyName(devSlot(lp),'move');
+    const msg='選ぶ（'+mvk+'）　'+AL(lp,'act','購入',1)+'　'+AL(lp,'sw','閉じる');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+16;
+    ctx.fillStyle='rgba(16,26,30,.9)';rr(fx-4,y+T*1.25+24,w,20,8);ctx.fill();text(msg,fx+4,y+T*1.25+34,11,'#ffe08a',800,'left')}
+}// the bar on a phone: fewer things, bigger (drawn at UZ)
 function drawTopBarPhone(){
   const W=GW*T/UZ,y=22;
   ctx.fillStyle='rgba(16,26,30,.88)';rr(6,4,W-12,36,10);ctx.fill();
@@ -2689,7 +2706,7 @@ function draw(){
   if(ph){ctx.save();ctx.scale(PZ,PZ);ctx.translate(-CAM.x*T,-CAM.y*T)}
   drawWorld(arr);
   if(ph)ctx.restore();
-  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
+  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();drawSidePanel()}
   drawWaiting();
   drawClosing();

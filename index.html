@@ -665,7 +665,7 @@ function bringInside(){
 function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
 const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
-  grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ3倍',dur:15,cd:45}};
+  grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -1423,7 +1423,7 @@ function update(dt){
     const e=Math.min(1,S.arrT/1.8);S.roadOff+=SPEEDS[1]*(1-e)*(1-e)*dt;S.arrT+=dt;
     for(const f of S.floats)f.t+=dt;return}
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
-  const growBoost=S.players.some(q=>(q.skT||0)>0&&q.skill==='grow')?3:1;
+  const growBoost=S.players.some(q=>(q.skT||0)>0&&q.skill==='grow')?2:1;
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)

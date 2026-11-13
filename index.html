@@ -668,7 +668,8 @@ const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd
   grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45},
   dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
   wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
-  smile:{n:'看板娘',e:'💖',d:'列で待っているお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true}};
+  smile:{n:'看板娘',e:'💖',d:'列で待っているお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
+  forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -982,7 +983,7 @@ const timingZone=()=>Math.min(0.3,0.1*S.up.gatherSpd);
 function gatherInput(p,inp,dt){
   const g=p.g,O=GOBJ[g.obj],tap=inp.act&&!p.prevAct;
   if(g.st===2){ // a random catch: keep it or put it back
-    if(inp.pick){addToBasket(p,[g.item]);p.g=null;sfx('put')}
+    if(inp.pick){addToBasket(p,Array(forageMul(p)).fill(g.item));p.g=null;sfx('put')}
     else if(inp.sw){float(g.x+.5,g.y,'戻した','#cfe');p.g=null;sfx('put')}
     return}
   if(inp.sw){p.g=null;return} // quit
@@ -1005,11 +1006,12 @@ function gatherInput(p,inp,dt){
     p.gLast=key;
   }
 }
+const forageMul=p=>(p.skT||0)>0&&p.skill==='forage'?2:1;   // 採りじょうず's skill
 function gatherDone(p,n){
   const g=p.g,O=GOBJ[g.obj];
   sfx('catch');
   if(O.items.length>1){g.item=O.items[rnd(O.items.length)];g.st=2;return}
-  addToBasket(p,Array(n||1).fill(O.items[0]));p.g=null;
+  addToBasket(p,Array((n||1)*forageMul(p)).fill(O.items[0]));p.g=null;
 }
 function addToBasket(p,ids){
   const b=p.hold;if(!b||b.kind!=='basket')return;

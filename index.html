@@ -664,15 +664,17 @@ function bringInside(){
 // ---------- feedback ----------
 function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
-const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
-  grow:{n:'畑のおばあちゃん',e:'🌱',d:'使ったときにまわり2マスにある菜園の苗が、15秒間2倍の速さで育つ',dur:15,cd:45,now:true},
-  dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
-  wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
-  smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
-  forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
-  haggle:{n:'値切り上手',e:'💰',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45},
-  tray:{n:'お盆じょうず',e:'🍱',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
-  boost:{n:'ひとっ走り',e:'🚀',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true}};
+// skill names are animals (placeholders until the characters are designed)
+const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd:40},
+  grow:{n:'ミツバチ',e:'🐝',d:'使ったときにまわり2マスにある菜園の苗が、15秒間2倍の速さで育つ',dur:15,cd:45,now:true},
+  dash:{n:'ウサギ',e:'🐇',d:'自分の走る速さ1.5倍',dur:10,cd:35},
+  wash:{n:'カワウソ',e:'🦦',d:'自分の皿洗いが2倍速',dur:12,cd:40},
+  smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
+  forage:{n:'リス',e:'🐿️',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
+  haggle:{n:'キツネ',e:'🦊',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45},
+  tray:{n:'ペンギン',e:'🐧',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
+  fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
+  boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -803,7 +805,7 @@ function placeOrTake(p,c){
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0}
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire'}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');
     else if(c.t==='blender')say(p,'ミキサーに入れない');
@@ -1480,12 +1482,12 @@ function update(dt){
       // a plant grows once it has been watered (one watering per seed)
       if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
-    const it=c.item; if(!it||it.kind!=='ing'||it.burnt)continue;
+    const it=c.item; if(!it){c.fast=false;continue} if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
-      if(nextStep(it)==='cook'){c.prog+=dt;if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
+      if(nextStep(it)==='cook'){c.prog+=dt*(c.fast?2:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     } else if(c.t==='blender'){
-      if(nextStep(it)==='blend'){c.prog+=dt;if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
+      if(nextStep(it)==='blend'){c.prog+=dt*(c.fast?2:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     }
   }
@@ -2040,6 +2042,8 @@ function drawTile(c,x,y){
     if(c.item&&nextStep(c.item)==='cook'){const g=ctx.createRadialGradient(b.cx,b.cy,2,b.cx,b.cy,17);g.addColorStop(0,'rgba(255,170,60,.85)');g.addColorStop(1,'rgba(255,90,20,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(b.cx,b.cy,17,0,7);ctx.fill()}
     if(!c.item)for(let k=0;k<8;k++){const a=k*Math.PI/4+S.t*0.5,fl=2.5+Math.sin(S.t*12+k)*0.8;ctx.fillStyle='rgba(90,170,255,.85)';ctx.beginPath();ctx.ellipse(b.cx+Math.cos(a)*7,b.cy+Math.sin(a)*7,1.6,fl,a+Math.PI/2,0,7);ctx.fill()}
   }
+  if((t==='stove'||t==='blender')&&c.fast&&c.item){   // ちびドラゴン's skill: this one cooks 2x
+    const a=0.6+0.4*Math.sin(S.t*8);ctx.fillStyle=`rgba(214,59,59,${0.75+0.2*a})`;rr(X+1,Y-4,26,15,7.5);ctx.fill();text('×2',X+14,Y+3.5,10,'#fff',800)}
   if(t==='plates'&&(S.cleanPlates||0)>0){   // how many clean plates are on the stand
     ctx.fillStyle='rgba(30,110,170,.95)';rr(X+T-25,Y+T-18,24,15,7.5);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
     text('×'+S.cleanPlates,X+T-13,Y+T-10.5,10,'#fff',800)}
@@ -3212,7 +3216,7 @@ function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -3360,7 +3364,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9]};
   }
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}

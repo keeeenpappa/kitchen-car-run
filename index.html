@@ -669,7 +669,8 @@ const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd
   dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
   wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
   smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
-  forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45}};
+  forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
+  haggle:{n:'値切り上手',e:'💰',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -935,18 +936,21 @@ function waterPlant(p,c,tx,ty){
 }
 function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6');sfx('harvest')}
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
+// 値切り上手: road-shop prices 30% off for the one who has the skill working
+const haggling=p=>!!p&&(p.skT||0)>0&&p.skill==='haggle';
+const priceFor=(p,it,shop)=>shop&&haggling(p)?Math.max(1,Math.round(it.price*0.7)):it.price;
 function buy(list,p,shop,tx,ty){
   if(!list||!list.length)return;
-  const it=list[wrap(p.cur,list.length)];
+  const it=list[wrap(p.cur,list.length)],pr=priceFor(p,it,shop);
   const no=m=>{say(p,m);sfx('nope')};
   if(it.sold){no('売り切れ');return}
-  if(S.money<it.price){no('お金が足りない');return}
+  if(S.money<pr){no('お金が足りない');return}
   if(it.type==='equip'&&p.hold){no('手を空けて受け取る');return}
   sfx(it.type==='fuel'&&S.fuel<FUEL_MAX?'fuel':it.type==='mystery'?'mystery':it.type==='fuel'?'nope':'buy');
   if(it.type==='fuel'){
     if(S.fuel>=FUEL_MAX){say(p,'もう満タン');return}
-    S.money-=it.price;S.fuel=Math.min(FUEL_MAX,S.fuel+it.qty);float(tx+.5,ty,'⛽ +'+it.qty+(S.fuel>=FUEL_MAX?'（満タン）':''),'#ffd0c0');return}
-  S.money-=it.price;
+    S.money-=pr;S.fuel=Math.min(FUEL_MAX,S.fuel+it.qty);float(tx+.5,ty,'⛽ +'+it.qty+(S.fuel>=FUEL_MAX?'（満タン）':''),'#ffd0c0');return}
+  S.money-=pr;if(pr<it.price)float(tx+.5,ty-0.5,'💰 値切った！ -'+(it.price-pr)+'G','#bff2c6');
   if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);if(it.id==='plates')S.cleanPlates+=PLATES_PER_STAND;float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
   if(it.type==='pack'){S.stock[it.id]=(S.stock[it.id]||0)+it.qty;float(tx+.5,ty,'+'+it.qty+' '+ING[it.id].e)}
   else if(it.type==='seed'){S.seeds[it.id]=(S.seeds[it.id]||0)+it.qty;float(tx+.5,ty,'種+'+it.qty+' '+ING[it.id].e)}
@@ -2202,7 +2206,7 @@ function drawOffer(items,cx,y,shop,fx){
     else if(it.type==='equip'){drawItem(makeEquip(it.id,it.pro),cxx,y+16,30)}
     else{emoji(ING[it.id].e,cxx,y+16,20);if(it.type==='seed')text('種',cxx+13,y+6,10,'#bff2c6',800)}
     text(it.type==='mystery'?'×?':'×'+it.qty,cxx,y+34,10,'#cfe',700);
-    text(it.price+'G',cxx,y+48,11,S.money>=it.price?'#ffe08a':'#ff9c9c',800);
+    {const pr=priceFor(localP(),it,shop);text(pr+'G',cxx,y+48,11,pr<it.price?'#7fe0a0':S.money>=pr?'#ffe08a':'#ff9c9c',800)}
     if(it.sold)text('売切',cxx,y+20,12,'#fff',800);
     ctx.globalAlpha=1;
   });
@@ -2659,7 +2663,7 @@ function drawUpcomingPhone(){
     items.forEach((it,i)=>{const cx=x+sw+2+i*iw+12,cy=y+33;const a0=ctx.globalAlpha;ctx.globalAlpha=a0*(it.sold?0.35:1);
       if(it.type==='mystery')emoji('🎁',cx,cy,16);else if(it.type==='fuel')emoji('⛽',cx,cy,16);
       else if(it.type==='equip')drawItem(makeEquip(it.id,it.pro),cx,cy,20);else{emoji(ING[it.id].e,cx,cy,16);if(it.type==='seed')text('種',cx+9,cy-8,9,'#bff2c6',800)}
-      text(it.price+'G',cx+12,cy+1,11,S.money>=it.price?'#ffe08a':'#ff9c9c',800,'left');ctx.globalAlpha=a0});
+      {const pr=priceFor(localP(),it,s);text(pr+'G',cx+12,cy+1,11,pr<it.price?'#7fe0a0':S.money>=pr?'#ffe08a':'#ff9c9c',800,'left')}ctx.globalAlpha=a0});
     ctx.globalAlpha=1;
     x+=w+8;
   }

@@ -668,7 +668,7 @@ const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd
   grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ2倍',dur:15,cd:45},
   dash:{n:'はやあし',e:'💨',d:'自分の走る速さ1.5倍',dur:10,cd:35},
   wash:{n:'アライグマ',e:'🫧',d:'自分の皿洗いが2倍速',dur:12,cd:40},
-  smile:{n:'看板娘',e:'💖',d:'列で待っているお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
+  smile:{n:'看板娘',e:'💖',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
   forage:{n:'採りじょうず',e:'🍄',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45}};
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
@@ -687,6 +687,10 @@ function skillNow(p,K){
   if(K===SKILLS.smile){
     const w=S.phase==='stop'?waiting():[];
     if(!w.length){say(p,'列で待っているお客さんがいない');return false}
+    // only works close to the line: within 2 tiles of a queue spot
+    const px=Math.floor(p.x),py=Math.floor(p.y);let near=false;
+    for(let k=0;k<QMAX;k++)if(Math.max(Math.abs(px-(QX+k)),Math.abs(py-QY))<=2)near=true;
+    if(!near){say(p,'列の近く（2マス以内）で使う');return false}
     for(const c of w){c.pat=c.max;const [x,y]=custPos(c);float(x,y-0.7,'💖','#ffb3c8')}
     return true}
   return true;

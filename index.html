@@ -357,7 +357,7 @@ function newRun(np,mode){
     upCount:{},offers:[],rerollCost:8};
   S.map[6][4].item={kind:'can',water:3};
   S.map[6][5].item={kind:'basket',items:[]};
-  for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0})}
+  for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
   if(mode==='layout')setupLayout();else showChoose();
@@ -664,8 +664,20 @@ function bringInside(){
 // ---------- feedback ----------
 function say(p,m){p.msg=m;p.msgT=1.6}
 // ---------- skills (test version: every chef is 包丁職人) ----------
-const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40}};
-const skillOf=p=>SKILLS.knife;
+const SKILLS={knife:{n:'包丁職人',e:'🔪',d:'切るのが2倍速',dur:10,cd:40},
+  grow:{n:'畑のおばあちゃん',e:'🌱',d:'苗の育つ速さ3倍',dur:15,cd:45}};
+const SKILL_K=Object.keys(SKILLS);
+const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
+// each player's skill is picked on the title (this device's choice is remembered)
+let PSKILL=['knife','knife','knife','knife'];
+try{const v=JSON.parse(localStorage.getItem('kcr-skill')||'null');if(Array.isArray(v))PSKILL=PSKILL.map((d,i)=>SKILLS[v[i]]?v[i]:d)}catch(_){}
+function cycleSkill(i){PSKILL[i]=SKILL_K[(SKILL_K.indexOf(PSKILL[i])+1)%SKILL_K.length];try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
+function skillRowInner(){
+  const n=NET.role!=='off'?1:4;
+  return '<span style="align-self:center;min-width:9em">スキル</span>'+Array.from({length:n},(_,i)=>{const K=SKILLS[PSKILL[i]];
+    return `<button class="ovbtn" data-act="skl" data-v="${i}">${NET.role!=='off'?'この端末':'P'+(i+1)}：${K.e}${K.n}（${K.d}）</button>`}).join('');
+}
+const skillRow=()=>`<div class="row" id="skillRow">${skillRowInner()}</div>`;
 function useSkill(p){
   const K=skillOf(p);if(!K)return;
   if((p.skT||0)>0)return;
@@ -1228,6 +1240,7 @@ function readyTick(dt){
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
+  if(a==='skl'){cycleSkill(+v||0);const r=document.getElementById('skillRow');if(r){r.innerHTML=skillRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='skl'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
   if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a!=='dev'&&a!=='title'&&guestLocked())return;   // the host's choice screens: a guest only watches
@@ -1294,6 +1307,7 @@ function showTitle(){
     <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td><td>Y ／ △ ／ X</td></tr></table>
     <p class="sub pconly" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
+    ${skillRow()}
     ${sndRow()}
     ${viewRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
@@ -1408,11 +1422,12 @@ function update(dt){
   if(S.phase==='stop'&&S.arrT!=null&&S.arrT<ARRIVE_T){
     const e=Math.min(1,S.arrT/1.8);S.roadOff+=SPEEDS[1]*(1-e)*(1-e)*dt;S.arrT+=dt;
     for(const f of S.floats)f.t+=dt;return}
-  // stations
+  // stations (畑のおばあちゃん's skill speeds every planter up while it works)
+  const growBoost=S.players.some(q=>(q.skT||0)>0&&q.skill==='grow')?3:1;
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     const it=c.item; if(!it||it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
@@ -3033,7 +3048,10 @@ function hostStart(mode){
   // the room stays open: friends can still join (they watch, and come in once the town's service is over)
   NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true}}).catch(()=>{});
   newRun(1+g.length,mode==='layout'?'layout':'preset');
+  // online: P1 is this device's pick, each guest brings its own
+  g.forEach((p,i)=>{const pl=S.players[i+1];if(pl)pl.skill=guestSkill(p)});
 }
+const guestSkill=p=>{const k=p&&p.presence&&p.presence.skill;return SKILLS[k]?k:'knife'};
 // tie a guest to player slot k (its presses so far don't count)
 function bindSlot(p,k){
   const pr=p.presence||{};
@@ -3065,7 +3083,7 @@ function hostRoster(){
   while(canIn&&NET.waiting.length&&S.players.length<4){
     const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
     const k=S.players.length,[x,y]=spawnSpot(k);
-    S.players.push({i:k,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0});
+    S.players.push({i:k,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:guestSkill(p)});
     S.np=S.players.length;bindSlot(p,k);
     S.toast={text:'P'+(k+1)+' が参加しました！',t:0,life:3};sfx('ready');
     NET.lobby.presence({host:{code:NET.code,n:S.np,open:true}}).catch(()=>{});
@@ -3149,7 +3167,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10)]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill)]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -3176,7 +3194,7 @@ async function joinRoom(code){
     if(NET.role!=='guest'){room.leave().catch(()=>{});return}
     NET.room=room;
     room.on('ov',onOvMsg,()=>{});
-    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null],uid:myUid()}).catch(()=>{});
+    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null],uid:myUid(),skill:PSKILL[0]}).catch(()=>{});
     if(NET.localOv==='conn')guestLocalOv('wait');
   }catch(e){if(NET.role!=='guest')return;leaveOnline();NET.err='部屋 '+code+' が見つかりませんでした。コードを確かめてください。';showTitle()}
 }
@@ -3292,7 +3310,7 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife'});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));

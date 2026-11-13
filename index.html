@@ -493,25 +493,27 @@ function furnPick(p,c,tx,ty){
     if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){if(!tableOK(tx,ty)){say(p,'となりにテーブルがある（お客さんが座る場所）');return true}S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
     if(inTruck(tx,ty)){say(p,'テーブルは外の広場に置く');return true}
   }
+  if(lay&&c.t==='table'&&c.item&&c.item.kind==='dirty'){if(!h){p.hold={kind:'dirty',cnt:1};c.item=null;sfx('pick')}else say(p,'手を空けて汚れた皿を持つ');return true}
   if(lay&&!h&&c.t==='table'){p.hold={kind:'station',st:'table'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
     if(tx===LEVER_FRONT[0]&&ty===LEVER_FRONT[1]){say(p,'運転席の前はあけておく');return true}
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};p.hold=null;rebuildStations();return true;
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
   // (in layout anything; otherwise cooking equipment for cooking equipment). Tools on counters are never swapped.
   if(holdsFurn(p)&&h.st!=='table'&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
-    if(c.item||c.dirty||c.clean){say(p,'上の物をどけてから');return true}
-    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null};
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null};
+    if(c.item){say(p,'上の物をどけてから');return true}
+    // a sink takes its plates (dirty and washed) along
+    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0};
+    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0};
     p.hold=old;rebuildStations();return true;
   }
   // layout: pick up furniture from the truck (a counter only when nothing is on it; a planter takes its crop along)
   if(lay&&!h&&FURN.includes(c.t)&&inTruck(tx,ty)){
-    if(c.item||c.dirty||c.clean){if(c.t==='counter'&&c.item)return false;say(p,'上の物をどけてから');return true}
-    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null};
+    if(c.item){if(c.t==='counter')return false;say(p,'上の物をどけてから');return true}
+    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0};
     S.map[ty][tx]=blankTile(ty);rebuildStations();return true;
   }
   // outside (layout, or the town stop): equipment and tools can be set down and picked up
@@ -759,11 +761,12 @@ function placeOrTake(p,c){
 function doPick(p,c,tx,ty){
   if(furnPick(p,c,tx,ty))return;
   if(S.phase==='layout'){
-    // only rearranging: tools can go on / come off counters, nothing else is used
-    const tool=it=>it&&(it.kind==='can'||it.kind==='basket');
+    // only rearranging: tools and plates can go on / come off counters; dirty plates into the sink
+    // (washing starts once on the road), empty ones back on the stand; nothing else is used
+    const tool=it=>it&&(it.kind==='can'||it.kind==='basket'||it.kind==='dirty'||emptyPlate(it));
     if(c.t==='counter'&&(tool(p.hold)||(!p.hold&&tool(c.item)))){placeOrTake(p,c);return}
-    if(c.t!=='floor'&&c.t!=='gap'&&c.t!=='wall')say(p,'配置の時間は並べ替えだけ');
-    return;
+    const plateTo=(c.t==='sink'&&p.hold&&p.hold.kind==='dirty')||(c.t==='plates'&&emptyPlate(p.hold));
+    if(!plateTo){if(c.t!=='floor'&&c.t!=='gap'&&c.t!=='wall')say(p,'配置の時間は並べ替えだけ');return}
   }
   switch(c.t){
     case 'fridge':{

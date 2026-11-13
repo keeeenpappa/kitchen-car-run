@@ -568,7 +568,7 @@ function pollPads(){
   for(let i=0;i<4;i++){
     const gp=PADGP[i]; if(!gp){pads[i]=null;continue}
     const b=k=>!!(gp.buttons[k]&&gp.buttons[k].pressed);
-    const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(3),sk:b(5),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
+    const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(5),sk:b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
     const prev=padPrev[gp.index]||{};
     pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0,gp};
     padPrev[gp.index]=now;
@@ -675,9 +675,9 @@ const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',ac
 const DEVK={
   kb0:{sk:'R',pick:'Space',act:'F',sw:'Q',menu:'Esc',ready:'R',ok:'Space',move:'WASD'},
   kb1:{sk:';',pick:'/',act:'.',sw:',',menu:'Esc',ready:'R',ok:'Space',move:'矢印'},
-  xbox:{sk:'RB',pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A',move:'十字'},
-  ns:{sk:'R',pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B',move:'十字'},
-  ps:{sk:'R1',pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×',move:'十字'},
+  xbox:{sk:'Y',pick:'A',act:'X',sw:'LB',menu:'メニュー',ready:'ビュー',ok:'A',move:'十字'},
+  ns:{sk:'X',pick:'B',act:'Y',sw:'L',menu:'＋',ready:'－',ok:'B',move:'十字'},
+  ps:{sk:'△',pick:'×',act:'□',sw:'L1',menu:'OPTIONS',ready:'SHARE',ok:'×',move:'十字'},
 };
 const DEVN={auto:'自動',kb:'キーボード',xbox:'Xbox',ns:'Switchプロコン',ps:'PlayStation'};
 let DEVPREF=['auto','auto','auto','auto'];
@@ -1289,7 +1289,7 @@ function showTitle(){
     <table class="ctl pconly"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th><th>スキル</th></tr>
     <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td><td><kbd>R</kbd></td></tr>
     <tr><td>P2</td><td>矢印キー</td><td><kbd>/</kbd> か <kbd>Enter</kbd></td><td><kbd>.</kbd></td><td><kbd>,</kbd></td><td><kbd>;</kbd></td></tr>
-    <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td><td>RB ／ R1 ／ R</td></tr></table>
+    <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td><td>Y ／ △ ／ X</td></tr></table>
     <p class="sub pconly" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
     ${sndRow()}

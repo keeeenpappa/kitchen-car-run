@@ -722,15 +722,10 @@ const emptyPlate=x=>!!x&&x.kind==='plate'&&!x.bare&&!x.items.length;
 const canAdd=(pl,it)=>it.kind==='ing'&&isDone(it)&&!it.burnt&&pl.items.length<3;
 function placeOrTake(p,c){
   const h=p.hold,it=c.item;
-  // plates are carried one at a time: from a stack of empty plates on a counter, take the top one
-  if(!h&&it&&emptyPlate(it)&&(it.cnt||1)>1){it.cnt--;p.hold={kind:'plate',items:[]};return}
+  // a counter holds one plate: empty plates only stack on the plate stand
   if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
-  if(h&&it&&emptyPlate(h)&&emptyPlate(it)){it.cnt=(it.cnt||1)+1;p.hold=null;return}   // empty plates stack
+  if(h&&it&&emptyPlate(h)&&emptyPlate(it)){say(p,'台には1枚だけ（重ねるのは皿置き場）');return}
   if(h&&it&&(h.kind==='dirty'||it.kind==='dirty')){say(p,h.kind==='dirty'?'汚れた皿はシンクへ':'汚れた皿がある');return}
-  // a prepared ingredient (or a stack of them) onto a pile of empty plates: take the top plate with it
-  if(h&&it&&c.t==='counter'&&emptyPlate(it)&&(it.cnt||1)>1&&(h.kind==='ing'||(h.kind==='plate'&&h.bare))){
-    if(h.kind==='ing'&&!(isDone(h)&&!h.burnt)){say(p,h.burnt?badW(h):'先に'+STEPN[nextStep(h)]);return}
-    it.cnt--;p.hold={kind:'plate',items:h.kind==='plate'?h.items:[h]};return}
   if(h&&!it){
     if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0}
     else if(c.t==='board')say(p,'切らなくていい');
@@ -1052,13 +1047,13 @@ function clearKitchen(){
     if(!c.item)continue;
     if(TOOL[c.item.kind]){if(c.item.kind==='basket'){lost+=c.item.items.length;c.item.items=[]}continue}
     if(c.item.kind==='station')continue; // bought equipment not installed yet is kept
-    if(emptyPlate(c.item)||c.item.kind==='dirty'){c.item=null;continue}   // plates: all back on the stand below
+    // plates stay where they are: empty / dirty ones as they are, a dish loses its food and is left dirty
+    if(emptyPlate(c.item)||c.item.kind==='dirty')continue;
+    if(c.item.kind==='plate'&&!c.item.bare){lost++;c.item={kind:'dirty',cnt:1};continue}
     lost++;c.item=null;c.prog=0;c.burn=0}
-  // after closing every plate is washed and back on the stand
-  S.cleanPlates=PLATES_TOTAL;
-  for(const r of S.map)for(const c of r){if(c.t==='sink'){c.dirty=0;c.clean=0}if(c.t==='table'&&c.item&&c.item.kind==='dirty')c.item=null}
   for(const p of S.players){
-    if(p.hold&&(emptyPlate(p.hold)||p.hold.kind==='dirty')){p.hold=null;continue}
+    if(p.hold&&(emptyPlate(p.hold)||p.hold.kind==='dirty'))continue;
+    if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare){lost++;p.hold={kind:'dirty',cnt:1};continue}
     if(!p.hold||p.hold.kind==='station')continue;
     if(TOOL[p.hold.kind]){
       if(p.hold.kind==='basket'){lost+=p.hold.items.length;p.hold.items=[]}
@@ -1074,6 +1069,8 @@ function clearKitchen(){
 }
 function endStop(){
   sfx('close');
+  // customers still eating leave their plate behind, dirty
+  for(const c of S.cust)if(c.st==='eat'){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:1}}
   S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
@@ -1944,7 +1941,9 @@ function drawTile(c,x,y){
     for(let k=0;k<nd;k++)plateDisk(b.cx-5,b.cy+2-k*2.5,T*0.42,true);
     if((c.dirty||0)>0){ctx.fillStyle='rgba(120,190,230,.35)';ctx.beginPath();ctx.ellipse(b.cx-5,b.cy+2,13,6,0,0,7);ctx.fill()}
     for(let k=0;k<nc;k++)plateDisk(X+T-9,Y+T-14-k*3,T*0.3,false);
-    if((c.dirty||0)>1){ctx.fillStyle='rgba(16,26,30,.85)';rr(X+2,Y+T-16,20,14,7);ctx.fill();text('×'+c.dirty,X+12,Y+T-9,10,'#fff',800)}
+    // how many are waiting: dirty (brown, left) and washed (blue, right)
+    if((c.dirty||0)>0){ctx.fillStyle='rgba(110,70,30,.92)';rr(X+1,Y+T-16,22,14,7);ctx.fill();text('×'+c.dirty,X+12,Y+T-9,10,'#fff',800)}
+    if((c.clean||0)>0){ctx.fillStyle='rgba(30,110,170,.95)';rr(X+T-25,Y+5,24,15,7.5);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();text('✨'+c.clean,X+T-13,Y+12.5,10,'#fff',800)}
     for(const p of S.players)if(p.tx===x&&p.ty===y&&p.actT>0&&(!p.hold||p.hold.kind==='can')){
       const full=p.hold?FILL*proMul(c):WASH*proMul(c);
       ctx.fillStyle='rgba(0,0,0,.35)';rr(X+3,Y-9,T-6,12,6);ctx.fill();bar(X+6,Y-6,T-12,p.actT/full,p.hold?'#4fb3ff':'#9be7c4')}

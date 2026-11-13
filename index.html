@@ -57,7 +57,7 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 .stage{container-type:inline-size}
 #pauseBtn{position:absolute;left:68.5%;top:1.05%;height:5.3%;z-index:6;font-size:1.05cqw;padding:0 .9cqw;border-radius:.7cqw;display:flex;align-items:center;background:#2c4650}
 #pauseBtn[hidden]{display:none}
-#infoBtn{position:absolute;left:8px;top:14%;z-index:6;font-size:13px;padding:6px 10px;background:rgba(44,70,80,.9)}
+#infoBtn{position:absolute;left:8px;bottom:8px;z-index:6;font-size:13px;padding:6px 10px;background:rgba(44,70,80,.9)}
 #infoBtn.on{border-color:var(--truck)}
 body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px));z-index:21;border-radius:999px}
 #infoBtn[hidden]{display:none}
@@ -2576,7 +2576,29 @@ function updateCam(dt){
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
   const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
 }
-// phone: what the shop at my window (or the open market) sells, big, at the top of the screen,
+// phone: the camera doesn't show the road ahead, so the next shops (and what they sell) are listed at the top while driving
+function drawUpcomingPhone(){
+  if(S.phase!=='drive')return;
+  const lp=localP();if(lp){const c=tile(lp.tx,lp.ty);if(c&&c.t==='window'&&shopAtWindow(lp.tx))return}   // the big list is up instead
+  const list=S.shops.filter(s=>!s.fade&&s.x+2+WMARGIN>=3.5).sort((a,b)=>a.x-b.x).slice(0,2);
+  let x=10;const y=63;
+  for(const s of list){
+    const atF=inWindowZone(s)&&s.x+1>8,atB=inWindowZone(s)&&!atF;
+    const tag=atF?'前の窓口で買える':atB?'後ろの窓口で買える':'あと'+kmTxt(Math.max(0.25,s.x-WMARGIN-13.5))+'km';
+    // compact: name and when on one line, then each item with its price beside it
+    const items=s.items,iw=60,title=s.type.e+' '+s.type.n;
+    ctx.font=`800 13px ${FNT}`;const tw=ctx.measureText(title).width;ctx.font=`800 11px ${FNT}`;const gw=ctx.measureText(tag).width;
+    const w=Math.max(tw+gw+30,items.length*iw+12),h=48;
+    ctx.fillStyle='rgba(16,26,30,.86)';rr(x,y,w,h,9);ctx.fill();
+    ctx.strokeStyle=atF||atB?'#ffe27a':'#4f6c74';ctx.lineWidth=atF||atB?2.5:1.2;ctx.stroke();
+    text(title,x+8,y+11,13,'#fff',800,'left');text(tag,x+w-8,y+11,11,atF||atB?'#ffe27a':'#9db3b4',800,'right');
+    items.forEach((it,i)=>{const cx=x+6+i*iw+14,cy=y+33;ctx.globalAlpha=it.sold?0.35:1;
+      if(it.type==='mystery')emoji('🎁',cx,cy,17);else if(it.type==='fuel')emoji('⛽',cx,cy,17);
+      else if(it.type==='equip')drawItem(makeEquip(it.id,it.pro),cx,cy,22);else{emoji(ING[it.id].e,cx,cy,17);if(it.type==='seed')text('種',cx+10,cy-8,9,'#bff2c6',800)}
+      text(it.price+'G',cx+13,cy+1,11,S.money>=it.price?'#ffe08a':'#ff9c9c',800,'left');ctx.globalAlpha=1});
+    x+=w+10;
+  }
+}// phone: what the shop at my window (or the open market) sells, big, at the top of the screen,
 // so it is never under the stick / buttons or off the camera
 function drawShopPanelPhone(){
   const lp=localP();if(!lp||lp.seat)return;
@@ -2706,7 +2728,7 @@ function draw(){
   if(ph){ctx.save();ctx.scale(PZ,PZ);ctx.translate(-CAM.x*T,-CAM.y*T)}
   drawWorld(arr);
   if(ph)ctx.restore();
-  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
+  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawUpcomingPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();drawSidePanel()}
   drawWaiting();
   drawClosing();

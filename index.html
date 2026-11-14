@@ -3036,7 +3036,8 @@ function drawShopPanelPhone(){
   if(S.phase==='drive'&&c&&c.t==='window'){shop=shopAtWindow(lp.tx);if(shop&&!shop.fade){items=shop.items;title=shop.type.e+' '+shop.type.n}}
   else if(S.phase==='stop'&&lp.mk){items=S.market;title='🏪 市場'}
   if(!items||!items.length)return;
-  const W=GW*T/UZ,tot=items.length*0.95*T,fx=Math.max(8,(W-tot)/2),y=114;
+  // a road shop opens in the same top-left place as the list of upcoming shops (no jump to the middle)
+  const W=GW*T/UZ,tot=items.length*0.95*T,fx=shop?14:Math.max(8,(W-tot)/2),y=shop?117:114;
   ctx.font=`800 14px ${FNT}`;const tw=ctx.measureText(title).width+20;
   ctx.fillStyle='rgba(16,26,30,.92)';rr(fx-4,y-54,tw,24,12);ctx.fill();text(title,fx+6,y-42,14,'#ffe08a',800,'left');
   drawOffer(items,0,y,shop,fx);

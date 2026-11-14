@@ -96,6 +96,8 @@ body.touch #pauseBtn{display:none}
 .ovtime{color:var(--truck);font-family:var(--display);font-size:22px;font-weight:400}
 #stock{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;align-items:center}
 .chip.zero{color:var(--bad);opacity:.85}
+.bigscore{text-align:center;font-size:52px;font-weight:900;color:#ffe08a;line-height:1.05;margin:2px 0 8px;font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(0,0,0,.35)}.bigscore span{font-size:22px;margin-left:4px}
+table.score{opacity:.8;font-size:13px}
 .fi{display:inline-block;width:1.5em;height:1.5em;vertical-align:-0.42em;margin:-0.2em 0;background:center/contain no-repeat}
 .rooms{display:flex;flex-direction:column;gap:8px;margin:10px 0}
 .room{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
@@ -1404,6 +1406,7 @@ function resultScreen(title,lead,clear){
   const tst=S.townStars.length?`<p class="mut">町ごとの評価　${S.townStars.map(v=>`<span class="stars sm">${starsHtml(v)}</span>`).join('　')}</p>`:'';
   showOv(`<div class="box"><h2>${title}</h2><p>${lead}</p>
     <div class="stars big">${starsHtml(stars)}</div>
+    <div class="bigscore">${sc.total}<span>点</span></div>
     <table class="score">${sc.rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}点</td></tr>`).join('')}<tr class="tot"><td>スコア</td><td>${sc.total}点</td></tr></table>
     ${rec?'<p class="rec">NEW RECORD!</p>':`<p class="mut">${S.np}人のベスト ${old.score}点</p>`}
     ${nxt}${tst}

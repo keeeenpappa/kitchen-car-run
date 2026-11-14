@@ -170,7 +170,7 @@ body.touch .pconly{display:none}
   </div>
   <div class="help">
     <div><b>1回の流れ</b><br>次の町を選ぶ → 走行中に窓口でお店から買う → 町で準備（15秒）→ 営業（2分）。これを4回くり返します。評判の♥が0になると終わりです。</div>
-    <div><b>料理の作り方</b><br>並んでいるお客さんを「持つ」で空いているテーブルへ案内 → 冷蔵庫から食材を出す → 切る／焼く／ミキサー → 皿に乗せる → ドアから出てテーブルへ運ぶ。焼きすぎると焦げます。皿は5枚だけ。食べ終わった皿はテーブルに残るので、1枚ずつシンクへ運び、作業ボタン長押しで洗います。</div>
+    <div><b>料理の作り方</b><br>並んでいるお客さんを「持つ」で空いているテーブルへ案内 → 冷蔵庫から食材を出す → 切る／焼く／ミキサー（ミキサーは材料をいくつか入れて混ぜることもできる：🥚＋🌾で生地、🍓＋🥛でいちごミルク、🍎だけでりんごジュース） → 皿に乗せる → ドアから出てテーブルへ運ぶ。焼きすぎると焦げます。皿は5枚だけ。食べ終わった皿はテーブルに残るので、1枚ずつシンクへ運び、作業ボタン長押しで洗います。</div>
     <div><b>食材の集め方</b><br>窓口で買う（店は通り過ぎたら戻りません）。種は走行中の「種屋」か町の市場で買い、種箱から出して菜園に植えます。植えたらじょうろで1回水をあげると育ちます（じょうろは3回で空になるので、シンクで作業ボタン長押しで汲み直す）。評判の♥が多いほどチップが増えます。町の外の5つの採取場所（釣り堀・木・原木・畜舎・畑）で採る（タダ。カゴを持って行き「持つ」で始める。採った物は冷蔵庫で「持つ」を押してしまう）。</div>
   </div>
 </div>
@@ -210,12 +210,29 @@ const ING={
   lettuce:{n:'レタス',e:'🥬',steps:['chop'],price:6,grow:45,seed:4},
   tomato:{n:'トマト',e:'🍅',steps:['chop'],price:6,grow:60,seed:4},
   potato:{n:'じゃがいも',e:'🥔',steps:['chop','cook'],price:6,grow:75,seed:5},
-  strawberry:{n:'いちご',e:'🍓',steps:['blend'],price:8,grow:90,seed:6},
+  strawberry:{n:'いちご',e:'🍓',steps:['chop'],price:8,grow:90,seed:6},
   fish:{n:'魚',e:'🐟',steps:['chop','cook'],price:14},
   shrimp:{n:'エビ',e:'🦐',steps:['cook'],price:14},
   mushroom:{n:'キノコ',e:'🍄',steps:['chop','cook'],price:12},
-  apple:{n:'りんご',e:'🍎',steps:['blend'],price:8},
+  apple:{n:'りんご',e:'🍎',steps:['chop','cook'],price:8},
+  flour:{n:'小麦粉',e:'🌾',steps:[],price:7},                       // only goes into the mixer
+  // made in the mixer from raw ingredients (see MIXES); never bought
+  batter:{n:'生地',e:'🥣',steps:['blend','cook'],mix:true,doneN:'スポンジ',doneE:'🥮'},
+  smilkd:{n:'いちごミルク',e:'🥤',steps:['blend'],mix:true},
+  ajuice:{n:'りんごジュース',e:'🧃',steps:['blend'],mix:true},
 };
+// the mixer takes several raw ingredients; once they make one of these it starts mixing
+const MIXES=[{in:['egg','flour'],out:'batter'},{in:['milk','strawberry'],out:'smilkd'},{in:['apple'],out:'ajuice'}];
+const mixOf=out=>MIXES.find(m=>m.out===out);
+// can `id` go into a mixer that already holds `items`? (still part of some mix)
+function mixCan(items,id){
+  const want=items.concat([id]);
+  return MIXES.some(m=>{const left=m.in.slice();for(const x of want){const k=left.indexOf(x);if(k<0)return false;left.splice(k,1)}return true});
+}
+const mixDone=items=>{const a=items.slice().sort().join(',');const m=MIXES.find(m=>m.in.slice().sort().join(',')===a);return m?m.out:null};
+const ingName=it=>{const I=ING[it.id];return I.doneN&&isDone(it)?I.doneN:I.n};
+const ingEmoji=it=>{const I=ING[it.id];return I.doneE&&isDone(it)?I.doneE:I.e};
+const BUYABLE=()=>Object.keys(ING).filter(k=>!ING[k].mix);
 const STEPN={chop:'切る',cook:'焼く',blend:'ミキサー'};
 // ---------- gathering: five fixed spots in every town, each with its own small action ----------
 //  fish: cast and wait, press 作業 when 「！」 shows / mash: tap 作業 repeatedly /
@@ -238,9 +255,11 @@ const RECIPES={
   fishset:{n:'焼き魚定食',e:'🍱',ings:['fish','rice'],price:26},
   soup:{n:'海鮮スープ',e:'🍲',ings:['shrimp','tomato'],price:24},
   risotto:{n:'キノコリゾット',e:'🥘',ings:['rice','mushroom','cheese'],price:30},
-  applejuice:{n:'りんごジュース',e:'🧃',ings:['apple'],price:12},
+  applejuice:{n:'りんごジュース',e:'🧃',ings:['ajuice'],price:12},
   omelet:{n:'オムレツ',e:'🍳',ings:['egg','cheese'],price:20},
-  smilk:{n:'いちごミルク',e:'🥤',ings:['strawberry','milk'],price:16},
+  smilk:{n:'いちごミルク',e:'🥤',ings:['smilkd'],price:16},
+  shortcake:{n:'ショートケーキ',e:'🍰',ings:['batter','strawberry'],price:32},
+  bakedapple:{n:'焼きりんご',e:'🥧',ings:['apple'],price:14},
 };
 const TOWNS={
   port:{n:'港町',e:'⚓',menu:['fishset','soup'],gather:['fish','shrimp'],rate:1,pay:1.1,ground:'#cdb886',deco:'#4f97b8'},
@@ -248,12 +267,13 @@ const TOWNS={
   ranch:{n:'牧場の町',e:'🐄',menu:['omelet','smilk'],gather:['milk','cheese'],rate:1,pay:1.0,ground:'#9db866',deco:'#d9e6b0'},
   busy:{n:'駅前の町',e:'🚉',menu:['burger','fries'],gather:[],rate:1,pay:1.3,lively:true,ground:'#aaa59a',deco:'#6d6a63'},
   farm:{n:'畑の町',e:'🌾',menu:['sandwich','fries'],gather:['lettuce','tomato'],rate:1,pay:0.95,ground:'#c39f68',deco:'#8a6a3c'},
+  sweets:{n:'スイーツの町',e:'🍰',menu:['shortcake','bakedapple'],gather:['strawberry','apple'],rate:1,pay:1.1,ground:'#e3c3b8',deco:'#c77f9a'},
 };
 const pack=id=>({type:'pack',id,qty:3,price:Math.max(3,ING[id].price+rnd(4)-2)});
 const seedItem=id=>({type:'seed',id,qty:2,price:ING[id].seed+rnd(2)});
 const SHOPTYPES=[
   {n:'八百屋',e:'🥕',c:'#4f9a4c',w:3,gen:()=>pickN(['lettuce','tomato','potato','strawberry','apple'],2+rnd(2)).map(pack)},
-  {n:'パンと米の店',e:'🥖',c:'#c98d3e',w:3,gen:()=>pickN(['bread','rice','egg'],2+rnd(2)).map(pack)},
+  {n:'パンと米の店',e:'🥖',c:'#c98d3e',w:3,gen:()=>pickN(['bread','rice','egg','flour'],2+rnd(2)).map(pack)},
   {n:'肉とチーズの店',e:'🍖',c:'#b9484a',w:2,gen:()=>pickN(['meat','cheese','milk'],2).map(pack)},
   {n:'魚屋',e:'🐠',c:'#3a7fae',w:1,gen:()=>['fish','shrimp'].map(pack)},
   {n:'種屋',e:'🌱',c:'#6f8f2f',w:3,gen:()=>pickN(['lettuce','tomato','potato','strawberry'],2+rnd(2)).map(seedItem)},
@@ -323,7 +343,7 @@ const badW=it=>it&&it.id&&ING[it.id]&&ING[it.id].steps.at(-1)==='blend'?'ダメ�
 const nextStep=it=>it.kind==='ing'&&!it.burnt?ING[it.id].steps[it.step]:undefined;
 const isDone=it=>it.kind==='ing'&&it.step>=ING[it.id].steps.length;
 const fmtT=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
-function townNeeds(town){const s=new Set();for(const r of town.menu)for(const i of RECIPES[r].ings)s.add(i);return [...s]}
+function townNeeds(town){const s=new Set();for(const r of town.menu)for(const i of RECIPES[r].ings){if(ING[i].mix)mixOf(i).in.forEach(x=>s.add(x));else s.add(i)}return [...s]}
 
 // ---------- canvas ----------
 const cv=document.getElementById('cv');let ctx=cv.getContext('2d');
@@ -806,7 +826,7 @@ function accepts(c,h){
   if(h.kind!=='ing')return false;
   if(c.t==='board')return nextStep(h)==='chop';
   if(c.t==='stove')return nextStep(h)==='cook';
-  if(c.t==='blender')return nextStep(h)==='blend';
+  if(c.t==='blender')return nextStep(h)==='blend'||(!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan([],h.id));
   return false;
 }
 const isDish=x=>!!x&&x.kind==='plate'&&!x.bare&&x.items.length>0;
@@ -815,6 +835,11 @@ const emptyPlate=x=>!!x&&x.kind==='plate'&&!x.bare&&!x.items.length;
 const canAdd=(pl,it)=>it.kind==='ing'&&isDone(it)&&!it.burnt&&pl.items.length<3;
 function placeOrTake(p,c){
   const h=p.hold,it=c.item;
+  // a mixer still being filled: empty hand takes the last one back out, a fitting raw ingredient goes in
+  if(c.t==='blender'&&it&&it.kind==='mix'){
+    if(!h){p.hold=newIng(it.items.pop());if(!it.items.length)c.item=null;return}
+    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);return}
+    say(p,'この組み合わせは混ぜられない');return}
   // a counter holds one plate: empty plates only stack on the plate stand
   if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&it&&emptyPlate(h)&&emptyPlate(it)){say(p,'台には1枚だけ（重ねるのは皿置き場）');return}
@@ -823,7 +848,8 @@ function placeOrTake(p,c){
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire'}
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';
+      if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c)}}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');
     else if(c.t==='blender')say(p,'ミキサーに入れない');
@@ -852,6 +878,8 @@ function placeOrTake(p,c){
     c.item={kind:'plate',bare:!onPlate,items:all};p.hold=null;
   }
 }
+// the mixer's contents make a mix: it turns into that and starts mixing
+function mixStart(c){const out=mixDone(c.item.items);if(out){c.item=newIng(out);c.prog=0;c.burn=0}}
 function doPick(p,c,tx,ty){
   {const k=kidNear(p);if(k){k.kidAway=2;float(k.kx,k.ky-0.6,'👶 はーい','#8fe39a');sfx('seat');return}}
   if(furnPick(p,c,tx,ty))return;
@@ -995,7 +1023,7 @@ function buy(list,p,shop,tx,ty){
   if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);if(it.id==='plates')S.cleanPlates+=PLATES_PER_STAND;float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
   if(it.type==='pack'){S.stock[it.id]=(S.stock[it.id]||0)+it.qty;float(tx+.5,ty,'+'+it.qty+' '+ING[it.id].e)}
   else if(it.type==='seed'){S.seeds[it.id]=(S.seeds[it.id]||0)+it.qty;float(tx+.5,ty,'種+'+it.qty+' '+ING[it.id].e)}
-  else{const ids=pickN(Object.keys(ING),2);for(const id of ids)S.stock[id]=(S.stock[id]||0)+2;
+  else{const ids=pickN(BUYABLE(),2);for(const id of ids)S.stock[id]=(S.stock[id]||0)+2;
     S.toast={text:'🎁 袋の中身：'+ids.map(id=>ING[id].e+ING[id].n+'×2').join('　'),t:0,life:4}}
   if(shop)it.sold=true;
 }
@@ -1726,7 +1754,7 @@ function drawItem(it,cx,cy,s,inHand){
       ctx.strokeStyle='#cfc6b3';ctx.lineWidth=1.5;ctx.stroke();
       ctx.strokeStyle='rgba(120,160,190,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,s*0.36,0,7);ctx.stroke()}
     const n=it.items.length;
-    it.items.forEach((x,i)=>{const a=n===1?0:(i/n)*Math.PI*2-Math.PI/2,r=n===1?0:s*0.2;emoji(ING[x.id].e,cx+Math.cos(a)*r,cy+Math.sin(a)*r,s*(n===1?0.55:0.4))});
+    it.items.forEach((x,i)=>{const a=n===1?0:(i/n)*Math.PI*2-Math.PI/2,r=n===1?0:s*0.2;emoji(ingEmoji(x),cx+Math.cos(a)*r,cy+Math.sin(a)*r,s*(n===1?0.55:0.4))});
     const rid=n?matchRecipe(it.items):null;
     if(rid)emoji(RECIPES[rid].e,cx+s*0.42,cy-s*0.42,s*0.38);
     return;
@@ -1779,10 +1807,14 @@ function drawItem(it,cx,cy,s,inHand){
     ctx.fillStyle='#8a6a3c';rr(cx-s*0.32,cy-s*0.3,s*0.64,s*0.62,6);ctx.fill();
     emoji(ING[it.id].e,cx,cy-s*0.02,s*0.36);text('種',cx,cy+s*0.2,s*0.2,'#fff');return;
   }
+  if(it.kind==='mix'){   // a mixer being filled: what is in it so far
+    const n=it.items.length;
+    it.items.forEach((id,k)=>emoji(ING[id].e,cx+(k-(n-1)/2)*s*0.3,cy-s*0.05,s*0.36));
+    text('混ぜる前',cx,cy+s*0.36,10,'#fff',800);return}
   const I=ING[it.id];
   if(it.burnt){ctx.fillStyle='#222';ctx.beginPath();ctx.arc(cx,cy,s*0.36,0,7);ctx.fill();emoji('💨',cx,cy,s*0.42);return}
   ctx.fillStyle='rgba(0,0,0,.16)';ctx.beginPath();ctx.ellipse(cx+1,cy+s*0.26,s*0.24,s*0.07,0,0,7);ctx.fill();
-  emoji(I.e,cx,cy,s*0.62);
+  emoji(ingEmoji(it),cx,cy,s*0.62);
   const st=I.steps;
   st.forEach((k,i)=>{const px=cx-(st.length-1)*5+i*10,py=cy+s*0.38;ctx.fillStyle=i<it.step?'#7fd893':'rgba(0,0,0,.55)';ctx.beginPath();ctx.arc(px,py,4,0,7);ctx.fill()});
   if(it.step>0){const k=st[it.step-1];text(k==='chop'?'切':k==='cook'?'焼':'混',cx+s*0.34,cy-s*0.32,11,'#fff',800)}
@@ -2281,7 +2313,7 @@ function house3d(x,y,w,h,col,roof,flat){
   ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(x,y+h-3,w,3);
 }
 const hash=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v)};
-const PASS_TOWNS=['port','forest','ranch','busy','farm','none'];
+const PASS_TOWNS=['port','forest','ranch','busy','farm','sweets','none'];
 function drawPassingTown(ro){
   const sky=ctx.createLinearGradient(0,0,0,6.6*T);sky.addColorStop(0,'#8fcbe6');sky.addColorStop(1,'#d9f0f6');
   ctx.fillStyle=sky;ctx.fillRect(0,0,GW*T,7*T);
@@ -2388,6 +2420,7 @@ const LOOKS={
   ranch:{sky:'#bfe4f2',cols:['#c0504d','#f1e6cf','#e2c48f','#d77f5a'],roof:'#7a3a2a',mark:['🐄','🌾','🐓']},
   busy:{sky:'#c9dcea',cols:['#b9c4cc','#e6e0d4','#9fb2bf','#d8c9b5'],roof:'#5b6770',mark:['🚉','🏢','🚌']},
   farm:{sky:'#cfe9f5',cols:['#f3e3b5','#e7b77f','#f6efe0','#d9a75a'],roof:'#9a5a2c',mark:['🌻','🌽','🚜']},
+  sweets:{sky:'#ffd9e6',cols:['#fbd3e0','#fff0c9','#cfeedd','#e6d4f5'],roof:'#d0607e',mark:['🍰','🍭','🧁']},
   none:{sky:'#bfe4f2',cols:['#f6efe0','#f2d8a7','#d9eef5','#f0c9b4'],roof:'#b0603a',mark:['🌳','🏠','🌷']},
 };
 function drawBackdrop(){const id=(S.town&&LOOKS[S.town.id])?S.town.id:'none';cachedRect('bd'+id,0,0,GW*T,7*T,()=>drawBackdropRaw())}
@@ -3262,7 +3295,7 @@ function renderHud(){
   let info='';
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
     const SHORT={chop:'切',cook:'焼',blend:'混'};
-    const stepTxt=i=>ING[i].e+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
+    const stepTxt=i=>ING[i].mix?'('+mixOf(i).in.map(x=>ING[x].e).join('+')+')'+ING[i].steps.map(s=>SHORT[s]).join('→'):ING[i].e+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
     info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>RECIPES[r].e+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${ING[id].e}${n}</span>`}).join(' ');
     if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>RECIPES[o].e).join('')).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
@@ -3481,6 +3514,7 @@ function encItem(it){
     case 'ing':return [0,ING_K.indexOf(it.id),it.step,it.burnt?1:0];
     case 'plate':return [1,it.bare?1:0,it.items.map(x=>[ING_K.indexOf(x.id),x.step,x.burnt?1:0]),it.cnt||1];
     case 'dirty':return [7,it.cnt||1];
+    case 'mix':return [8,it.items.map(id=>ING_K.indexOf(id))];
     case 'can':return [2,it.water,it.bonus||0,encUps(it)];
     case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id)),encUps(it)];
     case 'power':return [6,UPK.indexOf(it.up)];
@@ -3679,6 +3713,7 @@ function decItem(a){
     case 0:return ing(a[1],a[2],a[3]);
     case 1:{const o={kind:'plate',bare:!!a[1],items:(Array.isArray(a[2])?a[2]:[]).slice(0,3).map(x=>ing(x[0],x[1],x[2]))};if(+a[3]>1)o.cnt=Math.min(9,+a[3]);return o}
     case 7:return {kind:'dirty',cnt:Math.max(1,Math.min(9,+a[1]||1))};
+    case 8:return {kind:'mix',items:(Array.isArray(a[1])?a[1]:[]).slice(0,3).map(i=>ING_K[i]).filter(Boolean)};
     case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0,ups:decUps(a[3])};
     case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean),ups:decUps(a[3])};
     case 6:return UPK[a[1]]?{kind:'power',up:UPK[a[1]]}:null;

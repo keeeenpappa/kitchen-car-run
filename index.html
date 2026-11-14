@@ -50,6 +50,11 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 #ov[hidden]{display:none}
 #readyBtn{position:absolute;bottom:4%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
   background-image:linear-gradient(90deg,rgba(255,255,255,.65) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
+.stars{font-size:1.9em;line-height:1;margin:.15em 0 .3em;letter-spacing:.05em}.stars.big{font-size:2.8em}.stars.sm{font-size:1em;letter-spacing:0}
+.stars .st{color:#4a5a5e}.stars .st.on{color:#ffd84a;text-shadow:0 0 6px rgba(255,216,74,.5)}.stars .st.half{background:linear-gradient(90deg,#ffd84a 50%,#4a5a5e 50%);-webkit-background-clip:text;background-clip:text;color:transparent}
+table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score td{padding:.12em .6em;text-align:left}table.score td+td{text-align:right;font-weight:700}table.score tr.tot td{border-top:1px solid #6a7a7e;font-size:1.3em;color:#ffe08a;font-weight:800}
+.rec{font-size:1.6em;font-weight:900;color:#ff8ad0;text-shadow:0 0 10px rgba(255,138,208,.6);animation:recp .6s ease-in-out infinite alternate;margin:.2em 0}@keyframes recp{to{transform:scale(1.08)}}
+.perf{color:#8fe39a;font-weight:800}.best{color:#ffe08a}
 .money{display:flex;align-items:baseline;justify-content:center;gap:.4em;margin:.2em 0 .5em;font-weight:800;color:#ffe08a}.money .mk{font-size:1em;color:#cfe0e2}.money .mv{font-size:2.4em;line-height:1;text-shadow:0 2px 0 rgba(0,0,0,.35)}.money .mx{font-size:1em;color:#ff9c9c;margin-left:.8em}
 .skl-lab{align-self:flex-start;min-width:9em;padding-top:10px}
 .skl-col{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
@@ -363,7 +368,7 @@ function newRun(np,mode){
     earned:0,served:0,missed:0,totalEarned:0,totalServed:0,floats:[],map:buildMap(),players:[],
     roadOff:0,gatherLeft:[0,0],market:[],paused:false,t:0,
     up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
-    upCount:{},offers:[],rerollCost:8};
+    upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[]};
   S.map[6][4].item={kind:'can',water:3};
   S.map[6][5].item={kind:'basket',items:[]};
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
@@ -1200,12 +1205,17 @@ function endStop(){
   // customers still eating leave their plate behind, dirty
   for(const c of S.cust)if(c.st==='eat'){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.order2?2:1}}
   S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
+  const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
+  const tst=townStars(S.served,S.missed);S.townStars.push(tst);
+  const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0);
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
   const lost=clearKitchen();
   const last=S.stop>=STOPS;
   showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
-    <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b></p>
+    <div class="stars">${starsHtml(tst)}</div>
+    <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b>${perf?' <span class="perf">ノーミス ＋'+PERFECT_PT+'点</span>':''}</p>
+    <p class="mut">この町のスコア <b>${tpts}点</b>　（合計 ${runScore(false).total}点）</p>
     ${moneyBig('評判 '+'♥'.repeat(S.hearts))}
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
     <div class="row"><button class="ovbtn hold autofocus" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}（${OVK()}）</button></div></div>`);
@@ -1257,16 +1267,53 @@ function takeUpgrade(i){
   S.upCount[u.id]=(S.upCount[u.id]||0)+1; S.rerollCost=8;
   S.ovT=EQ_TIME;showEquipShop();
 }
+// ---------- score (score attack: best per player count, kept in this browser) ----------
+const SERVE_PT=20, PERFECT_PT=50, CLEAR_PT=300, HEART_PT=100;
+// customers a town sends on average (the stars are measured against this)
+const expCust=()=>SERVICE/[0,15,11,9,7.5][S.np];
+// town stars: plates served against the town's customers, half a star off per angry customer
+function townStars(served,missed){
+  const r=served/(expCust()*((S.town&&S.town.rate)||1));
+  const base=r>=1?5:r>=0.8?4:r>=0.6?3:r>=0.4?2:1;
+  return Math.max(0.5,base-0.5*missed);
+}
+function runScore(clear){
+  const earned=S.totalEarned+(S.phase==='over'?S.earned:0), served=S.totalServed+(S.phase==='over'?S.served:0);
+  const rows=[['売上 '+earned+'G',earned],['提供 '+served+'皿 ×'+SERVE_PT,served*SERVE_PT],['ノーミスの町 '+S.perfect+' ×'+PERFECT_PT,S.perfect*PERFECT_PT]];
+  if(clear){rows.push(['完走ボーナス',CLEAR_PT]);rows.push(['残った評判 '+S.hearts+' ×'+HEART_PT,S.hearts*HEART_PT])}
+  return {rows,total:rows.reduce((a,r)=>a+r[1],0)};
+}
+// trip stars from the score: the bar is roughly what a run serving every customer scores
+function tripBars(){const e=STOPS*expCust()*(22+8+SERVE_PT)+CLEAR_PT+HEART_MAX*HEART_PT;return [0.3,0.5,0.7,0.9].map(f=>Math.round(e*f/10)*10)}
+function tripStars(sc){let n=1;for(const v of tripBars())if(sc>=v)n++;return n}
+function starsHtml(v){let h='';for(let i=1;i<=5;i++)h+=`<span class="st${v>=i?' on':v>=i-0.5?' half':''}">★</span>`;return h}
+let BEST={};
+try{const v=JSON.parse(localStorage.getItem('kcr-best')||'null');if(v&&typeof v==='object')BEST=v}catch(_){}
+function bestLine(){
+  const xs=[1,2,3,4].filter(n=>BEST[n]).map(n=>`${n}人 <b>${BEST[n].score}点</b> <span class="stars sm">${starsHtml(BEST[n].stars)}</span>`);
+  return xs.length?`<p class="best">ベスト　${xs.join('　')}</p>`:'';
+}
+function resultScreen(title,lead,clear){
+  const sc=runScore(clear), stars=tripStars(sc.total), b=tripBars();
+  const old=BEST[S.np], rec=!old||sc.total>old.score;
+  if(rec){BEST[S.np]={score:sc.total,stars};try{localStorage.setItem('kcr-best',JSON.stringify(BEST))}catch(_){}}
+  const nxt=stars<5?`<p class="mut">次の★まで あと <b>${b[stars-1]-sc.total}点</b></p>`:'<p class="perf">最高評価！</p>';
+  const tst=S.townStars.length?`<p class="mut">町ごとの評価　${S.townStars.map(v=>`<span class="stars sm">${starsHtml(v)}</span>`).join('　')}</p>`:'';
+  showOv(`<div class="box"><h2>${title}</h2><p>${lead}</p>
+    <div class="stars big">${starsHtml(stars)}</div>
+    <table class="score">${sc.rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}点</td></tr>`).join('')}<tr class="tot"><td>スコア</td><td>${sc.total}点</td></tr></table>
+    ${rec?'<p class="rec">NEW RECORD!</p>':`<p class="mut">${S.np}人のベスト ${old.score}点</p>`}
+    ${nxt}${tst}
+    <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
+  if(rec)setTimeout(()=>sfx('record'),900);
+}
 function gameOver(){
   S.phase='over';sfx('over');
-  showOv(`<div class="box"><h2>評判がなくなった…</h2><p>${S.stop+1}つ目の町でお店をたたむことになりました。<br>合計の売上 ${S.totalEarned+S.earned}G</p>
-    <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
+  resultScreen('評判がなくなった…',`${S.stop+1}つ目の町でお店をたたむことになりました。`,false);
 }
 function showEnd(){
   S.phase='end';sfx('finish');
-  showOv(`<div class="box"><h2>旅の終わり</h2><p>${STOPS}つの町を回りきりました。</p>
-    <p>合計の売上 <b>${S.totalEarned}G</b> ／ 提供 <b>${S.totalServed}皿</b> ／ 残った評判 ${'♥'.repeat(S.hearts)}</p>
-    <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
+  resultScreen('旅の終わり',`${STOPS}つの町を回りきりました。`,true);
 }
 
 // ---------- overlays ----------
@@ -1400,6 +1447,7 @@ function showTitle(){
     <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
     <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
     <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
+    ${bestLine()}
     <div id="netTitle">${netTitleHtml()}</div></div>`);
 }
 const MOOD={'-10':'静か','0':'落ち着いた','10':'ほどよい人通り','20':'にぎやか','30':'活気あり'};
@@ -3737,6 +3785,7 @@ const SFX={
   close:t=>arp(t,[84,79,76,72,67,72],0.12,'triangle',.2,0.6),
   finish:t=>{arp(t,[72,72,72,76,79],0.11,'square',.08,0.2);arp(t+0.6,[77,81,84],0.1,'square',.08,0.8)},
   over:t=>arp(t,[67,66,65,64],0.28,'triangle',.2,0.8),
+  record:t=>{arp(t,[72,76,79,84,88],0.07,'square',.08,0.15);arp(t+0.45,[84,88,91,96],0.07,'square',.08,0.7)},
   ready:t=>arp(t,[72,79,84],0.07,'square',.08),
   confirm:t=>{osc(t,880,0.05,'square',.07);osc(t+0.05,1320,0.1,'square',.07)},
   gaswarn:t=>{osc(t,440,0.15,'square',.09);osc(t+0.2,440,0.15,'square',.09)},

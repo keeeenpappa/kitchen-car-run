@@ -369,7 +369,8 @@ function newRun(np,mode){
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
-  if(mode==='layout')setupLayout();else showChoose();
+  // everyone picks an animal (= skill) first; then the layout or the first town choice
+  S.startMode=mode;startSelect();
 }
 function rebuildStations(){
   S.stations=[];
@@ -1370,7 +1371,6 @@ function showTitle(){
     <tr><td>パッド</td><td>スティック</td><td>A ／ PS × ／ Switch B</td><td>X ／ □ ／ Y</td><td>LB ／ L1 ／ L</td><td>Y ／ △ ／ X</td></tr></table>
     <p class="sub pconly" style="color:var(--muted)">ゲームパッドは1台目がP1、2台目がP2…に対応します。3〜4人はゲームパッドで。<kbd>Esc</kbd>（パッドはメニュー／OPTIONS／＋）で一時停止。画面のボタン表示は、使っている物に合わせて自動で切り替わります。合わないときは下で選べます。</p>
     ${isTouch?'':devRow()}
-    ${skillRow()}
     ${sndRow()}
     ${viewRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
@@ -1482,6 +1482,7 @@ function menuInput(p,inp,dt){
 // ---------- update ----------
 function update(dt){
   S.t+=dt;
+  if(S.phase==='select'){selectUpdate(dt);return}
   if(S.phase==='stop'&&S.arrT!=null&&S.arrT<ARRIVE_T){
     const e=Math.min(1,S.arrT/1.8);S.roadOff+=SPEEDS[1]*(1-e)*(1-e)*dt;S.arrT+=dt;
     for(const f of S.floats)f.t+=dt;return}
@@ -2629,6 +2630,102 @@ function drawChefSprite(p,X,Y){
   for(const s of [-1,1]){const dx=s*12*CHEF_K+(side?s*st:0),dy=side?0:s*st*0.6;img(shoe,dx,dy)}
   img(L.over,0,-bob);
 }
+// ---------- character select: every player picks an animal (= skill) at the same time ----------
+const SEL_COLS=5, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
+function startSelect(){
+  S.phase='select';S.selT=0;S.selHold=0;hideOv();
+  for(const p of S.players){const k=SKILL_K.indexOf(p.skill);p.sel={cur:Math.max(0,k),ok:false,last:'0,0',rep:0};p.skill=SKILL_K[p.sel.cur]}
+}
+function selMove(p,k){if(!p.sel)return;k=wrap(k,SKILL_K.length);if(k!==p.sel.cur){p.sel.cur=k;p.sel.ok=false;p.skill=SKILL_K[k];sfx('tick')}}
+// a tap on an animal: the first tap picks it, a second tap on the same one says OK
+function selectTap(i,k){const p=S.players[i];if(!p||!p.sel||!(k>=0&&k<SKILL_K.length))return;
+  if(p.sel.cur===k){if(!p.sel.ok){p.sel.ok=true;sfx('ready')}}else selMove(p,k)}
+function selectUpdate(dt){
+  S.players.forEach((p,i)=>{
+    const inp=readInput(i),s=p.sel;if(!s)return;
+    const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,key=dx+','+dy;
+    let mv=false;if(key!=='0,0'){if(key!==s.last){mv=true;s.rep=0.32}else{s.rep-=dt;if(s.rep<=0){mv=true;s.rep=0.13}}}
+    s.last=key;
+    if(mv&&!s.ok){const n=SKILL_K.length,rows=Math.ceil(n/SEL_COLS);let c=s.cur%SEL_COLS,r=Math.floor(s.cur/SEL_COLS);
+      if(dx)c=wrap(c+dx,SEL_COLS);else if(dy)r=wrap(r+dy,rows);selMove(p,Math.min(n-1,r*SEL_COLS+c))}
+    if(inp.pick&&!s.ok){s.ok=true;sfx('ready')}
+    else if(inp.sw&&s.ok){s.ok=false;sfx('put')}
+  });
+  // everyone OK → a short countdown (anyone taking it back stops it); the host (P1) can also hold 作業 to go at once
+  if(S.players.every(p=>p.sel&&p.sel.ok)){S.selT+=dt;if(S.selT>=SEL_T){finishSelect();return}}else S.selT=0;
+  if(readInput(0).act){S.selHold+=dt;if(S.selHold>=SEL_HOLD){finishSelect();return}}else S.selHold=0;
+}
+function finishSelect(){
+  // this device remembers its picks for next time
+  if(NET.role==='off')S.players.forEach((p,i)=>{PSKILL[i]=p.skill});else PSKILL[0]=S.players[0].skill;
+  try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}
+  for(const p of S.players){p.sel=null;p.skCD=0;p.skT=0}
+  sfx('confirm');
+  if(S.startMode==='layout')setupLayout();else showChoose();
+}
+// layout of the screen (canvas units)
+const SELG={x0:206,y0:62,cw:148,ch:126,icon:88};
+const selCell=k=>({x:SELG.x0+(k%SEL_COLS)*SELG.cw,y:SELG.y0+Math.floor(k/SEL_COLS)*SELG.ch});
+function selSkillLine(K){return K.perTown?'1つの町へ1回':(K.dur<1?'すぐ効く':'効果 '+K.dur+'秒')+'・待ち '+K.cd+'秒'}
+function wrapText(t,x,y,w,lh,size,col,weight,maxLines){
+  ctx.font=`${weight||600} ${size}px ${FNT}`;ctx.fillStyle=col;ctx.textAlign='left';ctx.textBaseline='middle';
+  let line='',n=0;for(const ch of graphemes(t)){if(ctx.measureText(line+ch).width>w&&line){ctx.fillText(line,x,y+n*lh);line='';if(++n>=(maxLines||9))return}line+=ch}
+  if(line)ctx.fillText(line,x,y+n*lh);
+}
+function drawChefBig(an,col,cx,feetY,size,t){   // a large front view for the select screen
+  if(!CHEF.ready){emoji(SKILLS[Object.keys(SKILL_ANIMAL).find(k=>SKILL_ANIMAL[k]===an)||'knife'].e,cx,feetY-size*0.4,size*0.5);return}
+  const L=chefLayers(an,col,'front'),bob=Math.sin(t*3)*size*0.012,ox=cx-size/2,oy=feetY-size*240/256;
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(cx,feetY-2,size*0.2,size*0.05,0,0,7);ctx.fill();
+  ctx.drawImage(L.under,ox,oy-bob,size,size);
+  const shoe=chefTint('shoe_front_tint',col);for(const s of [-1,1])ctx.drawImage(shoe,ox+s*12*size/256,oy,size,size);
+  ctx.drawImage(L.over,ox,oy-bob,size,size);
+}
+function drawSelect(){
+  const W=GW*T,H=VH*T;
+  {const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#24414a');g.addColorStop(1,'#132026');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+  ctx.fillStyle='rgba(255,255,255,.04)';for(let k=0;k<14;k++){ctx.beginPath();ctx.arc((k*173)%W,(k*97)%H,40+(k%4)*18,0,7);ctx.fill()}
+  text('キャラを選ぶ',28,36,26,'#ffd84a',800,'left');
+  const lp=localP();
+  const keys=isTouch?'動物をタップ（もう一度タップでOK）':'選ぶ（'+keyName(devSlot(lp),'move')+'）　'+AL(lp,'pick','決定')+'　'+AL(lp,'sw','取り消し');
+  text(keys,W-28,36,14,'#cfe0e2',700,'right');
+  // the animals
+  SKILL_K.forEach((k,i)=>{const {x,y}=selCell(i),an=SKILL_ANIMAL[k],K=SKILLS[k];
+    ctx.fillStyle='rgba(16,26,30,.6)';rr(x+6,y+4,SELG.cw-12,SELG.ch-8,14);ctx.fill();
+    const im=CHEF.img[an+'_icon'];
+    if(im&&im.naturalWidth)ctx.drawImage(im,x+SELG.cw/2-SELG.icon/2,y+10,SELG.icon,SELG.icon);else emoji(K.e,x+SELG.cw/2,y+56,48);
+    text(K.n,x+SELG.cw/2,y+SELG.ch-18,14,'#fff',800)});
+  // cursors: each player's colour, nudged so several on one animal stay visible
+  S.players.forEach((p,i)=>{if(!p.sel)return;const {x,y}=selCell(p.sel.cur),d=i*4;
+    ctx.strokeStyle=PCOL[i];ctx.lineWidth=p.sel.ok?5:3;rr(x+4+d,y+2+d,SELG.cw-8-2*d,SELG.ch-4-2*d,14);ctx.stroke();
+    ctx.fillStyle=PCOL[i];rr(x+6+i*28,y-6,26,16,8);ctx.fill();text('P'+(i+1),x+19+i*28,y+2,10,'#fff',800)});
+  // one panel per player
+  const n=S.players.length,pw=Math.min(268,(W-60)/n-12),py=366,ph=H-py-14,tot=n*pw+(n-1)*12,px0=(W-tot)/2;
+  S.players.forEach((p,i)=>{const x=px0+i*(pw+12),K=SKILLS[p.skill]||SKILLS.knife,an=SKILL_ANIMAL[p.skill]||'beaver',ok=p.sel&&p.sel.ok;
+    ctx.fillStyle='rgba(16,26,30,.88)';rr(x,py,pw,ph,16);ctx.fill();ctx.strokeStyle=ok?'#ffd84a':PCOL[i];ctx.lineWidth=ok?3:2;ctx.stroke();
+    ctx.fillStyle=PCOL[i];rr(x,py,pw,28,[16,16,0,0]);ctx.fill();
+    const me=NET.role!=='off'&&NET.mySlot===i;text('P'+(i+1)+(me?'　あなた':''),x+14,py+14,14,'#fff',800,'left');
+    text(ok?'OK!':'えらび中…',x+pw-14,py+14,13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
+    drawChefBig(an,PCOL[i],x+70,py+176,150,S.t+i);
+    text(K.e+' '+K.n,x+136,py+52,17,'#fff',800,'left');
+    wrapText(K.d,x+136,py+80,pw-148,19,12.5,'#d8e6e7',600,5);
+    text(selSkillLine(K),x+136,py+ph-26,11.5,'#ffe08a',700,'left');
+    if(ok){ctx.save();ctx.translate(x+pw-48,py+ph-60);ctx.rotate(-0.18);ctx.strokeStyle='#ffd84a';ctx.lineWidth=3;rr(-34,-16,68,32,8);ctx.stroke();text('OK!',0,1,20,'#ffd84a',900);ctx.restore()}
+  });
+  // footer: what starts the run
+  const host=NET.role!=='guest';
+  let foot='全員がOKになったら出発'+(host&&n>1?'（P1は'+AL(S.players[0],'act','作業',1)+'でもすぐ出発）':host?'（'+AL(S.players[0],'act','作業',1)+'でもすぐ出発）':'');
+  if(S.selT>0)foot='まもなく出発！';
+  ctx.font=`800 13px ${FNT}`;const fw=ctx.measureText(foot).width+28;ctx.fillStyle='rgba(16,26,30,.85)';rr(W/2-fw/2,py-36,fw,26,13);ctx.fill();
+  text(foot,W/2,py-23,13,S.selT>0?'#ffd84a':'#cfe0e2',800);
+  if(S.selHold>0){ctx.fillStyle='#ffd84a';rr(W/2-fw/2,py-12,fw*Math.min(1,S.selHold/SEL_HOLD),4,2);ctx.fill()}
+}
+// tapping / clicking an animal on the canvas
+cv.addEventListener('pointerdown',e=>{
+  if(!S||S.phase!=='select'||!ov.hidden)return;
+  const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*GW*T,y=(e.clientY-r.top)/r.height*VH*T;
+  for(let k=0;k<SKILL_K.length;k++){const c=selCell(k);if(x>=c.x&&x<c.x+SELG.cw&&y>=c.y&&y<c.y+SELG.ch){
+    if(NET.role==='guest'){if(NET.mySlot>=0)guestSend('selpick',k)}else selectTap(0,k);e.preventDefault();return}}
+});
 function drawChef(p,X,Y){
   if(CHEF.ready){drawChefSprite(p,X,Y);return}
   const col=PCOL[p.i],dark=shade(col,-0.3),light=shade(col,0.25);
@@ -2902,6 +2999,7 @@ function drawMenus(){
 function draw(){
   ctx.clearRect(0,0,GW*T,GH*T);
   if(!S){drawRoadIdle();return}
+  if(S.phase==='select'){drawSelect();return}
   const arr=S.view==='town'&&S.town&&S.arrT!=null&&S.arrT<ARRIVE_T;
   // phone view: the world is drawn 1.5x around the camera; the bars and panels stay on the screen
   const ph=phoneView();
@@ -3070,7 +3168,7 @@ function renderHud(){
   {const lp=localP(),K=lp&&skillOf(lp),bs=document.getElementById('bSkill');if(bs&&K){const act=(lp.skT||0)>0,cd=(lp.skCD||0)>0&&!act;
     bs.textContent=K.e;bs.classList.toggle('act',act);bs.classList.toggle('cd',cd);
     bs.style.setProperty('--f',act?Math.round(lp.skT/K.dur*100)+'%':cd?Math.round((1-lp.skCD/K.cd)*100)+'%':'100%')}}
-  infoBtn.hidden=!(phoneView()&&ov.hidden);infoBtn.classList.toggle('on',PHONE_INFO);
+  infoBtn.hidden=!(phoneView()&&ov.hidden&&S.phase!=='select');infoBtn.classList.toggle('on',PHONE_INFO);
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
   infoEl.innerHTML=info||'　';S.sideInfo=info;
@@ -3174,7 +3272,7 @@ function hostStart(mode){
   NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true}}).catch(()=>{});
   newRun(1+g.length,mode==='layout'?'layout':'preset');
   // online: P1 is this device's pick, each guest brings its own
-  g.forEach((p,i)=>{const pl=S.players[i+1];if(pl)pl.skill=guestSkill(p)});
+  g.forEach((p,i)=>{const pl=S.players[i+1];if(pl){pl.skill=guestSkill(p);if(pl.sel)pl.sel.cur=Math.max(0,SKILL_K.indexOf(pl.skill))}});
 }
 const guestSkill=p=>{const k=p&&p.presence&&p.presence.skill;return SKILLS[k]?k:'knife'};
 // tie a guest to player slot k (its presses so far don't count)
@@ -3210,6 +3308,7 @@ function hostRoster(){
     const k=S.players.length,[x,y]=spawnSpot(k);
     S.players.push({i:k,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:guestSkill(p)});
     S.np=S.players.length;bindSlot(p,k);
+    {const q=S.players[k];if(S.phase==='select')q.sel={cur:Math.max(0,SKILL_K.indexOf(q.skill)),ok:false,last:'0,0',rep:0}}
     S.toast={text:'P'+(k+1)+' が参加しました！',t:0,life:3};sfx('ready');
     NET.lobby.presence({host:{code:NET.code,n:S.np,open:true}}).catch(()=>{});
   }
@@ -3224,7 +3323,8 @@ function remoteInput(i){
   return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk};
 }
 const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
-function guestAction(a,v){
+function guestAction(a,v,slot){
+  if(a==='selpick'){if(S&&S.phase==='select'&&slot!=null)selectTap(slot,+v);return}   // a guest tapped an animal
   if(a==='ready'){if(ov.hidden)finishLayout();return}
   if(a==='pause'){pauseGame();return}
   if(!GUEST_OK.has(a)||ov.hidden)return;
@@ -3238,7 +3338,7 @@ function hostFrame(dt){
     const i=NET.slots[p.peer]; if(!i)continue;
     const pr=p.presence||{};
     if(Array.isArray(pr.in))NET.inputs[i]=pr.in;
-    if(Array.isArray(pr.oc)&&pr.oc[0]!==NET.lastOc[p.peer]){NET.lastOc[p.peer]=pr.oc[0];guestAction(String(pr.oc[1]),pr.oc[2])}
+    if(Array.isArray(pr.oc)&&pr.oc[0]!==NET.lastOc[p.peer]){NET.lastOc[p.peer]=pr.oc[0];guestAction(String(pr.oc[1]),pr.oc[2],i)}
   }
   // presses made while a screen was up are dropped
   if(!ov.hidden||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];(NET.lastSk=NET.lastSk||[])[i]=+r[5]||0}});
@@ -3292,12 +3392,13 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2)]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
+    sc:S.phase==='select'?Math.round((S.selT||0)*10):-1,sh2:S.phase==='select'?Math.round((S.selHold||0)*100):0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
   d.wt=S.waitN||0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
@@ -3412,9 +3513,11 @@ function sanitizeOv(html){
 function applySnap(d){
   if(!S||!S.guest)S={guest:true,map:buildMap(),players:[],cust:[],shops:[],market:[],floats:[],stock:{},seeds:{},up:{},t:0,toast:null,gatherLeft:[0,0],stations:[]};
   const n=v=>+v||0;
+  // a guest remembers the animal it played once the select screen is over
+  if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
   S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;
-  S.waitN=Math.max(0,Math.min(3,n(d.wt)));
+  S.waitN=Math.max(0,Math.min(3,n(d.wt)));S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100}):null;
   S.town=town(d.tw);S.next=town(d.nx);
@@ -3435,7 +3538,7 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17])});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));
@@ -3737,7 +3840,7 @@ function frame(now){
   else if(escK&&S&&S.paused&&!ov.hidden){resumeGame()}
   else if(escK&&S&&!ov.hidden&&canPause()){pauseGame()}
   else if(!ov.hidden){overlayInput()}
-  else if(S&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout')){
+  else if(S&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'||S.phase==='select')){
     // layout: R (or the gamepad Back/Select button) finishes; finishing opens the town choice
     if(!ov.hidden){}
     else if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))pauseGame();

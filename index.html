@@ -924,15 +924,15 @@ function doPick(p,c,tx,ty){
           if(p.hold.kind==='dirty'){c.item.cnt=(c.item.cnt||1)+(p.hold.cnt||1);p.hold=null;sfx('put');return}   // stack onto it
           say(p,f?'先に汚れた皿を片付ける':'手を空けて汚れた皿を持つ');return}
         if(p.hold&&p.hold.kind==='dirty'&&!f){c.item=p.hold;p.hold=null;sfx('put');return}
-        if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,RECIPES[f.order].e+' ご注文','#fff');sfx('seat')}
+        if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,pendingOrders(f).map(o=>RECIPES[o].e).join('')+' ご注文','#fff');sfx('seat')}
         else say(p,S.sub==='service'?'並んでいるお客さんを案内してくる':'まだ営業前');
         return}
       if(g.st==='eat'){say(p,'食事中');return}
       if(f){say(p,'このテーブルはうまっている');return}
-      if(p.hold2&&isDish(p.hold)&&matchRecipe(p.hold.items)!==g.order&&matchRecipe(p.hold2.items)===g.order){const a=p.hold;p.hold=p.hold2;p.hold2=a}
+      if(p.hold2&&isDish(p.hold)&&!pendingOrders(g).includes(matchRecipe(p.hold.items))&&pendingOrders(g).includes(matchRecipe(p.hold2.items))){const a=p.hold;p.hold=p.hold2;p.hold2=a}
       if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare&&p.hold.items.length)serve(p,tx,ty,g);
       else if(p.hold&&((p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)))say(p,'お皿にのせて出す');
-      else say(p,'注文は '+RECIPES[g.order].e+RECIPES[g.order].n);
+      else say(p,'注文は '+orderText(g));
       return}
     case 'counter':case 'board':case 'stove':case 'blender':
       placeOrTake(p,c);return;
@@ -1072,10 +1072,16 @@ function tipRate(){return 0.25+1.25*Math.max(0,Math.min(HEART_MAX,S.hearts))/HEA
 function serve(p,tx,ty,c){
   const rid=matchRecipe(p.hold.items);
   if(!rid){say(p,'料理になっていない');return}
-  if(rid!==c.order){say(p,'注文は '+RECIPES[c.order].e+RECIPES[c.order].n);return}
+  const CT=ctypeOf(c);
+  // which order this dish fills (a family has two; either can come first)
+  let k=-1;if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
+  if(k<0){say(p,'注文は '+orderText(c));return}
   const R=RECIPES[rid];
-  const pay=Math.round(R.price*S.town.pay*S.up.pay), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate());
-  S.money+=pay+tip;S.earned+=pay+tip;S.served++;c.st='eat';c.t=EAT_T;p.hold=null;
+  const pay=Math.round(R.price*S.town.pay*S.up.pay), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate()*(CT.tip||1));
+  S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;
+  if(c.got)c.got[k]=true;
+  // they start eating once everything they ordered is on the table
+  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1)}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a');sfx('coin');
 }
 
@@ -1135,10 +1141,27 @@ function custPos(c){
   return [c.tx+0.5,c.ty+0.5];
 }
 function startLeave(c,mad){const [x,y]=custPos(c);c.from=c.st;c.st='leave';c.mad=mad;c.lx=x;c.ly=y;c.by=-1}
+// customer types: ordinary people and four kinds with a quirk
+const CTYPE={
+  normal:{n:'',w:6},
+  slow:{n:'ゆっくり',e:'🐢',w:1.2,pat:1.5,eat:2},      // waits patiently, but eats slowly (the table stays taken)
+  hasty:{n:'せっかち',e:'⚡',w:1.2,pat:0.6,tip:1.6},   // short fuse, tips well
+  big:{n:'大食い',e:'🍖',w:1.1,second:true},          // orders a second dish after the first
+  family:{n:'子連れ',e:'👶',w:1.1,two:true},           // two at one table, two orders, they eat once both are there
+};
+const CTYPE_K=Object.keys(CTYPE);
+const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
+const pickMenu=()=>S.town.menu[rnd(S.town.menu.length)];
+// the orders still to bring (a family has two)
+const pendingOrders=c=>c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
+const orderText=c=>pendingOrders(c).map(o=>RECIPES[o].e+RECIPES[o].n).join('・');
 function spawnCust(){
   if(waiting().length>=QMAX)return;
-  const order=S.town.menu[rnd(S.town.menu.length)],max=(S.np===1?85:70)*S.up.pat;
-  S.cust.push({order,pat:max,max,hue:rnd(360),st:'wait',by:-1,tx:0,ty:0,t:0});sfx('bell');
+  const type=weighted(CTYPE_K.map(k=>({k,w:CTYPE[k].w}))).k,CT=CTYPE[type];
+  const max=(S.np===1?85:70)*S.up.pat*(CT.pat||1);
+  const c={type,order:pickMenu(),pat:max,max,hue:rnd(360),st:'wait',by:-1,tx:0,ty:0,t:0};
+  if(CT.two){c.order2=pickMenu();c.got=[false,false]}
+  S.cust.push(c);sfx('bell');
 }
 function clearKitchen(){
   // leftovers from this town are thrown away (planters keep growing)
@@ -1175,7 +1198,7 @@ function clearKitchen(){
 function endStop(){
   sfx('close');
   // customers still eating leave their plate behind, dirty
-  for(const c of S.cust)if(c.st==='eat'){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:1}}
+  for(const c of S.cust)if(c.st==='eat'){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.order2?2:1}}
   S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
@@ -1585,7 +1608,9 @@ function update(dt){
           continue}
         if(c.st==='eat'){c.t-=dt;if(c.t<=0){
           // the empty plate stays on the table, dirty
-          const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'){if(tb.item&&tb.item.kind==='dirty')tb.item.cnt=(tb.item.cnt||1)+1;else tb.item={kind:'dirty',cnt:1}}
+          const nPl=c.order2?2:1,tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'){if(tb.item&&tb.item.kind==='dirty')tb.item.cnt=(tb.item.cnt||1)+nPl;else tb.item={kind:'dirty',cnt:nPl}}
+          // 大食い: one more dish (the empty plate stays on the table)
+          if(ctypeOf(c).second&&!c.secondDone){c.secondDone=true;c.order=pickMenu();c.st='seat';c.pat=c.max;float(c.tx+.5,c.ty-0.3,'🍖 おかわり！ '+RECIPES[c.order].e,'#ffe08a');sfx('seat');continue}
           startLeave(c,false)}continue}
         c.pat-=c.st==='wait'?dt/WAIT_PAT:dt;   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'😠 ♥-1','#ff9c9c');if(S.hearts<=0){gameOver();return}}
@@ -2338,8 +2363,7 @@ function drawTown(){
     O.items.forEach((id,j,a)=>{const bx=X+T/2+(j-(a.length-1)/2)*25,by=Y-7;ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(bx,by,12,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1.5;ctx.stroke();emoji(ING[id].e,bx,by+1,17)});
   }
   drawQueueMat();
-  drawSeated();
-  drawTables();
+  drawTables(true);   // stools, then the seated customers, then the table tops (so the stool never covers a face)
   drawCustomers();
   if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(VH-0.25)*T,13,'#1d2a20',800);
 }
@@ -2352,20 +2376,23 @@ function drawQueueMat(){
   text('待ち列',(QX+QMAX/2)*T,QY*T-6,11,'#1d2a20',800);
   text('入口 ←',(GW-0.2)*T,(QY+1.25)*T,11,'#1d2a20',800,'right');
 }
-function drawTables(){
-  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){
-    if(S.map[y][x].t!=='table')continue;
-    drawTableShape(x*T+T/2,y*T+T/2);drawTableDirty(S.map[y][x],x*T+T/2,y*T+T/2);
-  }
+function drawTables(withSeated){
+  const tbs=[];for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table')tbs.push([x,y]);
+  for(const [x,y] of tbs)drawStool(x*T+T/2,y*T+T/2);
+  if(withSeated)drawSeated();
+  for(const [x,y] of tbs){drawTableShape(x*T+T/2,y*T+T/2,true);drawTableDirty(S.map[y][x],x*T+T/2,y*T+T/2)}
+}
+// the stool behind a table (the customer sits here): blue cushion to match the cloth
+function drawStool(X,Y){
+  ctx.fillStyle='#6b4428';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
+  const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(20,50,90,.5)';ctx.lineWidth=1;ctx.stroke();
 }
 // the plate a customer left, dirty, on the table
 function drawTableDirty(c,X,Y){if(c&&c.item&&c.item.kind==='dirty')drawItem(c.item,X,Y-3,T*0.44)}
-function drawTableShape(X,Y){
+function drawTableShape(X,Y,noStool){
   softShadow(X+3,Y+T*0.46,T*0.52,9,.38);
-  // stool behind the table (the customer sits here): blue cushion to match the cloth
-  ctx.fillStyle='#6b4428';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
-  {const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
-   ctx.strokeStyle='rgba(20,50,90,.5)';ctx.lineWidth=1;ctx.stroke()}
+  if(!noStool)drawStool(X,Y);
   // thick wooden top with a dark rim so it reads on any ground
   const R=T*0.46,ry=T*0.26,cy=Y+1;
   // four legs: the back two (further away) are shorter and darker, the front two splay a little
@@ -2397,6 +2424,8 @@ function drawTableShape(X,Y){
   ctx.fillStyle='#8fc7e0';rr(X-3,cy-4,6,6,2);ctx.fill();ctx.fillStyle='#ff8fb1';ctx.beginPath();ctx.arc(X,cy-6,3,0,7);ctx.fill();ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(X,cy-6,1.2,0,7);ctx.fill();
 }
 function drawCustBody(X,Y,c){
+  const CT=ctypeOf(c);
+  if(CT.two)drawKid(X+13,Y+5,c);   // 子連れ: a small child beside the parent
   softShadow(X,Y+13,13,4.5,.3);
   const base=`hsl(${c.hue} 50% 62%)`,lite=`hsl(${c.hue} 60% 78%)`,dk=`hsl(${c.hue} 45% 44%)`;
   const g=ctx.createRadialGradient(X-4,Y-5,2,X,Y,15);g.addColorStop(0,lite);g.addColorStop(0.6,base);g.addColorStop(1,dk);
@@ -2406,6 +2435,15 @@ function drawCustBody(X,Y,c){
   ctx.fillStyle='#2b2230';ctx.beginPath();ctx.ellipse(X-4.5,Y-1,1.9,2.4,0,0,7);ctx.ellipse(X+4.5,Y-1,1.9,2.4,0,0,7);ctx.fill();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X-4,Y-2,0.8,0,7);ctx.arc(X+5,Y-2,0.8,0,7);ctx.fill();
   ctx.fillStyle='rgba(255,110,140,.45)';ctx.beginPath();ctx.ellipse(X-8,Y+3,2.6,1.6,0,0,7);ctx.ellipse(X+8,Y+3,2.6,1.6,0,0,7);ctx.fill();
+  if(c.type==='slow'){ctx.fillStyle='#eef1f4';ctx.beginPath();ctx.ellipse(X,Y-11,8,4,0,Math.PI,0);ctx.fill()}   // grey hair
+  if(CT.e){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-12,Y-11,7.5,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=1;ctx.stroke();emoji(CT.e,X-12,Y-10.5,10)}
+}
+function drawKid(X,Y,c){
+  softShadow(X,Y+9,9,3.2,.3);
+  const h=(c.hue+140)%360,g=ctx.createRadialGradient(X-3,Y-3,1,X,Y,10);g.addColorStop(0,`hsl(${h} 60% 80%)`);g.addColorStop(1,`hsl(${h} 50% 58%)`);
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(X,Y,8.5,0,7);ctx.fill();
+  ctx.fillStyle='#2b2230';ctx.beginPath();ctx.arc(X-3,Y-0.5,1.3,0,7);ctx.arc(X+3,Y-0.5,1.3,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,110,140,.5)';ctx.beginPath();ctx.ellipse(X-5,Y+2.5,1.8,1.1,0,0,7);ctx.ellipse(X+5,Y+2.5,1.8,1.1,0,0,7);ctx.fill();
 }
 function drawSeated(){for(const c of S.cust)if(c.st==='seat'||c.st==='eat'){const [px,py]=custPos(c);drawCustBody(px*T,py*T-T*0.42,c)}}
 function drawCustomers(){
@@ -2414,10 +2452,10 @@ function drawCustomers(){
     if(c.st==='seat'||c.st==='eat'){
       const Y=py*T-T*0.42;
       // order bubble above the table (a happy face while eating)
-      const top=Y-58,bh=36;
-      ctx.fillStyle='#fff';rr(X-20,top,40,bh,9);ctx.fill();
+      const top=Y-58,bh=36,ord=c.st==='eat'?['😋']:pendingOrders(c).map(o=>RECIPES[o].e),bw=ord.length>1?66:40;
+      ctx.fillStyle='#fff';rr(X-bw/2,top,bw,bh,9);ctx.fill();
       ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
-      emoji(c.st==='eat'?'😋':RECIPES[c.order].e,X,top+bh/2,24);
+      ord.forEach((e,k)=>emoji(e,X+(k-(ord.length-1)/2)*28,top+bh/2,ord.length>1?21:24));
       if(c.st==='seat')bar(X-17,Y+15,34,f,col);
       continue}
     const Y=py*T;
@@ -3146,7 +3184,7 @@ function renderHud(){
     const stepTxt=i=>ING[i].e+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
     info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>RECIPES[r].e+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${ING[id].e}${n}</span>`}).join(' ');
-    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>RECIPES[c.order].e).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
+    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>RECIPES[o].e).join('')).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
     if(S.phase==='drive'){
       const ahead=S.shops.filter(s=>s.x+2+WMARGIN>3.5);
       info+=`　<span class="dim">｜この先のお店 あと${ahead.length}軒</span>`;
@@ -3393,7 +3431,7 @@ function sendSnap(){
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0]),
-    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0]),
+    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
@@ -3541,7 +3579,7 @@ function applySnap(d){
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
-  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9]}));
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));

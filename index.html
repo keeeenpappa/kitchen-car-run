@@ -1869,8 +1869,11 @@ function drawItem(it,cx,cy,s,inHand){
   if(it.kind==='mix'){   // a mixer being filled: what is in it so far
     const n=it.items.length;
     it.items.forEach((id,k)=>emoji(ingIc(id),cx+(k-(n-1)/2)*s*0.3,cy-s*0.05,s*0.36));
-    text('混ぜる前',cx,cy+s*0.36,10,'#fff',800);return}
+    return}
   const I=ING[it.id];
+  // made in the mixer and still mixing: show what went in, not the result
+  if(I.mix&&!it.step&&!it.burnt){const ins=mixOf(it.id).in,n=ins.length;
+    ins.forEach((id,k)=>emoji(ingIc(id),cx+(k-(n-1)/2)*s*0.3,cy-s*0.05,n>1?s*0.36:s*0.5));return}
   if(it.burnt){{const im=fimg(badW(it)==='ダメになっている'?'fx_spoiled':'fx_burnt');if(im){const w=s*0.78;ctx.drawImage(im,cx-w/2,cy-w/2,w,w);return}}ctx.fillStyle='#222';ctx.beginPath();ctx.arc(cx,cy,s*0.36,0,7);ctx.fill();emoji('💨',cx,cy,s*0.42);return}
   ctx.fillStyle='rgba(0,0,0,.16)';ctx.beginPath();ctx.ellipse(cx+1,cy+s*0.26,s*0.24,s*0.07,0,0,7);ctx.fill();
   emoji(ingEmoji(it),cx,cy,s*0.62);

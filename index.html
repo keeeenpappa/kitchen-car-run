@@ -250,6 +250,10 @@ const ingKey=(id,step)=>{const I=ING[id];return id+'_'+(step>0?STATEN[I.steps[st
 const ingIc=(id,step)=>{const k=ingKey(id,step||0);return FOOD.img[k]?FTOK+k+FTOK+ING[id].e:ING[id].e};
 const dishIc=r=>FOOD.img['d_'+r]?FTOK+'d_'+r+FTOK+RECIPES[r].e:RECIPES[r].e;
 // the same for HTML (the stock bar)
+const ITOK='';
+const itok=id=>{const k=ingKey(id,0);return FOOD.img[k]?ITOK+k+ITOK:ING[id].e};
+const dtok=r=>FOOD.img['d_'+r]?ITOK+'d_'+r+ITOK:RECIPES[r].e;
+const tokHtml=h=>h.replace(/([^]+)/g,(m,k)=>FOOD.img[k]?`<img class="fic" src="${FOOD.img[k].src}" alt="">`:'');
 const ingHtml=id=>{const s=FOOD.img[ingKey(id,0)];return s?`<img class="fic" src="${s.src}" alt="${ING[id].e}">`:ING[id].e};
 const ingEmoji=it=>{const I=ING[it.id];return FOOD.img[ingKey(it.id,it.step)]?ingIc(it.id,it.step):I.doneE&&isDone(it)?I.doneE:I.e};
 const BUYABLE=()=>Object.keys(ING).filter(k=>!ING[k].mix);
@@ -2584,8 +2588,8 @@ function drawCustFig(X,FY,an,hue,dir,flip,sc,type){
 }
 function custIcon(X,HY,type){
   const ic=CICON[type],im=ic&&cimg(ic);if(!im)return false;
-  ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,8.5,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=1;ctx.stroke();
-  ctx.drawImage(im,X-16-7,HY-12-7,14,14);return true;
+  ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-18,HY-13,11,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1.2;ctx.stroke();
+  ctx.drawImage(im,X-18-9.5,HY-13-9.5,19,19);return true;
 }
 const KID_HUE=h=>(h+140)%360;
 function drawCustBody(X,Y,c){
@@ -2628,6 +2632,9 @@ function drawKidsAway(){
     const X=c.kx*T,Y=c.ky*T,b=c.kidAway===1?Math.abs(Math.sin(S.t*8))*3:0;
     if(c.an&&cimg(c.an+'_side_base')){const gx=c.kidAway===2?c.tx+0.8:c.kgx;softShadow(X,Y+10,8,3,.3);drawCustFig(X,Y+12-b,c.an,KID_HUE(c.hue),'side',gx<c.kx,0.6,'normal')}
     else drawKid(X,Y-b,c);
+    if(c.kidAway===1)for(const p of S.players)if(Math.hypot(c.kx-p.x,c.ky-p.y)<1.0){
+      const m=AL(p,'pick','連れ戻す');ctx.font=`800 12px ${FNT}`;const w=ctx.measureText(m).width+14;
+      ctx.fillStyle=PCOL[p.i];rr(X-w/2,Y-50,w,19,9);ctx.fill();text(m,X,Y-40.5,12,'#fff',800);break}
     if(c.kidAway===1){const s=1+0.12*Math.sin(S.t*6);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X,Y-21,8*s,0,7);ctx.fill();text('!',X,Y-20,13*s,'#e2504a',900)}
   }
 }
@@ -3303,7 +3310,8 @@ function drawSidePanel(px,py,pw,phh){
   for(const r of runs){
     if(!r){if(!empty){y+=lh;empty=true}x=x0+pad;continue}
     ctx.font=`${r.b?800:600} 12px ${FNT}`;ctx.fillStyle=r.c;
-    for(const ch of graphemes(r.t)){
+    for(const ch of r.t.split(/([^]+)/).flatMap(t=>t[0]===ITOK?[t]:graphemes(t))){
+      if(ch[0]===ITOK){const im=fimg(ch.slice(1,-1)),cw=17;if(x+cw>right){y+=lh;x=x0+pad+8}if(im)ctx.drawImage(im,x-1,y-9,18,18);x+=cw;empty=false;continue}
       if(empty&&ch===' ')continue;
       const cw=ctx.measureText(ch).width;
       if(x+cw>right){y+=lh;x=x0+pad+8}
@@ -3368,10 +3376,10 @@ function renderHud(){
   let info='';
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
     const SHORT={chop:'切',cook:'焼',blend:'混'};
-    const stepTxt=i=>ING[i].mix?'('+mixOf(i).in.map(x=>ING[x].e).join('+')+')'+ING[i].steps.map(s=>SHORT[s]).join('→'):ING[i].e+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
-    info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>RECIPES[r].e+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
-    info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${ING[id].e}${n}</span>`}).join(' ');
-    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>RECIPES[o].e).join('')).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
+    const stepTxt=i=>ING[i].mix?'('+mixOf(i).in.map(x=>itok(x)).join('+')+')'+ING[i].steps.map(s=>SHORT[s]).join('→'):itok(i)+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
+    info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
+    info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${itok(id)}${n}</span>`}).join(' ');
+    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>dtok(o)).join('')).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
     if(S.phase==='drive'){
       const ahead=S.shops.filter(s=>s.x+2+WMARGIN>3.5);
       info+=`　<span class="dim">｜この先のお店 あと${ahead.length}軒</span>`;
@@ -3396,7 +3404,7 @@ function renderHud(){
   infoBtn.hidden=!(phoneView()&&ov.hidden&&S.phase!=='select');infoBtn.classList.toggle('on',PHONE_INFO);
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
-  infoEl.innerHTML=info||'　';S.sideInfo=info;
+  {const h=tokHtml(info)||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=h}}S.sideInfo=info;
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
   const ch=ids.map(k=>{const n=S.stock[k]||0;return `<span class="chip${n?'':' zero'}">${ingHtml(k)} ${ING[k].n} ${n}</span>`}).join('');

@@ -198,11 +198,11 @@ const CUST_SWEAT={"penguin_front":[176,21,57,57],"penguin_side":[182,21,57,57],"
 const T=48, GW=24, GH=14, VH=13.5; // VH: rows shown (24 x 13.5 = 16:9); the last row is only a border // 16:9-ish field: truck top-left, town below and to the right
 const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
-const QX=18, QY=8, QMAX=5, EAT_T=4;              // waiting line x18..22 on row 8; eating time at the table
+const QX=14, QY=8, QMAX=5, QGAP=2, EAT_T=4;      // waiting line on row 8: spots x14,16,18,20,22 (a free tile between two); eating time at the table
 const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the plaza under the truck)
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
 const PRESET_TABLES=[[4,9],[9,9],[14,9]];
-const tableOK=(x,y)=>inTblZone(x,y)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
+const tableOK=(x,y)=>inTblZone(x,y)&&!(y===QY&&x>=QX-1)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const HEART_MAX=3;
@@ -409,7 +409,7 @@ function buildMap(){
   bot.forEach((t,i)=>set(2+i,6,t));
   m[6][3].win='後'; m[6][13].win='前';
   set(MKT[0],MKT[1],'market'); for(const k of GOBJ_K)set(GOBJ[k].x,GROW,'gather',{obj:k});
-  for(let k=0;k<QMAX;k++)set(QX+k,QY,'queue',{slot:k});
+  for(let k=0;k<QMAX;k++)set(QX+k*QGAP,QY,'queue',{slot:k});
   for(const [x,y] of PRESET_TABLES)set(x,y,'table');
   return m;
 }
@@ -777,7 +777,7 @@ function skillNow(p,K){
     if(!w.length){say(p,'列で待っているお客さんがいない');return false}
     // only works close to the line: within 2 tiles of a queue spot
     const px=Math.floor(p.x),py=Math.floor(p.y);let near=false;
-    for(let k=0;k<QMAX;k++)if(Math.max(Math.abs(px-(QX+k)),Math.abs(py-QY))<=2)near=true;
+    for(let k=0;k<QMAX;k++)if(Math.max(Math.abs(px-(QX+k*QGAP)),Math.abs(py-QY))<=2)near=true;
     if(!near){say(p,'列の近く（2マス以内）で使う');return false}
     for(const c of w){c.pat=c.max;const [x,y]=custPos(c);float(x,y-0.7,'💖','#ffb3c8')}
     return true}
@@ -1205,7 +1205,7 @@ const follower=p=>S.cust.find(c=>c.st==='follow'&&c.by===p.i);
 const guestAt=(x,y)=>S.cust.find(c=>(c.st==='seat'||c.st==='eat')&&c.tx===x&&c.ty===y);
 function custPos(c){
   if(c.st==='leave')return [c.lx,c.ly];
-  if(c.st==='wait'){const i=waiting().indexOf(c);return [QX+i+0.5,QY+0.5]}
+  if(c.st==='wait'){const i=waiting().indexOf(c);return [QX+i*QGAP+0.5,QY+0.5]}
   if(c.st==='follow'){const p=S.players[c.by];if(p)return [p.x-(p.dx||0)*0.7,p.y-(p.dy||0)*0.7]}
   return [c.tx+0.5,c.ty+0.5];
 }
@@ -2515,12 +2515,12 @@ function drawTown(){
   if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(VH-0.25)*T,13,'#1d2a20',800);
 }
 function drawQueueMat(){
-  const x=QX*T+2,y=QY*T+5,w=QMAX*T-4,h=T-10;
+  const x=QX*T+2,y=QY*T+5,w=((QMAX-1)*QGAP+1)*T-4,h=T-10;
   softShadow(x+w/2,y+h,w*0.52,6,.2);
   ctx.fillStyle='#8a3a3a';rr(x,y+3,w,h,10);ctx.fill();
   const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,'#d9645a');g.addColorStop(1,'#b84a42');ctx.fillStyle=g;rr(x,y,w,h,10);ctx.fill();
   ctx.strokeStyle='rgba(255,236,200,.75)';ctx.lineWidth=2;ctx.setLineDash([6,4]);rr(x+5,y+5,w-10,h-10,7);ctx.stroke();ctx.setLineDash([]);
-  text('待ち列',(QX+QMAX/2)*T,QY*T-6,11,'#1d2a20',800);
+  text('待ち列',(QX+((QMAX-1)*QGAP+1)/2)*T,QY*T-6,11,'#1d2a20',800);
   text('入口 ←',(GW-0.2)*T,(QY+1.25)*T,11,'#1d2a20',800,'right');
   if(S.phase==='stop'&&S.sub==='service'&&S.spawnT>0&&S.spawnT<2.5&&S.timer>0&&waiting().length<QMAX){
     const k=0.5+0.5*Math.sin(S.t*9),X=(GW-0.15)*T,Y=QY*T-16,m='お客さんが来るよ！';
@@ -2740,6 +2740,10 @@ function drawPlayers(){
     const c=tile(p.tx,p.ty);
     const furnSpot=c&&(((c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&p.hold.st!=='table'&&inTruck(p.tx,p.ty))||(c.t==='ground'&&!c.item&&p.hold&&p.hold.kind==='station'&&p.hold.st==='table'&&inTblZone(p.tx,p.ty)));
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
+    if(c&&c.t==='queue'&&S.phase==='stop'&&S.sub==='service'&&waiting()[c.slot]&&!follower(p)){
+      ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=3.5;rr(p.tx*T+2,p.ty*T-T*0.55,T-4,T*1.5,9);ctx.stroke();
+      const me=NET.role==='off'||NET.mySlot===p.i;
+      if(me){const m=AL(p,'pick','案内');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;ctx.fillStyle=PCOL[p.i];rr(p.tx*T+T/2-w/2,p.ty*T-T*0.55-20,w,17,8);ctx.fill();text(m,p.tx*T+T/2,p.ty*T-T*0.55-11.5,11,'#fff',800)}}
     if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me||p.seat){const msg=p.seat?AL(p,'act','スピード切替')+'　'+AL(p,'pick','降りる'):AL(p,'pick','運転席に座る');

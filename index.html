@@ -211,7 +211,7 @@ const HEART_MAX=3;
 const PLATES_TOTAL=5, WASH=2.0;   // the truck owns 5 plates; washing one at the sink takes 2 s (作業 hold)
 const WAIT_PAT=1.2;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
-const DRIVE=65, PREP=15, SERVICE=120, SPEED=0.45, STOPS=4, WMARGIN=0.6;
+const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=0.6;
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
 const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FNT='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif';
@@ -273,14 +273,15 @@ const BUYABLE=()=>Object.keys(ING).filter(k=>!ING[k].mix);
 const STEPN={chop:'切る',cook:'焼く',blend:'ミキサー'};
 // ---------- gathering: five fixed spots in every town, each with its own small action ----------
 //  fish: cast and wait, press 作業 when 「！」 shows / mash: tap 作業 repeatedly /
-//  timing: stop the moving marker (middle = 2) / arrows: input the 2 shown directions
+//  timing: stop the moving marker (middle = 2) / arrows: input the 2 shown directions /
+//  pull: hold 作業 to pull, let go inside the green band (it moves every pull); 2 green pulls, a pull outside counts half
 // Spots with two possible items give a random one, then you choose to keep it (持つ) or put it back (切替).
 const GOBJ={
   pond:{n:'釣り堀',e:'🎣',items:['fish','shrimp'],act:'fish',x:13,col:'#3d8ab3'},
   tree:{n:'木',e:'🌳',items:['apple'],act:'mash',x:15,col:'#4f7a36'},
   log:{n:'原木',e:'🪵',items:['mushroom'],act:'timing',x:17,col:'#6b4a2f'},
   barn:{n:'畜舎',e:'🐄',items:['milk','egg'],act:'arrows',x:19,col:'#b8834f'},
-  field:{n:'畑',e:'🌱',items:['potato','strawberry'],act:'mash',x:21,col:'#7a5a34'},
+  field:{n:'畑',e:'🌱',items:['potato','strawberry'],act:'pull',x:21,col:'#7a5a34'},
 };
 const GOBJ_K=Object.keys(GOBJ);
 const GATHERABLE=new Set(Object.values(GOBJ).flatMap(o=>o.items));
@@ -1091,8 +1092,12 @@ function startGather(p,c,tx,ty){
   if(O.act==='fish')p.g.t=(1.4+Math.random()*2.2)/S.up.gatherSpd;
   if(O.act==='mash')p.g.need=Math.max(3,Math.round(MASH_N/S.up.gatherSpd));
   if(O.act==='arrows')p.g.seq=[rnd(4),rnd(4)];
+  if(O.act==='pull')p.g.seq=[pullZone()];
   p.gLast='0,0';
 }
+const PULL_SPD=0.9, PULL_MIN=0.15;   // gauge per second while held / a shorter pull does nothing
+const pullW=()=>Math.min(0.3,0.18*S.up.gatherSpd);
+const pullZone=()=>Math.round((0.25+Math.random()*(0.7-pullW()))*100);   // where the green band starts (0-100)
 const timingZone=()=>Math.min(0.15,0.05*S.up.gatherSpd);
 function gatherInput(p,inp,dt){
   const g=p.g,O=GOBJ[g.obj],tap=inp.act&&!p.prevAct;
@@ -1110,6 +1115,13 @@ function gatherInput(p,inp,dt){
   } else if(O.act==='timing'){
     g.t+=dt;g.v=1-Math.abs(((g.t*1.1)%2)-1);
     if(tap)gatherDone(p,Math.abs(g.v-0.5)<=timingZone()?2:1);
+  } else if(O.act==='pull'){
+    const done=c=>{g.need+=c;g.v=0;g.hold=0;
+      if(g.need>=4){gatherDone(p);return}
+      float(g.x+.5,g.y,c===2?'グッ！':'ちょっと動いた','#bff2c6');sfx('tap');g.seq=[pullZone()]};
+    if(inp.act){g.hold=1;g.v+=dt*PULL_SPD;if(g.v>=1){say(p,'引っぱりすぎ！');done(1)}}
+    else if(g.hold){g.hold=0;const z0=(g.seq[0]||0)/100;
+      if(g.v<PULL_MIN)g.v=0;else done(g.v>=z0&&g.v<=z0+pullW()?2:1)}
   } else if(O.act==='arrows'){
     const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,key=dx+','+dy;
     if(key!=='0,0'&&key!==p.gLast&&(dx===0||dy===0)){
@@ -3055,6 +3067,16 @@ function drawGather(p){
     ctx.fillStyle='rgba(255,255,255,.15)';rr(bx,by,bw,14,7);ctx.fill();
     ctx.fillStyle='rgba(127,216,147,.85)';ctx.fillRect(bx+bw*(0.5-z),by,bw*z*2,14);
     ctx.fillStyle='#ffe08a';ctx.fillRect(bx+bw*g.v-2,by-4,4,22);
+  } else if(O.act==='pull'){
+    const sh=g.v>0?Math.sin(S.t*40)*g.v*2.5:0;
+    emoji(ingIc(O.items[0]),x+24+sh,y+30,20);
+    text(AL(p,'act','長押しで引っぱる'),x+40,y+14,10,'#fff',800,'left');text('緑で離す',x+40,y+27,10,'#bff2c6',800,'left');
+    const bx=x+40,bw=w-54,by=y+38,z0=(g.seq[0]||0)/100;
+    ctx.fillStyle='rgba(255,255,255,.15)';rr(bx,by,bw,14,7);ctx.fill();
+    ctx.fillStyle='rgba(127,216,147,.9)';ctx.fillRect(bx+bw*z0,by,bw*pullW(),14);
+    ctx.fillStyle='rgba(255,109,109,.6)';ctx.fillRect(bx+bw*0.95,by,bw*0.05,14);
+    ctx.fillStyle='#ffe08a';ctx.fillRect(bx+bw*Math.min(1,g.v)-2,by-4,4,22);
+    bar(bx,by+20,bw,Math.min(1,g.need/4),'#7fd893');
   } else if(O.act==='arrows'){
     text('この順に入力',cx,y+14,10,'#fff',800);
     g.seq.forEach((k,j)=>{const A=ARW[k];if(A)text(A[2],cx-22+j*44,y+38,26,j<g.v?'#7fd893':'#ffe08a',800)});

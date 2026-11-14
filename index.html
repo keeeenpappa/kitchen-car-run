@@ -200,7 +200,7 @@ const CUST_SWEAT={"penguin_front":[176,21,57,57],"penguin_side":[182,21,57,57],"
 const T=48, GW=24, GH=14, VH=13.5; // VH: rows shown (24 x 13.5 = 16:9); the last row is only a border // 16:9-ish field: truck top-left, town below and to the right
 const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
-const QX=16, QY=8, QMAX=5, QGAP=1.5, EAT_T=4;    // waiting line on row 8, x16..22: a customer every 1.5 tiles; eating time at the table
+const QX=17, QY=8, QMAX=5, QGAP=1.2, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
 const QSPAN=Math.ceil((QMAX-1)*QGAP)+1;         // tiles the line covers (each tile belongs to the nearest spot)
 const qCX=k=>QX+k*QGAP+0.5;                      // centre x of spot k
 const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the plaza under the truck)
@@ -1262,7 +1262,7 @@ const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
 const pickMenu=()=>S.town.menu[rnd(S.town.menu.length)];
 const CUST_AN={port:['penguin','seal','gull'],forest:['bear','deer','owl'],ranch:['sheep','cow','chicken'],busy:['pigeon','dog','panda'],farm:['mole','frog','pig'],sweets:['hamster','hedgehog','alpaca']};
 const CUST_ALL=Object.values(CUST_AN).flat();
-const pickAnimal=()=>{const k=Object.keys(TOWNS).find(k=>TOWNS[k]===S.town),l=CUST_AN[k]||CUST_ALL;return l[rnd(l.length)]};
+const pickAnimal=()=>{const k=S.town&&(S.town.id||Object.keys(TOWNS).find(k=>TOWNS[k]===S.town)),l=CUST_AN[k]||CUST_ALL;return l[rnd(l.length)]};
 // the orders still to bring (a family has two)
 const pendingOrders=c=>c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
 const orderText=c=>pendingOrders(c).map(o=>RECIPES[o].e+RECIPES[o].n).join('・');

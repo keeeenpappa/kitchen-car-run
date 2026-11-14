@@ -853,6 +853,7 @@ function placeOrTake(p,c){
   }
 }
 function doPick(p,c,tx,ty){
+  {const k=kidNear(p);if(k){k.kidAway=2;float(k.kx,k.ky-0.6,'👶 はーい','#8fe39a');sfx('seat');return}}
   if(furnPick(p,c,tx,ty))return;
   if(S.phase==='layout'){
     // only rearranging: tools and plates can go on / come off counters; dirty plates into the sink
@@ -1086,7 +1087,7 @@ function serve(p,tx,ty,c){
   S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;
   if(c.got)c.got[k]=true;
   // they start eating once everything they ordered is on the table
-  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1)}
+  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1);if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5)}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a');sfx('coin');
 }
 
@@ -1146,13 +1147,34 @@ function custPos(c){
   return [c.tx+0.5,c.ty+0.5];
 }
 function startLeave(c,mad){const [x,y]=custPos(c);c.from=c.st;c.st='leave';c.mad=mad;c.lx=x;c.ly=y;c.by=-1}
+// the empty plate stays on the table, dirty
+function leavePlate(c){const nPl=c.order2?2:1,tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'){if(tb.item&&tb.item.kind==='dirty')tb.item.cnt=(tb.item.cnt||1)+nPl;else tb.item={kind:'dirty',cnt:nPl}}}
+// 子連れ: the child gets bored and wanders around the plaza; 持つ next to it sends it back to the table
+const KID_SPD=1.5, KID_BACK=3.2;
+const KID_RANGE=3;   // tiles from its table (across, down and diagonally)
+function kidSpot(c){
+  const ok=[];for(let y=Math.max(7,c.ty-KID_RANGE);y<=Math.min(12,c.ty+KID_RANGE);y++)for(let x=Math.max(1,c.tx-KID_RANGE);x<=Math.min(GW-2,c.tx+KID_RANGE);x++){const t=tile(x,y);if(t&&t.t==='ground'&&!t.item)ok.push([x+0.5,y+0.5])}
+  return ok.length?ok[rnd(ok.length)]:[c.tx+0.8,c.ty+0.6];
+}
+function kidRunOff(c){c.kidAway=1;c.kx=c.tx+0.8;c.ky=c.ty+0.6;[c.kgx,c.kgy]=kidSpot(c);c.kwait=0;float(c.tx+.5,c.ty-0.3,'👶 あれ？','#ffe08a')}
+function kidMove(c,dt){
+  if(c.kidAway===2){   // walking back to the table
+    const dx=c.tx+0.8-c.kx,dy=c.ty+0.6-c.ky,d=Math.hypot(dx,dy),st=KID_BACK*dt;
+    if(d<=st){c.kidAway=0;c.kidDone=true;if(c.t<=0)c.t=0.01}else{c.kx+=dx/d*st;c.ky+=dy/d*st}
+    return}
+  if(c.kwait>0){c.kwait-=dt;return}
+  const dx=c.kgx-c.kx,dy=c.kgy-c.ky,d=Math.hypot(dx,dy),st=KID_SPD*dt;
+  if(d<=st){c.kx=c.kgx;c.ky=c.kgy;c.kwait=0.6+Math.random()*1.2;[c.kgx,c.kgy]=kidSpot(c)}else{c.kx+=dx/d*st;c.ky+=dy/d*st}
+}
+// a player pressing 持つ right next to a wandering child
+function kidNear(p){return S.phase==='stop'&&S.cust.find(c=>c.kidAway===1&&Math.hypot(c.kx-p.x,c.ky-p.y)<1.0)}
 // customer types: ordinary people and four kinds with a quirk
 const CTYPE={
   normal:{n:'',w:6},
   slow:{n:'ゆっくり',e:'🐢',w:1.2,pat:1.5,eat:2},      // waits patiently, but eats slowly (the table stays taken)
   hasty:{n:'せっかち',e:'⚡',w:1.2,pat:0.6,tip:1.6},   // short fuse, tips well
   big:{n:'大食い',e:'🍖',w:1.1,second:true},          // orders a second dish after the first
-  family:{n:'子連れ',e:'👶',w:1.1,two:true},           // two at one table, two orders, they eat once both are there
+  family:{n:'子連れ',e:'👶',w:1.1,kid:true},           // the child wanders off while they eat; they can't leave until someone brings it back (持つ near it)
 };
 const CTYPE_K=Object.keys(CTYPE);
 const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
@@ -1203,7 +1225,7 @@ function clearKitchen(){
 function endStop(){
   sfx('close');
   // customers still eating leave their plate behind, dirty
-  for(const c of S.cust)if(c.st==='eat'){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.order2?2:1}}
+  for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.order2?2:1}}
   S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);
@@ -1654,9 +1676,11 @@ function update(dt){
           if(Math.abs(c.ly-gy)>0.05)c.ly+=Math.sign(gy-c.ly)*Math.min(Math.abs(gy-c.ly),3*dt);else c.lx+=3*dt;
           if(c.lx>GW+0.6)S.cust.splice(k,1);
           continue}
-        if(c.st==='eat'){c.t-=dt;if(c.t<=0){
-          // the empty plate stays on the table, dirty
-          const nPl=c.order2?2:1,tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'){if(tb.item&&tb.item.kind==='dirty')tb.item.cnt=(tb.item.cnt||1)+nPl;else tb.item={kind:'dirty',cnt:nPl}}
+        if(c.st==='eat'){c.t-=dt;
+          if(c.kidAt!=null&&!c.kidAway&&!c.kidDone&&c.t<=c.kidAt)kidRunOff(c);
+          if(c.kidAway){kidMove(c,dt);if(c.t<=0&&!c.plateLeft){c.plateLeft=true;leavePlate(c)}continue}   // can't go home without the child
+          if(c.t<=0){
+          if(!c.plateLeft)leavePlate(c);
           // 大食い: one more dish (the empty plate stays on the table)
           if(ctypeOf(c).second&&!c.secondDone){c.secondDone=true;c.order=pickMenu();c.st='seat';c.pat=c.max;float(c.tx+.5,c.ty-0.3,'🍖 おかわり！ '+RECIPES[c.order].e,'#ffe08a');sfx('seat');continue}
           startLeave(c,false)}continue}
@@ -2473,7 +2497,7 @@ function drawTableShape(X,Y,noStool){
 }
 function drawCustBody(X,Y,c){
   const CT=ctypeOf(c);
-  if(CT.two)drawKid(X+13,Y+5,c);   // 子連れ: a small child beside the parent
+  if(CT.kid&&!c.kidAway)drawKid(X+13,Y+5,c);   // 子連れ: a small child beside the parent (unless it has wandered off)
   softShadow(X,Y+13,13,4.5,.3);
   const base=`hsl(${c.hue} 50% 62%)`,lite=`hsl(${c.hue} 60% 78%)`,dk=`hsl(${c.hue} 45% 44%)`;
   const g=ctx.createRadialGradient(X-4,Y-5,2,X,Y,15);g.addColorStop(0,lite);g.addColorStop(0.6,base);g.addColorStop(1,dk);
@@ -2494,13 +2518,22 @@ function drawKid(X,Y,c){
   ctx.fillStyle='rgba(255,110,140,.5)';ctx.beginPath();ctx.ellipse(X-5,Y+2.5,1.8,1.1,0,0,7);ctx.ellipse(X+5,Y+2.5,1.8,1.1,0,0,7);ctx.fill();
 }
 function drawSeated(){for(const c of S.cust)if(c.st==='seat'||c.st==='eat'){const [px,py]=custPos(c);drawCustBody(px*T,py*T-T*0.42,c)}}
+function drawKidsAway(){
+  for(const c of S.cust){
+    if(!c.kidAway)continue;
+    const X=c.kx*T,Y=c.ky*T,b=c.kidAway===1?Math.abs(Math.sin(S.t*8))*3:0;
+    drawKid(X,Y-b,c);
+    if(c.kidAway===1){const s=1+0.12*Math.sin(S.t*6);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X,Y-21,8*s,0,7);ctx.fill();text('!',X,Y-20,13*s,'#e2504a',900)}
+  }
+}
 function drawCustomers(){
+  drawKidsAway();
   for(const c of S.cust){
     const [px,py]=custPos(c),X=px*T,f=c.pat/c.max,col=f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d';
     if(c.st==='seat'||c.st==='eat'){
       const Y=py*T-T*0.42;
       // order bubble above the table (a happy face while eating)
-      const top=Y-58,bh=36,ord=c.st==='eat'?['😋']:pendingOrders(c).map(o=>RECIPES[o].e),bw=ord.length>1?66:40;
+      const top=Y-58,bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?['👶','❓']:['😋']):pendingOrders(c).map(o=>RECIPES[o].e),bw=ord.length>1?66:40;
       ctx.fillStyle='#fff';rr(X-bw/2,top,bw,bh,9);ctx.fill();
       ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
       ord.forEach((e,k)=>emoji(e,X+(k-(ord.length-1)/2)*28,top+bh/2,ord.length>1?21:24));
@@ -3479,7 +3512,7 @@ function sendSnap(){
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0]),
-    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1]),
+    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100)]),
@@ -3627,7 +3660,7 @@ function applySnap(d){
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
-  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined}));
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100}));

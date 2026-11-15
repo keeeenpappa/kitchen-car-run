@@ -1409,9 +1409,10 @@ function endStop(){
   const lost=clearKitchen();
   const last=S.stop>=STOPS;
   showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
-    <div class="stars">${starsHtml(tst)}</div>
+    <div class="stars big" style="text-align:center">${starsHtml(tst)}</div>
+    <div class="bigscore">${tpts}<span>点</span></div>
+    <p style="text-align:center" class="mut">合計 <b>${runScore(false).total}点</b></p>
     <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b>${perf?' <span class="perf">ノーミス ＋'+PERFECT_PT+'点</span>':''}</p>
-    <p class="mut">この町のスコア <b>${tpts}点</b>　（合計 ${runScore(false).total}点）</p>
     ${moneyBig('評判 '+'♥'.repeat(S.hearts))}
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
     <div class="row"><button class="ovbtn hold autofocus" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}（${OVK()}）</button></div></div>`);

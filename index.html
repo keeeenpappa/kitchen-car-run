@@ -763,7 +763,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
   boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true},
-  nofire:{n:'ゾウ',e:'🐘',d:'12秒間、キッチンの料理が焦げない（焦げかけも止まる）。燃えている火は消えない',dur:12,cd:45},
+  nofire:{n:'ゾウ',e:'🐘',d:'12秒間、キッチンの料理が焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
   tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
   herd:{n:'ミーアキャット',e:'🐾',d:'まわり2マスの仲間と自分の、切る・洗う・水汲み・走る・焼く・ミキサーが1.3倍速（焼く・ミキサーは入れたときに範囲内なら）',dur:10,cd:45}};
@@ -1113,6 +1113,11 @@ function igniteTile(c){
   sfx('burnt');
 }
 function fireUpdate(dt){
+  // elephant: while the skill runs, fires within 2 tiles of it are put out
+  for(const p of S.players){if(p.skill!=='nofire'||!((p.skT||0)>0))continue;
+    for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
+      if(c.fire&&Math.max(Math.abs(x-p.tx),Math.abs(y-p.ty))<=2){c.fire=0;c.smoke=0;sfx('water');float(x+.5,y,'消えた！','#cdeeff')}}
+    if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];if(!c.fire)continue;
     const before=c.fire;c.fire+=dt;
     if(Math.floor(c.fire/FIRE_SPREAD)>Math.floor(before/FIRE_SPREAD)){
@@ -3418,6 +3423,9 @@ function drawCombo(x,y,zm,compact){zm=zm||1;
   ctx.save();ctx.translate(x,y+12*zm);ctx.scale(sc*zm,sc*zm);
   ctx.font=`900 14px ${FNT}`;const lw=ctx.measureText(lab).width;ctx.font=`800 11px ${FNT}`;const mw=ctx.measureText(mt).width,w=lw+mw+(compact?80:90);
   ctx.fillStyle='rgba(16,26,30,.9)';rr(0,-12,w,24,12);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
+  // lion: the gauge is frozen -> the frame blinks
+  if(skillOn('combo')){const k=0.5+0.5*Math.sin(performance.now()/1000*Math.PI*4);
+    ctx.save();ctx.shadowColor='#ffd84a';ctx.shadowBlur=10*k;ctx.strokeStyle=`rgba(255,${Math.round(216+39*k)},${Math.round(74+181*k)},${0.45+0.55*k})`;ctx.lineWidth=3;rr(-2,-14,w+4,28,14);ctx.stroke();ctx.restore()}
   text(lab,10,0,14,'#ffe08a',900,'left');bar(lw+18,-3,56,S.comboT/(S.comboMax||1),'#ffd84a');text(mt,lw+82,0,11,'#7fe0a0',800,'left');
   ctx.restore();
 }

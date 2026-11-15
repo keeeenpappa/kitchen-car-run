@@ -763,7 +763,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
   boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true},
-  nofire:{n:'ゾウ',e:'🐘',d:'12秒間、キッチンの料理が焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
+  nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
   tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
   herd:{n:'ミーアキャット',e:'🐾',d:'まわり2マスの仲間と自分の、切る・洗う・水汲み・走る・焼く・ミキサーが1.3倍速（焼く・ミキサーは入れたときに範囲内なら）',dur:10,cd:45}};
@@ -824,6 +824,8 @@ function skillNow(p,K){
   // an instant skill: works at once (and is not used up when there is nothing to do)
   if(K.now&&!skillNow(p,K))return;
   p.skT=K.dur;p.skCD=K.cd;sfx('skill');
+  // elephant: stoves / mixers within 2 tiles when it is used stay safe for the whole skill
+  if(p.skill==='nofire')for(const c of S.stations)if((c.t==='stove'||c.t==='blender')&&Math.max(Math.abs(c._x-p.tx),Math.abs(c._y-p.ty))<=2){c.nbT=K.dur;float(c._x+.5,c._y,'焦げない','#cdeeff')}
 }
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
@@ -1768,7 +1770,7 @@ function update(dt){
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
   fireUpdate(dt);
   const growBoost=c=>(c.boostT||0)>0?2:1;
-  for(const c of S.stations)if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);
+  for(const c of S.stations){if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);if(c.nbT>0)c.nbT=Math.max(0,c.nbT-dt)}
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
@@ -1776,14 +1778,14 @@ function update(dt){
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
     const it=c.item; if(!it){c.fast=false;c.herd=false;c.smoke=0;continue}
-    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!skillOn('nofire'))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
+    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!((c.nbT||0)>0))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
     if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
       if(nextStep(it)==='cook'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
-      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){if(!skillOn('nofire'))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){if(!((c.nbT||0)>0))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     } else if(c.t==='blender'){
       if(nextStep(it)==='blend'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
-      else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){if(!skillOn('nofire'))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){if(!((c.nbT||0)>0))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     }
   }
   // players

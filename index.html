@@ -1317,7 +1317,7 @@ const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
 const pickMenu=()=>S.town.menu[rnd(S.town.menu.length)];
 const CUST_AN={port:['penguin','seal','gull'],forest:['bear','deer','owl'],ranch:['sheep','cow','chicken'],busy:['pigeon','dog','panda'],farm:['mole','frog','pig'],sweets:['hamster','hedgehog','alpaca']};
 const CUST_ALL=Object.values(CUST_AN).flat().concat(['tanuki']);
-const REG_NAME='タヌ吉さん', REG_HUE=30;
+const REG_NAME='常連さん', REG_HUE=30;   // no personal name: just 常連
 const pickAnimal=()=>{const k=S.town&&(S.town.id||Object.keys(TOWNS).find(k=>TOWNS[k]===S.town)),l=CUST_AN[k]||CUST_ALL;return l[rnd(l.length)]};
 // the orders still to bring (a family has two)
 const pendingOrders=c=>c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
@@ -1330,7 +1330,7 @@ function spawnCust(){
   const max=(S.np===1?85:70)*S.up.pat*(CT.pat||1);
   const c={type,order:type==='regular'&&S.reg?S.reg.order:pickMenu(),pat:max,max,hue:type==='regular'?REG_HUE:rnd(360),an:type==='regular'?'tanuki':pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0};
   if(CT.two){c.order2=pickMenu();c.got=[false,false]}
-  if(type==='regular'){if(!S.reg)S.reg={order:c.order,st:'cand'};else{S.regCame=true;S.toast={text:'🎫 常連の'+REG_NAME+'が来た！ いつもの：'+RECIPES[c.order].n,t:0,life:3.5}}}
+  if(type==='regular'){if(!S.reg)S.reg={order:c.order,st:'cand'};else{S.regCame=true;S.toast={text:'🎫 '+REG_NAME+'が来た！ いつもの：'+RECIPES[c.order].n,t:0,life:3.5}}}
   S.cust.push(c);sfx('bell');
 }
 function clearKitchen(){
@@ -1597,7 +1597,7 @@ const pauseHtml=()=>`<div class="box"><h2>一時停止</h2><p class="mut">${isTo
 const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べる',slow:'気が長いけど、食べるのがゆっくり（テーブルを長く使う）',hasty:'気が短いけど、早く出すとチップが多い',
   big:'食べ終わると、おかわりを頼む',family:'食事中に子どもが歩き回る。子どもの近くで「持つ」で連れ戻すまで帰れない',
   takeout:'席に座らず列で待つ。料理を列まで持っていって渡す（皿はその場で汚れた皿になる）',vip:'たまに来る。王冠をかぶっている。待てる時間は短いけど、料金が2倍',
-  regular:'ポイントカードを持ったタヌ吉さん。最初の町のどこかで来て、そのとき頼んだ料理を「いつもの」として、ほかの町でも毎回頼む（その町のメニューになくても）。町を進むほどチップが増える。怒らせると来なくなる'};
+  regular:'ポイントカードを持ったタヌキ。最初の町のどこかで来て、そのとき頼んだ料理を「いつもの」として、ほかの町でも毎回頼む（その町のメニューになくても）。町を進むほどチップが増える。怒らせると来なくなる'};
 const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
   return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:(C.e||'🙂')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
   <div class="row"><button class="ovbtn autofocus" data-act="pback">もどる</button><button class="ovbtn" data-act="resume">つづける</button></div></div>`;
@@ -2772,7 +2772,7 @@ function drawCustBody(X,Y,c){
     if(!seat)softShadow(X,Y+15,12,4,.3);
     const HY=drawCustFig(X,FY,c.an,c.hue,dir,flip,1,c.type);
     if(c.type==='vip'&&HY!=null)drawVip(X,HY,FY);
-    if(c.type==='regular'&&HY!=null){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText(REG_NAME).width+10;ctx.fillStyle='rgba(124,74,180,.9)';rr(X-w/2,FY+2,w,14,7);ctx.fill();text(REG_NAME,X,FY+9,10,'#fff',800)}
+    if(c.type==='regular'&&HY!=null){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('常連').width+10;ctx.fillStyle='rgba(124,74,180,.9)';rr(X-w/2,FY+2,w,14,7);ctx.fill();text('常連',X,FY+9,10,'#fff',800)}
     if(CT.e&&!custIcon(X,HY,c.type)){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,7.5,0,7);ctx.fill();emoji(CT.e,X-16,HY-11.5,10)}
     return}
   if(CT.kid&&!c.kidAway)drawKid(X+13,Y+5,c);   // 子連れ: a small child beside the parent (unless it has wandered off)

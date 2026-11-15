@@ -2951,14 +2951,21 @@ function drawFires(){
 const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${Math.max(0,Math.min(1,a))})`};
 // the animal's face icon for a skill, or null while its pictures are not delivered
 const skillIconImg=k=>{const an=SKILL_ANIMAL[k];if(!an||artAn(an)!==an)return null;const im=CHEF.img[an+'_icon'];return im&&im.naturalWidth?im:null};
-function elephantSpray(p){
-  if(p.skill!=='nofire'||!((p.skT||0)>0))return;
-  const cx=Math.floor(p.x),cy=Math.floor(p.y),x0=Math.max(2,cx-2)*T,y0=Math.max(2,cy-2)*T,x1=Math.min(16,cx+3)*T,y1=Math.min(7,cy+3)*T,t=S.t;
-  ctx.save();ctx.fillStyle='rgba(120,200,255,.10)';rr(x0+2,y0+2,x1-x0-4,y1-y0-4,10);ctx.fill();
-  ctx.strokeStyle=`rgba(140,210,255,${0.35+0.2*Math.sin(t*5)})`;ctx.lineWidth=2;ctx.setLineDash([6,5]);rr(x0+2,y0+2,x1-x0-4,y1-y0-4,10);ctx.stroke();ctx.setLineDash([]);
-  // falling drops
-  for(let k=0;k<18;k++){const a=(t*1.4+k*0.137)%1,hx=x0+((k*53.7)%(x1-x0-12))+6,hy=y0+((k*31.3)%(y1-y0-20))+4+a*16;
-    ctx.globalAlpha=1-a;ctx.fillStyle='#8fd6ff';ctx.beginPath();ctx.ellipse(hx,hy,2.2,3.4,0,0,7);ctx.fill()}
+// a 5x5 skill area round the chef: a faint tint, a soft dashed edge, and a light effect inside
+function skillArea(p){
+  if(!((p.skT||0)>0)||(p.skill!=='nofire'&&p.skill!=='herd'))return;
+  const el=p.skill==='nofire',cx=Math.floor(p.x),cy=Math.floor(p.y),t=S.t;
+  const x0=Math.max(2,cx-2)*T,y0=Math.max(2,cy-2)*T,x1=Math.min(16,cx+3)*T,y1=Math.min(7,cy+3)*T,w=x1-x0,h=y1-y0;
+  const rgb=el?'90,180,255':'255,196,40';
+  ctx.save();ctx.fillStyle=`rgba(${rgb},.16)`;rr(x0+2,y0+2,w-4,h-4,10);ctx.fill();
+  ctx.strokeStyle=`rgba(${rgb},${0.75+0.2*Math.sin(t*4)})`;ctx.lineWidth=3;ctx.setLineDash([8,6]);ctx.lineDashOffset=-t*12;rr(x0+2,y0+2,w-4,h-4,10);ctx.stroke();ctx.setLineDash([]);
+  for(let k=0;k<16;k++){
+    const a=(t*(el?1.4:0.9)+k*0.137)%1,hx=x0+8+((k*53.7)%(w-16)),hy=y0+6+((k*31.3)%(h-22));
+    ctx.globalAlpha=0.95*(1-a*0.8);
+    if(el){ctx.fillStyle='#5cbcff';ctx.beginPath();ctx.ellipse(hx,hy+a*16,3,4.6,0,0,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(hx-1,hy+a*16-1.5,1,0,7);ctx.fill()}   // water drops falling
+    else{const y=hy+12-a*16,z=3.4;ctx.fillStyle='#ffd23a';ctx.beginPath();   // little sparkles rising
+      for(let q=0;q<8;q++){const r=q%2?z*0.4:z*1.3,an=q*Math.PI/4;ctx.lineTo(hx+Math.cos(an)*r,y+Math.sin(an)*r)}ctx.closePath();ctx.fill()}
+  }
   ctx.restore();
 }
 function skillGlow(p,X,Y){
@@ -3007,7 +3014,7 @@ function drawPlayers(){
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     // held item goes behind the chef when facing away, in front otherwise
     const holdAt=()=>{if(p.hold2)drawItem(p.hold2,X+p.dx*16-(p.dx?0:9),Y+p.dy*14-4+(p.dx?-9:0),T*0.62,true);if(p.hold)drawItem(p.hold,X+p.dx*16+(p.hold2&&!p.dx?9:0),Y+p.dy*14-4+(p.hold2&&p.dx?5:0),T*0.62,true)};
-    elephantSpray(p);skillGlow(p,X,Y);
+    skillArea(p);skillGlow(p,X,Y);
     if(p.dy===-1)holdAt();
     drawChef(p,X,Y);
     if(p.dy!==-1)holdAt();

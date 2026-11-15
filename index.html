@@ -208,6 +208,8 @@ const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the 
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
 const PRESET_TABLES=[[4,9],[9,9],[14,9]];
 const tableOK=(x,y)=>inTblZone(x,y)&&!(y===QY&&x>=QX-1)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
+const FIRE_T=5, FIRE_SPREAD=8, EXT_T=0.8;   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
+const FLAMMABLE=['counter','board','stove','blender','plates','serve'];
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const HEART_MAX=3;
@@ -434,6 +436,7 @@ function newRun(np,mode){
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],reg:null};
   S.map[6][4].item={kind:'can',water:3};
   S.map[6][5].item={kind:'basket',items:[]};
+  {const f=S.map[6].find(t=>t.t==='counter'&&!t.item)||S.map.slice(2,7).flat().find(t=>t.t==='counter'&&!t.item);if(f)f.item={kind:'ext'}}   // the extinguisher: first free counter
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
@@ -460,7 +463,7 @@ const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 // row 7 is reached from the walkway under it), then further out. Kept off the table plaza (rows 8-10, x1-17) and the waiting line
 const TABLE_SPOT=[19,9];   // the table pile waits under the queue
 const GROUND_SPOTS=[[19,9],[5,7],[7,7],[5,9],[7,9],[9,7],[3,9],[9,9],[11,7],[11,9],[13,7],[13,9],[1,9],[15,7],[15,9],[17,9],[5,11],[7,11],[3,11],[9,11],[1,11],[11,11],[13,11],[15,11],[17,11],[19,11],[21,11],[21,9],[19,10],[21,10]];
-const storable=it=>!!it&&['station','can','basket','power'].includes(it.kind);
+const storable=it=>!!it&&['station','can','basket','power','ext'].includes(it.kind);
 // put objects on free spots outside; same-kind counters/planters join one pile
 function putOutside(objs){
   for(const o of objs){
@@ -483,7 +486,7 @@ function setupLayout(){
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x];
     if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0,ups:c.ups||null});
-    if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))objs.push(c.item);
+    if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'||c.item.kind==='ext'))objs.push(c.item);
     if(!FIXED.has(c.t))S.map[y][x]=blankTile(y);
   }
   let tb=0;
@@ -924,12 +927,13 @@ function placeOrTake(p,c){
 // the mixer's contents make a mix: it turns into that and starts mixing
 function mixStart(c){const out=mixDone(c.item.items);if(out){c.item=newIng(out);c.prog=0;c.burn=0}}
 function doPick(p,c,tx,ty){
+  if(c&&c.fire&&S.phase!=='layout'){say(p,p.hold&&p.hold.kind==='ext'?AL(p,'act','消火',1):'燃えている！ 消火器で消す');return}
   {const k=kidNear(p);if(k){k.kidAway=2;float(k.kx,k.ky-0.6,'👶 はーい','#8fe39a');sfx('seat');return}}
   if(furnPick(p,c,tx,ty))return;
   if(S.phase==='layout'){
     // only rearranging: tools and plates can go on / come off counters; dirty plates into the sink
     // (washing starts once on the road), empty ones back on the stand; nothing else is used
-    const tool=it=>it&&(it.kind==='can'||it.kind==='basket'||it.kind==='dirty'||emptyPlate(it));
+    const tool=it=>it&&(it.kind==='can'||it.kind==='basket'||it.kind==='ext'||it.kind==='dirty'||emptyPlate(it));
     if(c.t==='counter'&&(tool(p.hold)||(!p.hold&&tool(c.item)))){placeOrTake(p,c);return}
     const plateTo=(c.t==='sink'&&p.hold&&p.hold.kind==='dirty')||(c.t==='plates'&&emptyPlate(p.hold));
     if(!plateTo){if(c.t!=='floor'&&c.t!=='gap'&&c.t!=='wall')say(p,'配置の時間は並べ替えだけ');return}
@@ -965,6 +969,7 @@ function doPick(p,c,tx,ty){
     case 'trash':
       if(p.hold){
         if(p.hold.kind==='can'){say(p,'じょうろは捨てられない');return}
+        if(p.hold.kind==='ext'){say(p,'消火器は捨てられない');return}
         if(emptyPlate(p.hold)||p.hold.kind==='dirty'){say(p,'皿は捨てられない');return}
         sfx('trash');
         if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
@@ -1073,11 +1078,30 @@ function buy(list,p,shop,tx,ty){
     S.toast={text:'🎁 袋の中身：'+ids.map(id=>ING[id].e+ING[id].n+'×2').join('　'),t:0,life:4}}
   if(shop)it.sold=true;
 }
+// ---------- fire ----------
+function igniteTile(c){
+  if(c.fire||!FLAMMABLE.includes(c.t))return;
+  c.fire=0.01;c.smoke=0;c.prog=0;
+  if(c.item&&c.item.kind==='ing')c.item.burnt=true;
+  if(!S.fireWarn){S.fireWarn=true;S.toast={text:'🔥 火事！ 消火器を持って、燃えている所で作業長押し',t:0,life:3.5}}
+  sfx('burnt');
+}
+function fireUpdate(dt){
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];if(!c.fire)continue;
+    const before=c.fire;c.fire+=dt;
+    if(Math.floor(c.fire/FIRE_SPREAD)>Math.floor(before/FIRE_SPREAD)){
+      const nb=DIRS.map(([dx,dy])=>tile(x+dx,y+dy)).filter(t=>t&&!t.fire&&FLAMMABLE.includes(t.t));
+      if(nb.length)igniteTile(nb[rnd(nb.length)])}}
+}
 function doAct(p,c,tx,ty,dt){
   if(S.phase==='layout')return; // layout time: rearranging only
   const key=tx+','+ty;
   if(p.actKey!==key){p.actKey=key;p.actT=0}
   if(p.lock)return;
+  if(c.fire){
+    if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
+    else say(p,'燃えている！ 消火器で消す');
+    return}
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1);if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
@@ -1299,9 +1323,10 @@ function spawnCust(){
   S.cust.push(c);sfx('bell');
 }
 function clearKitchen(){
+  for(const r of S.map)for(const c of r){c.fire=0;c.smoke=0}S.fireWarn=false;
   // leftovers from this town are thrown away (planters keep growing)
   // tools (watering can, basket) are kept; whatever is still in the basket is lost
-  const TOOL={can:1,basket:1};
+  const TOOL={can:1,basket:1,ext:1};
   let lost=0;
   for(const r of S.map)for(const c of r){
     if(!c.item)continue;
@@ -1704,6 +1729,7 @@ function update(dt){
     for(const f of S.floats)f.t+=dt;return}
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
+  fireUpdate(dt);
   const growBoost=c=>(c.boostT||0)>0?2:1;
   for(const c of S.stations)if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);
   for(const c of S.stations){
@@ -1711,7 +1737,10 @@ function update(dt){
       // a plant grows once it has been watered (one watering per seed)
       if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
-    const it=c.item; if(!it){c.fast=false;continue} if(it.kind!=='ing'||it.burnt)continue;
+    if(c.fire)continue;   // a burning unit does nothing until it is put out
+    const it=c.item; if(!it){c.fast=false;c.smoke=0;continue}
+    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
+    if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
       if(nextStep(it)==='cook'){c.prog+=dt*(c.fast?2:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
@@ -1887,6 +1916,14 @@ function drawItem(it,cx,cy,s,inHand){
     if(upTotal(it))text('⬆'+upTotal(it),cx-s*0.34,cy-s*0.32,11,'#ffd84a',800);
     return;
   }
+  if(it.kind==='ext'){   // a red extinguisher with a black hose
+    const g=ctx.createLinearGradient(cx-s*0.18,0,cx+s*0.18,0);g.addColorStop(0,'#ff6b5e');g.addColorStop(1,'#b8261c');
+    ctx.fillStyle=g;rr(cx-s*0.16,cy-s*0.22,s*0.32,s*0.52,s*0.1);ctx.fill();
+    ctx.fillStyle='#2c2c2c';rr(cx-s*0.08,cy-s*0.32,s*0.16,s*0.12,2);ctx.fill();
+    ctx.strokeStyle='#2c2c2c';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx+s*0.06,cy-s*0.28);ctx.quadraticCurveTo(cx+s*0.34,cy-s*0.26,cx+s*0.3,cy+s*0.05);ctx.stroke();
+    ctx.fillStyle='#fff';rr(cx-s*0.12,cy-s*0.02,s*0.24,s*0.1,2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.35)';rr(cx-s*0.12,cy-s*0.18,3,s*0.4,1.5);ctx.fill();
+    return}
   if(it.kind==='can'){
     {const g=ctx.createLinearGradient(cx-s*0.3,0,cx+s*0.18,0);g.addColorStop(0,'#78b6cf');g.addColorStop(1,'#3b7891');ctx.fillStyle=g;rr(cx-s*0.3,cy-s*0.22,s*0.48,s*0.44,6);ctx.fill();
      ctx.fillStyle='rgba(255,255,255,.45)';rr(cx-s*0.25,cy-s*0.17,3,s*0.3,1.5);ctx.fill()}
@@ -2780,7 +2817,7 @@ function drawGroundItems(){
   }
 }
 function layoutHint(p,c,tx,ty){
-  const h=p.hold,tool=it=>it&&(it.kind==='can'||it.kind==='basket');
+  const h=p.hold,tool=it=>it&&(it.kind==='can'||it.kind==='basket'||it.kind==='ext');
   if(!c)return '';
   if(h&&h.kind==='power'){const U=upById(h.up),tg=U&&U.tgt;
     if((inTruck(tx,ty)&&c.t===tg)||(c.item&&c.item.kind===tg))return '重ねる';
@@ -2802,6 +2839,7 @@ function layoutHint(p,c,tx,ty){
 function playHint(p,c){
   if(!c||p.menu||p.g||p.mk||p.seat)return '';
   const h=p.hold;
+  if(c.fire)return h&&h.kind==='ext'?(p.actT>0?'':AL(p,'act','消火',1)):'燃えている！ 消火器で';
   if(c.t==='sink'&&h&&h.kind==='dirty')return AL(p,'pick','シンクに入れる');
   if(c.t==='sink'&&!h&&(c.dirty||0)>0&&!(p.actT>0))return AL(p,'act','洗う',1);
   if(c.t==='table'&&!h&&c.item&&c.item.kind==='dirty')return AL(p,'pick','汚れた皿を持つ');
@@ -2809,6 +2847,16 @@ function playHint(p,c){
   if(c.t==='planter'&&c.plant&&h&&h.kind==='can'&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow)return h.water>0?AL(p,'pick','水をあげる'):'じょうろが空';
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop')return AL(p,'act','切る',1);
   return '';
+}
+function drawFires(){
+  if(!S.map)return;const t=S.t||0;
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
+    if(!c.fire){if(c.smoke>0&&c.smoke<FIRE_T){const k=c.smoke/FIRE_T;ctx.fillStyle=`rgba(60,60,60,${0.25+0.35*k})`;for(let j=0;j<3;j++){const a=(t*1.5+j*0.33)%1;ctx.beginPath();ctx.arc(x*T+T/2+Math.sin(t*3+j)*6,y*T+T*0.3-a*22,5+a*7*k+3*k,0,7);ctx.fill()}}continue}
+    const X=x*T+T/2,Y=y*T+T*0.62;
+    for(let j=0;j<5;j++){const ph=t*9+j*1.3,h=T*(0.42+0.16*Math.sin(ph)),w=T*0.2,ox=(j-2)*T*0.14;
+      const g=ctx.createLinearGradient(0,Y,0,Y-h);g.addColorStop(0,'#ff4a1c');g.addColorStop(0.55,'#ff9a1f');g.addColorStop(1,'rgba(255,230,90,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(X+ox-w/2,Y);ctx.quadraticCurveTo(X+ox-w*0.6,Y-h*0.5,X+ox+Math.sin(ph)*3,Y-h);ctx.quadraticCurveTo(X+ox+w*0.6,Y-h*0.5,X+ox+w/2,Y);ctx.fill()}
+  }
 }
 function drawPlayers(){
   for(const p of S.players){
@@ -3389,6 +3437,7 @@ function drawWorld(arr){
   if(S.view==='road')drawShops();
   ctx.save();ctx.translate(0,-bounce);
   drawCab(false);
+  drawFires();
   drawPlayers();
   drawCab(true);
   ctx.restore();
@@ -3813,6 +3862,7 @@ function encItem(it){
     case 'plate':return [1,it.bare?1:0,it.items.map(x=>[ING_K.indexOf(x.id),x.step,x.burnt?1:0]),it.cnt||1];
     case 'dirty':return [7,it.cnt||1];
     case 'mix':return [8,it.items.map(id=>ING_K.indexOf(id))];
+    case 'ext':return [9];
     case 'can':return [2,it.water,it.bonus||0,encUps(it)];
     case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id)),encUps(it)];
     case 'power':return [6,UPK.indexOf(it.up)];
@@ -3828,7 +3878,7 @@ function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0,c.fire?1:0,Math.round((c.smoke||0)*10)];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -3979,7 +4029,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9]};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10};
   }
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}
@@ -4011,6 +4061,7 @@ function decItem(a){
     case 0:return ing(a[1],a[2],a[3]);
     case 1:{const o={kind:'plate',bare:!!a[1],items:(Array.isArray(a[2])?a[2]:[]).slice(0,3).map(x=>ing(x[0],x[1],x[2]))};if(+a[3]>1)o.cnt=Math.min(9,+a[3]);return o}
     case 7:return {kind:'dirty',cnt:Math.max(1,Math.min(9,+a[1]||1))};
+    case 9:return {kind:'ext'};
     case 8:return {kind:'mix',items:(Array.isArray(a[1])?a[1]:[]).slice(0,3).map(i=>ING_K[i]).filter(Boolean)};
     case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0,ups:decUps(a[3])};
     case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean),ups:decUps(a[3])};

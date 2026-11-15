@@ -420,7 +420,7 @@ function buildMap(){
   top.forEach((t,i)=>set(2+i,2,t));
   for(let y=3;y<=5;y++){set(2,y,'planter',{plant:null});set(15,y,'counter')}
   set(15,4,'floor');set(16,4,'lever');
-  for(let x=7;x<=9;x++)set(x,4,'counter');
+  for(let x=7;x<=10;x++)set(x,4,'counter');
   const bot=['counter','window','counter','counter','door','counter','counter','counter','counter','counter','counter','window','counter','counter'];
   bot.forEach((t,i)=>set(2+i,6,t));
   m[6][3].win='後'; m[6][13].win='前';
@@ -896,9 +896,8 @@ const wrap=(i,n)=>((i%n)+n)%n;
 
 // ---------- interactions ----------
 function accepts(c,h){
-  if(c.t==='counter')return true;
+  if(c.t==='counter'||c.t==='board')return true;   // a board is a counter you can also chop on
   if(h.kind!=='ing')return false;
-  if(c.t==='board')return nextStep(h)==='chop';
   if(c.t==='stove')return nextStep(h)==='cook';
   if(c.t==='blender')return nextStep(h)==='blend'||(!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan([],h.id));
   return false;
@@ -934,7 +933,7 @@ function placeOrTake(p,c){
     if(['can','seed','basket'].includes(h.kind)||['can','seed','basket'].includes(it.kind)){say(p,'ここには置けない');return}
     const items=x=>x.kind==='plate'?x.items:[x];
     const ok=x=>x.kind==='plate'||(isDone(x)&&!x.burnt);
-    if(c.t!=='counter'){
+    if(c.t!=='counter'&&c.t!=='board'){
       // a finished item on a board / stove / blender can be scooped up with a plate or a prepared ingredient in hand
       if(!(it.kind==='ing'&&isDone(it))){say(p,'まだ調理中');return}
       if(it.burnt){say(p,badW(it));return}
@@ -1227,7 +1226,7 @@ function payTip(c,rid){
   return [pay,tip];
 }
 // combo: serving again before the gauge runs out adds one; the tip grows 10% per step (up to x1.5)
-const COMBO_T=[0,22,17,14,12];   // seconds per gauge, by player count
+const COMBO_T=[0,32,17,14,12];   // seconds per gauge, by player count
 const comboMulOf=n=>1+0.1*Math.min(5,Math.max(0,n-1));
 const comboNext=()=>S.comboT>0?(S.combo||0)+1:1;
 const orderGold=c=>pendingOrders(c).reduce((a,o)=>{const [p,t]=payTip(c,o);return a+p+t},0);
@@ -1397,7 +1396,6 @@ function clearKitchen(){
 }
 function endStop(){
   if(S.reg&&S.reg.st==='cand')S.reg.st='off';   // never served in the first town: not a regular
-  sfx('close');
   // customers still eating leave their plate behind, dirty
   for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.order2?2:1}}
   S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
@@ -1709,15 +1707,18 @@ function showChoose(){
     <div class="cards">${cards}</div>
     <p class="mut">${isTouch?'カードを長押しで決定':`←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定`}</p></div>`);
 }
+let OVSTICK=0;
 function overlayInput(){
   const b=ovButtons(); if(!b.length||guestLocked())return;
   if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
   const p0=pads[0];
   let mv=0,ok=false;
-  if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r')))mv=1;
-  if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l')))mv=-1;
+  // left stick: one step per push (back to the middle before the next)
+  const sx=p0?p0.ax:0,sd=sx>0.6?1:sx<-0.6?-1:0,st=sd&&sd!==OVSTICK?sd:0;if(Math.abs(sx)<0.3)OVSTICK=0;else if(sd)OVSTICK=sd;
+  if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r'))||st===1)mv=1;
+  if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l'))||st===-1)mv=-1;
   if(pressed.has('Space')||pressed.has('Enter')||pressed.has('KeyF')||pressed.has('Period')||(p0&&(p0.edge('a')||p0.edge('x'))))ok=true;
-  if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
+  if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')||st))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
   for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
   if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
@@ -1730,14 +1731,13 @@ const MENU={
 };
 function marketInput(p,inp,dt){
   const c=tile(p.tx,p.ty);
-  if(S.phase!=='stop'||!c||c.t!=='market'||inp.sw){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
-  if(inp.pick){say(p,AL(p,'act','購入',1));sfx('nope')}
-  const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0, dy=inp.my<-0.5?-1:0, key=dx+','+dy;
+  if(S.phase!=='stop'||!c||c.t!=='market'){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
+  if(inp.pick){p.mk=false;p.prevAct=inp.act;p.actT=0;return}       // 持つ closes the list
+  const dy=inp.my<-0.5?-1:0;
   if(dy<0){p.mk=false;p.prevAct=inp.act;p.actT=0;return}           // step back up: close the list
-  let move=false;
-  if(dx){if(key!==p.menuLast){move=true;p.menuRep=0.32}else{p.menuRep-=dt;if(p.menuRep<=0){move=true;p.menuRep=0.11}}}
-  p.menuLast=key;
-  if(move){p.cur=wrap(p.cur,S.market.length)+dx;p.actT=0}
+  // 切替 (LB / RB) picks the next item, the same as the road shops
+  const move=!!inp.sw;
+  if(move){p.cur=wrap(p.cur,S.market.length)+1;p.actT=0}
   // buying is a long press of 作業, like the road shops
   if(!inp.act){p.lock=false;p.actT=0}
   else if(!p.lock&&!move){p.actT+=dt;if(p.actT>=BUY){p.actT=0;p.lock=true;buy(S.market,p,null,p.tx,p.ty)}}
@@ -1773,6 +1773,7 @@ function menuInput(p,inp,dt){
 }
 
 // ---------- update ----------
+const NOINP={mx:0,my:0,pick:false,act:false,sw:false,sk:false};
 function update(dt){
   S.t+=dt;
   if(S.phase==='select'){selectUpdate(dt);return}
@@ -1803,7 +1804,7 @@ function update(dt){
   }
   // players
   S.players.forEach((p,i)=>{
-    const inp=readInput(i);
+    const inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
     p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);
     if(inp.sk&&(S.phase==='drive'||S.phase==='stop'))useSkill(p);
     if(p.menu){const h0=p.hold,s0=p.menu.sel;menuInput(p,inp,dt);if(p.hold!==h0)sfx('pick');else if(p.menu&&p.menu.sel!==s0)sfx('tick');p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
@@ -1874,6 +1875,7 @@ function update(dt){
       const b=S.bonus||0;
       S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;S.combo=0;S.comboT=0;S.regCame=false;S.regAt=S.timer*(0.4+Math.random()*0.45);sfx('service');
       if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
+    else if(S.sub==='closing'){S.timer=0;S.closeT-=dt;if(S.closeT<=0)endStop()}
     else{
       if(S.comboT>0&&!skillOn('combo')){S.comboT-=dt;if(S.comboT<=0){S.comboT=0;S.combo=0;S.comboBreak=0}}
       S.spawnT-=dt;
@@ -1897,7 +1899,7 @@ function update(dt){
         c.pat-=c.st==='wait'?dt/WAIT_PAT:dt;   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
-      if(S.timer<=0)endStop();
+      if(S.timer<=0){S.sub='closing';S.closeT=2;sfx('close');S.toast={text:'営業終了！',t:0,life:2}}
     }
   }
   if(S.toast){S.toast.t+=dt;if(S.toast.t>S.toast.life)S.toast=null}
@@ -2670,8 +2672,7 @@ function drawTown(){
   drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
   const mp=S.players.find(q=>q.mk);
   if(mp){const hx=(MKT[0]+1.2)*T,hy=(MKT[1]-0.45)*T-14;
-    const mvk=isTouch&&(NET.role!=='off'||mp.i===0)?'スティック':keyName(devSlot(mp),'move');
-    ctx.font=`800 11px ${FNT}`;const msg='選ぶ（'+mvk+'）　'+AL(mp,'act','購入',1)+'　'+AL(mp,'sw','閉じる'),w=ctx.measureText(msg).width+16;
+    ctx.font=`800 11px ${FNT}`;const msg=AL(mp,'sw','切替')+'　'+AL(mp,'act','購入',1)+'　'+AL(mp,'pick','閉じる'),w=ctx.measureText(msg).width+16;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(hx-4,hy-10,w,20,8);ctx.fill();text(msg,hx+4,hy,11,'#ffe08a',800,'left')}
   // gathering spots (the same five in every town)
   for(const k of GOBJ_K){
@@ -2950,6 +2951,16 @@ function drawFires(){
 const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${Math.max(0,Math.min(1,a))})`};
 // the animal's face icon for a skill, or null while its pictures are not delivered
 const skillIconImg=k=>{const an=SKILL_ANIMAL[k];if(!an||artAn(an)!==an)return null;const im=CHEF.img[an+'_icon'];return im&&im.naturalWidth?im:null};
+function elephantSpray(p){
+  if(p.skill!=='nofire'||!((p.skT||0)>0))return;
+  const cx=Math.floor(p.x),cy=Math.floor(p.y),x0=Math.max(2,cx-2)*T,y0=Math.max(2,cy-2)*T,x1=Math.min(16,cx+3)*T,y1=Math.min(7,cy+3)*T,t=S.t;
+  ctx.save();ctx.fillStyle='rgba(120,200,255,.10)';rr(x0+2,y0+2,x1-x0-4,y1-y0-4,10);ctx.fill();
+  ctx.strokeStyle=`rgba(140,210,255,${0.35+0.2*Math.sin(t*5)})`;ctx.lineWidth=2;ctx.setLineDash([6,5]);rr(x0+2,y0+2,x1-x0-4,y1-y0-4,10);ctx.stroke();ctx.setLineDash([]);
+  // falling drops
+  for(let k=0;k<18;k++){const a=(t*1.4+k*0.137)%1,hx=x0+((k*53.7)%(x1-x0-12))+6,hy=y0+((k*31.3)%(y1-y0-20))+4+a*16;
+    ctx.globalAlpha=1-a;ctx.fillStyle='#8fd6ff';ctx.beginPath();ctx.ellipse(hx,hy,2.2,3.4,0,0,7);ctx.fill()}
+  ctx.restore();
+}
 function skillGlow(p,X,Y){
   const K=skillOf(p),cd=p.skCD||0;
   if(p._lcd!=null&&cd>p._lcd+1)p._popT=S.t;p._lcd=cd;
@@ -2996,7 +3007,7 @@ function drawPlayers(){
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     // held item goes behind the chef when facing away, in front otherwise
     const holdAt=()=>{if(p.hold2)drawItem(p.hold2,X+p.dx*16-(p.dx?0:9),Y+p.dy*14-4+(p.dx?-9:0),T*0.62,true);if(p.hold)drawItem(p.hold,X+p.dx*16+(p.hold2&&!p.dx?9:0),Y+p.dy*14-4+(p.hold2&&p.dx?5:0),T*0.62,true)};
-    skillGlow(p,X,Y);
+    elephantSpray(p);skillGlow(p,X,Y);
     if(p.dy===-1)holdAt();
     drawChef(p,X,Y);
     if(p.dy!==-1)holdAt();
@@ -3405,8 +3416,8 @@ function drawShopPanelPhone(){
   ctx.font=`800 14px ${FNT}`;const tw=ctx.measureText(title).width+20;
   ctx.fillStyle='rgba(16,26,30,.92)';rr(fx-4,y-54,tw,24,12);ctx.fill();text(title,fx+6,y-42,14,'#ffe08a',800,'left');
   drawOffer(items,0,y,shop,fx);
-  if(!shop){const mvk=isTouch?'スティック':keyName(devSlot(lp),'move');
-    const msg='選ぶ（'+mvk+'）　'+AL(lp,'act','購入',1)+'　'+AL(lp,'sw','閉じる');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+16;
+  if(!shop){
+    const msg=AL(lp,'sw','切替')+'　'+AL(lp,'act','購入',1)+'　'+AL(lp,'pick','閉じる');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+16;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(fx-4,y+T*1.25+24,w,20,8);ctx.fill();text(msg,fx+4,y+T*1.25+34,11,'#ffe08a',800,'left')}
 }// the bar on a phone: fewer things, bigger (drawn at UZ)
 function drawTopBarPhone(){

@@ -765,6 +765,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true},
   nofire:{n:'ゾウ',e:'🐘',d:'12秒間、キッチンの料理が焦げない（焦げかけも止まる）。燃えている火は消えない',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
+  tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
   herd:{n:'ミーアキャット',e:'🐾',d:'まわり2マスの仲間と自分の、切る・洗う・水汲み・走る・焼く・ミキサーが1.3倍速（焼く・ミキサーは入れたときに範囲内なら）',dur:10,cd:45}};
 // ミーアキャット: a 5x5-tile area round a meerkat whose skill is working; it does not add up with a chef's own speed skill (the faster one counts)
 const HERD=1.3, HERD_R=2.5;
@@ -797,6 +798,14 @@ function skillNow(p,K){
   if(K===SKILLS.boost){
     if(S.phase!=='drive'){say(p,'走行中に使う');return false}
     S.boostN=2;S.prevZone=S.shops.some(inWindowZone);S.toast={text:'🚀 ひとっ走り！ 次の2区間は燃料なしで急ぐ',t:0,life:2.5};
+    return true}
+  if(K===SKILLS.tidy){   // タコ: every dirty plate on the tables comes into this chef's hands
+    if(S.phase!=='stop'){say(p,'町の営業中に使う');return false}
+    if(p.hold&&p.hold.kind!=='dirty'){say(p,'手を空けて使う');return false}
+    let n=0;for(const [x,y] of tablesList()){const c=S.map[y][x];if(c.item&&c.item.kind==='dirty'){n+=c.item.cnt||1;float(x+.5,y,'🐙','#ffd0e0');c.item=null}}
+    if(!n){say(p,'汚れた皿がない');return false}
+    if(p.hold)p.hold.cnt=(p.hold.cnt||1)+n;else p.hold={kind:'dirty',cnt:n};
+    float(p.x,p.y-0.8,'お片づけ ×'+n,'#ffe08a');sfx('pick');
     return true}
   if(K===SKILLS.smile){
     const w=S.phase==='stop'?waiting():[];
@@ -3020,7 +3029,7 @@ function shade(hex,k){
 const CHEF_DY=8;
 // ----- animal chefs (delivered art): parts on a shared 256x256 grid, feet anchored at (128,240).
 // The player colour is multiplied into the *_tint layers; the animal follows the chef's skill.
-const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion',herd:'meerkat'};
+const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion',herd:'meerkat',tidy:'octopus'};
 // an animal whose pictures have not been delivered yet is drawn with the beaver's until they arrive
 const artAn=an=>typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[an+'_head_front']?an:'beaver';
 const CHEF_K=0.22;            // world units per sprite pixel (the chef is about 48 world units tall)

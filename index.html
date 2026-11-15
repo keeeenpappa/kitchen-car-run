@@ -70,7 +70,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 #pauseBtn[hidden]{display:none}
 #infoBtn{position:absolute;left:8px;bottom:8px;z-index:6;font-size:13px;padding:6px 10px;background:rgba(44,70,80,.9)}
 #infoBtn.on{border-color:var(--truck)}
-body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(4px + env(safe-area-inset-right,0px));bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:21;border-radius:999px;font-size:12px;padding:4px 9px}
+body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(186px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:21;border-radius:999px;font-size:18px;padding:6px 14px}
 #infoBtn[hidden]{display:none}
 body.touch #pauseBtn{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
@@ -132,7 +132,7 @@ body.touch .narrow{display:none}
 #joy{left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));width:128px;height:128px;border-radius:50%;
   background:rgba(33,52,60,.55);border:2px solid rgba(157,179,180,.5)}
 #knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(243,183,58,.85);pointer-events:none}
-#btns{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:auto auto;gap:10px;align-items:end}
+#btns{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:auto auto;gap:10px;align-items:end}
 .tb{font:inherit;font-weight:800;color:var(--ink);border:2px solid rgba(157,179,180,.55);border-radius:50%;background:rgba(33,52,60,.6);display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
 .tb.on{background:rgba(243,183,58,.7);color:#1b1206}
 #bPick{width:76px;height:76px;font-size:15px}
@@ -3386,10 +3386,10 @@ function drawTopBarPhone(){
   ctx.fillStyle='rgba(16,26,30,.88)';rr(6,4,W-12,36,10);ctx.fill();
   emoji(stIc('status_tip','🪙'),22,y,18);text(S.money+'G',34,y,18,'#ffe08a',800,'left');
   for(let k=0;k<HEART_MAX;k++)text('♥',112+k*17,y,16,k<S.hearts?'#ff6d6d':'#3b5059',800);
-  drawCombo(10,44,1.4);
   const tw=S.phase==='stop'?S.town:(S.phase==='drive'||(S.phase==='layout'&&S.stop>0))?S.next:null;
   if(tw){const nm=(S.phase==='stop'?'':'→ ')+tw.e+' '+tw.n;ctx.font=`800 15px ${FNT}`;const nw=ctx.measureText(nm).width+20;
     ctx.fillStyle='#2f6f6a';rr(170,9,nw,26,13);ctx.fill();text(nm,180,y,15,'#fff',800,'left')}
+  drawCombo(tw?170+ctx.measureText((S.phase==='stop'?'':'→ ')+tw.e+' '+tw.n).width+30:170,10,1,true);
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'配置 '+fmtT(S.timer):'時間切れ';
   else if(S.phase==='drive')ph=kmTxt(Math.min(S.dist,S.route))+'/'+kmTxt(S.route)+'km';
@@ -3408,15 +3408,15 @@ function drawTopBarPhone(){
   if(NET.role!=='off'&&NET.code)text('部屋 '+NET.code,14,y2,12,'#ffe08a',800,'left');
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
-function drawCombo(x,y,zm){zm=zm||1;
+function drawCombo(x,y,zm,compact){zm=zm||1;
   if(S.comboPop!=null)S.comboPop+=1/60;if(S.comboBreak!=null)S.comboBreak+=1/60;
   if(S.phase!=='stop'||!S.combo){
     if(S.comboBreak!=null&&S.comboBreak<0.5){ctx.globalAlpha=1-S.comboBreak/0.5;ctx.fillStyle='#c0392b';rr(x,y,150*zm,24*zm,12*zm);ctx.fill();text('コンボ終了',x+75*zm,y+12*zm,12*zm,'#fff',800);ctx.globalAlpha=1}
     return}
   const p=S.comboPop!=null&&S.comboPop<0.35?S.comboPop/0.35:1,sc=1+0.35*Math.sin(p*Math.PI)*(p<1?1:0);
-  const m=comboMulOf(S.combo),lab='×'+S.combo+' コンボ',mt='チップ'+(Math.round(m*10)/10)+'倍';
+  const m=comboMulOf(S.combo),lab='×'+S.combo+' コンボ',mt=compact?'':'チップ'+(Math.round(m*10)/10)+'倍';
   ctx.save();ctx.translate(x,y+12*zm);ctx.scale(sc*zm,sc*zm);
-  ctx.font=`900 14px ${FNT}`;const lw=ctx.measureText(lab).width;ctx.font=`800 11px ${FNT}`;const mw=ctx.measureText(mt).width,w=lw+mw+90;
+  ctx.font=`900 14px ${FNT}`;const lw=ctx.measureText(lab).width;ctx.font=`800 11px ${FNT}`;const mw=ctx.measureText(mt).width,w=lw+mw+(compact?80:90);
   ctx.fillStyle='rgba(16,26,30,.9)';rr(0,-12,w,24,12);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
   text(lab,10,0,14,'#ffe08a',900,'left');bar(lw+18,-3,56,S.comboT/(S.comboMax||1),'#ffd84a');text(mt,lw+82,0,11,'#7fe0a0',800,'left');
   ctx.restore();

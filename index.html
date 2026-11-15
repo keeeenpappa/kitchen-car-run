@@ -764,7 +764,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   haggle:{n:'キツネ',e:'🦊',d:'自分が買うと、道のお店も町の市場も3割引き',dur:17,cd:45},
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
-  boost:{n:'ウマ',e:'🐎',d:'走行中に使うと、10秒間、燃料なしで「急ぐ」より少し速く走る（窓口でお店と並んでいる間はいつもの速さ）',dur:10,cd:40,now:true},
+  boost:{n:'ウマ',e:'🐎',d:'走行中に使うと、10秒間、燃料なしで「急ぐ」より少し速く走る（窓口でお店と並んでいる間はいつもの速さで、残り時間も減らない）',dur:10,cd:40,now:true},
   nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
   tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
@@ -1806,7 +1806,9 @@ function update(dt){
   // players
   S.players.forEach((p,i)=>{
     const inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
-    p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);
+    // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
+    const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);
+    if(!horseWait)p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);
     if(inp.sk&&(S.phase==='drive'||S.phase==='stop'))useSkill(p);
     if(p.menu){const h0=p.hold,s0=p.menu.sel;menuInput(p,inp,dt);if(p.hold!==h0)sfx('pick');else if(p.menu&&p.menu.sel!==s0)sfx('tick');p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     if(p.mk){const c0=p.cur;marketInput(p,inp,dt);if(p.mk&&p.cur!==c0)sfx('tick');if(p.msgT>0)p.msgT-=dt;return}
@@ -1869,7 +1871,7 @@ function update(dt){
       if(s.x+2+WMARGIN<3.5)s.fade=(s.fade||0)+dt;
     }
     S.shops=S.shops.filter(s=>!(s.fade>0.3));
-    if(S.dist>=S.route)arrive();
+    if(S.dist>=S.route){arrive();for(const q of S.players)if(q.skill==='boost')q.skT=0}
   } else if(S.phase==='stop'){
     S.timer-=dt;
     if(S.sub==='prep'){if(S.timer<=0){

@@ -3875,8 +3875,19 @@ function beaconStart(){
 function beaconStop(){NET.beaconRun=(NET.beaconRun||0)+1;if(NET.beacon){try{NET.beacon.destroy()}catch(_){}}NET.beacon=null;NET.beaconSlot=null}
 // guest side: look for rooms every few seconds while the list is open
 function scanStop(){clearTimeout(NET.scanT);NET.scanT=0;NET.listOpen=false;if(NET.scanner){try{NET.scanner.destroy()}catch(_){}}NET.scanner=null}
+// the scanning peer can lose its server link (phones do this often): reconnect, or make a new one, then go on
+function withScanner(cb,fail){
+  let pr=NET.scanner;
+  if(pr&&pr.open){cb(pr);return}
+  let done=false;const go=()=>{if(done)return;done=true;cb(NET.scanner)},bad=()=>{if(done)return;done=true;if(fail)fail()};
+  setTimeout(bad,8000);
+  if(pr&&!pr.destroyed&&pr.disconnected){pr.once('open',go);try{pr.reconnect()}catch(_){}return}
+  if(pr){try{pr.destroy()}catch(_){}}
+  pr=NET.scanner=new Peer();pr.on('open',go);pr.on('error',()=>{});
+}
 function scanOnce(){
-  const pr=NET.scanner;if(!pr||!pr.open)return;
+  const pr=NET.scanner;
+  if(!pr||!pr.open){if(NET.listOpen)withScanner(()=>{if(NET.listOpen)scanOnce()},()=>{if(NET.listOpen)NET.scanT=setTimeout(scanOnce,2500)});return}
   const found={};
   for(let i=0;i<LOBBY_N;i++){
     const c=pr.connect(PEER_PREFIX+'lobby-'+i,{reliable:true});
@@ -3893,8 +3904,7 @@ function showRoomList(){
     <div class="rooms" id="roomList"></div>
     <div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div></div>`);
   renderRooms(true);
-  if(!NET.scanner){const pr=NET.scanner=new Peer();pr.on('open',()=>scanOnce());pr.on('error',()=>{})}
-  else scanOnce();
+  scanOnce();
 }
 function renderRooms(force){
   const el=document.getElementById('roomList');if(!el||!NET.listOpen)return;
@@ -3920,10 +3930,13 @@ function lobbyPick(i){
   setTimeout(()=>{const e=document.getElementById('joinPw');if(e)e.focus()},50);
 }
 function lobbyJoin(i,pw){
-  const pr=NET.scanner;if(!pr||!pr.open){showRoomList();return}
+  const err0=t=>{const e=document.getElementById('pwErr');if(e)e.textContent=t;else{NET.err=t;showRoomList()}};
+  if(!document.getElementById('pwErr')){NET.listOpen=false;clearTimeout(NET.scanT);paintOv(`<div class="box"><h2>部屋 ${i+1}</h2><p>部屋につないでいます…</p></div>`)}
+  withScanner(pr=>lobbyJoinWith(pr,i,pw),()=>err0('通信がつながりませんでした。もう一度試してください。'));
+}
+function lobbyJoinWith(pr,i,pw){
   const err=t=>{const e=document.getElementById('pwErr');if(e)e.textContent=t;else{NET.err=t;showRoomList()}};
   const c=pr.connect(PEER_PREFIX+'lobby-'+i,{reliable:true});let done=false;
-  if(!document.getElementById('pwErr')){NET.listOpen=false;clearTimeout(NET.scanT);paintOv(`<div class="box"><h2>部屋 ${i+1}</h2><p>部屋につないでいます…</p></div>`)}
   const tm=setTimeout(()=>{if(!done){done=true;err('部屋につながりませんでした。もう一度試してください。')}},6000);
   c.on('open',()=>{try{c.send({t:'join',pw})}catch(_){}});
   c.on('data',m=>{if(done||!m)return;done=true;clearTimeout(tm);try{c.close()}catch(_){}

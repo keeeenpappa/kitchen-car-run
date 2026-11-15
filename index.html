@@ -762,7 +762,10 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   haggle:{n:'キツネ',e:'🦊',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45},
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
-  boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true}};
+  boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true},
+  nofire:{n:'ゾウ',e:'🐘',d:'12秒間、キッチンの料理が焦げない（焦げかけも止まる）。燃えている火は消えない',dur:12,cd:45},
+  combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45}};
+const skillOn=k=>!!S&&S.players.some(q=>q.skill===k&&(q.skT||0)>0);   // someone's skill k is working right now
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
@@ -1751,14 +1754,14 @@ function update(dt){
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
     const it=c.item; if(!it){c.fast=false;c.smoke=0;continue}
-    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
+    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!skillOn('nofire'))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
     if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
       if(nextStep(it)==='cook'){c.prog+=dt*(c.fast?2:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
-      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){if(!skillOn('nofire'))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     } else if(c.t==='blender'){
       if(nextStep(it)==='blend'){c.prog+=dt*(c.fast?2:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
-      else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
+      else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){if(!skillOn('nofire'))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     }
   }
   // players
@@ -1835,7 +1838,7 @@ function update(dt){
       S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;S.combo=0;S.comboT=0;S.regCame=false;S.regAt=S.timer*(0.4+Math.random()*0.45);sfx('service');
       if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
     else{
-      if(S.comboT>0){S.comboT-=dt;if(S.comboT<=0){S.comboT=0;S.combo=0;S.comboBreak=0}}
+      if(S.comboT>0&&!skillOn('combo')){S.comboT-=dt;if(S.comboT<=0){S.comboT=0;S.combo=0;S.comboBreak=0}}
       S.spawnT-=dt;
       if(S.spawnT<=0){spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
       for(let k=S.cust.length-1;k>=0;k--){
@@ -3008,7 +3011,9 @@ function shade(hex,k){
 const CHEF_DY=8;
 // ----- animal chefs (delivered art): parts on a shared 256x256 grid, feet anchored at (128,240).
 // The player colour is multiplied into the *_tint layers; the animal follows the chef's skill.
-const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse'};
+const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion'};
+// an animal whose pictures have not been delivered yet is drawn with the beaver's until they arrive
+const artAn=an=>typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[an+'_head_front']?an:'beaver';
 const CHEF_K=0.22;            // world units per sprite pixel (the chef is about 48 world units tall)
 const CSZ=192;                // the size the parts were packed at
 const CHEF={img:{},ready:false,cache:new Map()};
@@ -3025,6 +3030,7 @@ function chefTint(key,col){   // a *_tint layer multiplied by the player colour,
 }
 // what goes under the shoes (bee wings, a tail seen from the side) and over them (clothes, paws, head, hat), per animal / colour / direction
 function chefLayers(an,col,dir){
+  an=artAn(an);
   const ck='l|'+an+'|'+col+'|'+dir;let L=CHEF.cache.get(ck);if(L)return L;
   const mk=()=>{const c=document.createElement('canvas');c.width=c.height=CSZ;const g=c.getContext('2d');g.scale(CSZ/256,CSZ/256);return [c,g]};
   const [uc,ug]=mk(),[oc,og]=mk(),I=k=>CHEF.img[k],put=(g,k,dx,dy,flip)=>{const im=I(k);if(!im||!im.naturalWidth)return;
@@ -3055,7 +3061,7 @@ function drawChefSprite(p,X,Y){
   img(L.over,0,-bob);
 }
 // ---------- character select: every player picks an animal (= skill) at the same time ----------
-const SEL_COLS=5, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
+const SEL_COLS=6, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
 function startSelect(){
   S.phase='select';S.selT=0;S.selHold=0;hideOv();
   for(const p of S.players){const k=SKILL_K.indexOf(p.skill);p.sel={cur:Math.max(0,k),ok:false,last:'0,0',rep:0};p.skill=SKILL_K[p.sel.cur]}
@@ -3097,6 +3103,7 @@ function wrapText(t,x,y,w,lh,size,col,weight,maxLines){
   if(line)ctx.fillText(line,x,y+n*lh);
 }
 function drawChefBig(an,col,cx,feetY,size,t){   // a large front view for the select screen
+  const an0=an;an=artAn(an);
   if(!CHEF.ready){emoji(SKILLS[Object.keys(SKILL_ANIMAL).find(k=>SKILL_ANIMAL[k]===an)||'knife'].e,cx,feetY-size*0.4,size*0.5);return}
   const L=chefLayers(an,col,'front'),bob=Math.sin(t*3)*size*0.012,ox=cx-size/2,oy=feetY-size*240/256;
   ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(cx,feetY-2,size*0.2,size*0.05,0,0,7);ctx.fill();

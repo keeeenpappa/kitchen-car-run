@@ -98,6 +98,7 @@ body.touch #pauseBtn{display:none}
 .chip.zero{color:var(--bad);opacity:.85}
 .bigscore{text-align:center;font-size:52px;font-weight:900;color:#ffe08a;line-height:1.05;margin:2px 0 8px;font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(0,0,0,.35)}.bigscore span{font-size:22px;margin-left:4px}
 table.score{opacity:.8;font-size:13px}
+.ctypes td{padding:6px 8px;text-align:left;vertical-align:middle}.ctypes .fi{width:2em;height:2em}
 .fi{display:inline-block;width:1.5em;height:1.5em;vertical-align:-0.42em;margin:-0.2em 0;background:center/contain no-repeat}
 .rooms{display:flex;flex-direction:column;gap:8px;margin:10px 0}
 .room{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
@@ -270,7 +271,7 @@ const tokHtml=h=>h.replace(/([^]+)/g,(m,k)=>FOOD.img[k]?`<img class="fic" src
 const fiH=k=>FOOD.img[k]?`<span class="fi fk-${k}"></span>`:'';
 const ingOv=id=>fiH(ingKey(id,0))||ING[id].e;
 const dishOv=r=>fiH('d_'+r)||RECIPES[r].e;
-function fillFood(root){for(const el of root.querySelectorAll('span.fi')){const m=/fk-(\S+)/.exec(el.className),im=m&&FOOD.img[m[1]];if(im)el.style.backgroundImage=`url("${im.src}")`}}
+function fillFood(root){for(const el of root.querySelectorAll('span.fi')){const m=/fk-(\S+)/.exec(el.className),im=m&&(FOOD.img[m[1]]||CUST.img[m[1]]);if(im)el.style.backgroundImage=`url("${im.src}")`}}
 const ingHtml=id=>{const s=FOOD.img[ingKey(id,0)];return s?`<img class="fic" src="${s.src}" alt="${ING[id].e}">`:ING[id].e};
 const ingEmoji=it=>{const I=ING[it.id];return FOOD.img[ingKey(it.id,it.step)]?ingIc(it.id,it.step):I.doneE&&isDone(it)?I.doneE:I.e};
 const BUYABLE=()=>Object.keys(ING).filter(k=>!ING[k].mix);
@@ -1488,6 +1489,8 @@ function readyTick(dt){
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
+  if(a==='ctypes'){paintOv(ctypesHtml());play('confirm');return}
+  if(a==='pback'){paintOv(pauseHtml());if(NET.role==='guest')localizeOv();play('confirm');return}
   if(a==='skl'){cycleSkill(+v||0);const r=document.getElementById('skillRow');if(r){r.innerHTML=skillRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='skl'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
   if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
@@ -1535,10 +1538,18 @@ function canPause(){
   if(['drive','stop','layout','select'].includes(S.phase))return ov.hidden||!!S.guest;
   return ['choose','upgrade','equip'].includes(S.phase);
 }
+const pauseHtml=()=>`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="ctypes">お客さんの種類</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}${viewRow()}</div>`;
+// the customer types, for the pause menu (shown on this device only)
+const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べる',slow:'気が長いけど、食べるのがゆっくり（テーブルを長く使う）',hasty:'気が短いけど、早く出すとチップが多い',
+  big:'食べ終わると、おかわりを頼む',family:'食事中に子どもが歩き回る。子どもの近くで「持つ」で連れ戻すまで帰れない',
+  takeout:'席に座らず列で待つ。料理を列まで持っていって渡す（皿はその場で汚れた皿になる）',vip:'たまに来る。王冠をかぶっている。待てる時間は短いけど、料金が2倍'};
+const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
+  return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:(C.e||'🙂')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
+  <div class="row"><button class="ovbtn autofocus" data-act="pback">もどる</button><button class="ovbtn" data-act="resume">つづける</button></div></div>`;
 function pauseGame(){
   if(!S||S.paused||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
-  S.paused=true;showOv(`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}${viewRow()}</div>`);
+  S.paused=true;showOv(pauseHtml());
 }
 function resumeGame(){
   if(!S)return;S.paused=false;

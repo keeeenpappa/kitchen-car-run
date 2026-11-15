@@ -208,7 +208,7 @@ const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the 
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
 const PRESET_TABLES=[[4,9],[9,9],[14,9]];
 const tableOK=(x,y)=>inTblZone(x,y)&&!(y===QY&&x>=QX-1)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
-const FIRE_T=5, FIRE_SPREAD=8, EXT_T=0.8;   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
+const FIRE_T=3, FIRE_SPREAD=5, EXT_T=0.8;   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
 const FLAMMABLE=['counter','board','stove','blender','plates','serve'];
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
@@ -1083,7 +1083,6 @@ function igniteTile(c){
   if(c.fire||!FLAMMABLE.includes(c.t))return;
   c.fire=0.01;c.smoke=0;c.prog=0;
   if(c.item&&c.item.kind==='ing')c.item.burnt=true;
-  if(!S.fireWarn){S.fireWarn=true;S.toast={text:'🔥 火事！ 消火器を持って、燃えている所で作業長押し',t:0,life:3.5}}
   sfx('burnt');
 }
 function fireUpdate(dt){

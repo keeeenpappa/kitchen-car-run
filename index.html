@@ -440,7 +440,9 @@ function newRun(np,mode){
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],reg:null};
   S.map[6][4].item={kind:'can',water:3};
   S.map[6][5].item={kind:'basket',items:[]};
-  {const f=S.map[6].find(t=>t.t==='counter'&&!t.item)||S.map.slice(2,7).flat().find(t=>t.t==='counter'&&!t.item);if(f)f.item={kind:'ext'}}   // the extinguisher: first free counter
+  {// the extinguisher: the first free counter a chef can reach (a walkable floor tile next to it)
+   const reach=(x,y)=>DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='floor'});
+   let done=false;for(const y of [6,2,3,4,5])for(let x=2;x<=15&&!done;x++){const t=S.map[y][x];if(t.t==='counter'&&!t.item&&reach(x,y)){t.item={kind:'ext'};done=true}}}
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
@@ -2619,7 +2621,7 @@ function drawTown(){
   if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(VH-0.25)*T,13,'#1d2a20',800);
 }
 function drawQueueMat(){
-  const x=QX*T+2,y=QY*T+5,w=QSPAN*T-4,h=T-10;
+  const x=QX*T+2,y=QY*T+5,w=(GW-QX)*T-2,h=T-10;   // the mat runs to the right edge (where customers come in)
   softShadow(x+w/2,y+h,w*0.52,6,.2);
   ctx.fillStyle='#8a3a3a';rr(x,y+3,w,h,10);ctx.fill();
   const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,'#d9645a');g.addColorStop(1,'#b84a42');ctx.fillStyle=g;rr(x,y,w,h,10);ctx.fill();

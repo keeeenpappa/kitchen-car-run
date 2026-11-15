@@ -70,7 +70,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 #pauseBtn[hidden]{display:none}
 #infoBtn{position:absolute;left:8px;bottom:8px;z-index:6;font-size:13px;padding:6px 10px;background:rgba(44,70,80,.9)}
 #infoBtn.on{border-color:var(--truck)}
-body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px));z-index:21;border-radius:999px}
+body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(4px + env(safe-area-inset-right,0px));bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:21;border-radius:999px;font-size:12px;padding:4px 9px}
 #infoBtn[hidden]{display:none}
 body.touch #pauseBtn{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
@@ -121,6 +121,10 @@ table.ctl th{color:var(--muted);font-weight:400}
 /* touch controls */
 #touch{display:none}
 body.touch{touch-action:manipulation}
+/* while a game runs on a phone the page does not scroll (a finger slipping off the stick moved it); overlays still scroll inside */
+html:has(body.touch.playing),body.touch.playing{overflow:hidden;overscroll-behavior:none}
+body.touch.playing{touch-action:none}
+body.touch.playing #ov{touch-action:pan-y}
 body.touch #touch{display:block}
 body.touch.ovopen #touch{display:none}
 body.touch .narrow{display:none}
@@ -128,7 +132,7 @@ body.touch .narrow{display:none}
 #joy{left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));width:128px;height:128px;border-radius:50%;
   background:rgba(33,52,60,.55);border:2px solid rgba(157,179,180,.5)}
 #knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(243,183,58,.85);pointer-events:none}
-#btns{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:auto auto;gap:10px;align-items:end}
+#btns{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:auto auto;gap:10px;align-items:end}
 .tb{font:inherit;font-weight:800;color:var(--ink);border:2px solid rgba(157,179,180,.55);border-radius:50%;background:rgba(33,52,60,.6);display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
 .tb.on{background:rgba(243,183,58,.7);color:#1b1206}
 #bPick{width:76px;height:76px;font-size:15px}
@@ -3547,6 +3551,7 @@ readyBtn.addEventListener('contextmenu',e=>e.preventDefault());
 const hudEl=document.getElementById('hud'),infoEl=document.getElementById('info'),stockEl=document.getElementById('stock');
 let hudT=0;
 function renderHud(){
+  if(isTouch){const pl=!!S;if(pl!==document.body.classList.contains('playing')){document.body.classList.toggle('playing',pl);if(pl)window.scrollTo(0,0)}}
   if(!S){hudEl.innerHTML='';infoEl.innerHTML='人数を選んでスタート';stockEl.innerHTML='';readyBtn.hidden=true;pauseBtn.hidden=true;infoBtn.hidden=true;return}
   let phase='';
   if(S.phase==='layout')phase=S.timer>0?`レイアウト ${fmtT(S.timer)}`:'時間切れ';

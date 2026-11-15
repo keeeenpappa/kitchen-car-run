@@ -3094,7 +3094,7 @@ function finishSelect(){
   if(S.startMode==='layout')setupLayout();else showChoose();
 }
 // layout of the screen (canvas units)
-const SELG={x0:206,y0:62,cw:148,ch:126,icon:88};
+const SELG={x0:GW*T/2-SEL_COLS*148/2,y0:62,cw:148,ch:126,icon:88};   // the grid is centred on the screen
 const selCell=k=>({x:SELG.x0+(k%SEL_COLS)*SELG.cw,y:SELG.y0+Math.floor(k/SEL_COLS)*SELG.ch});
 function selSkillLine(K){return K.perTown?'1つの町へ1回':(K.dur<1?'すぐ効く':'効果 '+K.dur+'秒')+'・待ち '+K.cd+'秒'}
 function wrapText(t,x,y,w,lh,size,col,weight,maxLines){

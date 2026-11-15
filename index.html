@@ -2925,17 +2925,20 @@ function drawFires(){
 }
 // skill feedback: a soft golden glow (with a ring showing the time left) at the feet while a skill works,
 // and the animal's icon popping up over the chef the moment it is used (seen from the cooldown jumping up, so guests see it too)
+const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${Math.max(0,Math.min(1,a))})`};
+// the animal's face icon for a skill, or null while its pictures are not delivered
+const skillIconImg=k=>{const an=SKILL_ANIMAL[k];if(!an||artAn(an)!==an)return null;const im=CHEF.img[an+'_icon'];return im&&im.naturalWidth?im:null};
 function skillGlow(p,X,Y){
   const K=skillOf(p),cd=p.skCD||0;
   if(p._lcd!=null&&cd>p._lcd+1)p._popT=S.t;p._lcd=cd;
   const on=(p.skT||0)>0&&K.dur>=1&&K.dur<999;if(!on)return;
-  const a=0.32+0.18*Math.sin(S.t*6),fy=Y+15;
-  const g=ctx.createRadialGradient(X,fy,2,X,fy,30);g.addColorStop(0,`rgba(255,226,110,${a+0.15})`);g.addColorStop(1,'rgba(255,216,74,0)');
+  const a=0.32+0.18*Math.sin(S.t*6),fy=Y+15,col=PCOL[p.i]||'#ffd84a',ca=al=>hexA(col,al);
+  const g=ctx.createRadialGradient(X,fy,2,X,fy,30);g.addColorStop(0,ca(a+0.2));g.addColorStop(1,ca(0));
   ctx.save();ctx.translate(X,fy);ctx.scale(1,0.42);ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,30,0,7);ctx.fill();
-  ctx.strokeStyle='rgba(255,216,74,.35)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,24,0,7);ctx.stroke();
-  ctx.strokeStyle='#ffd84a';ctx.beginPath();ctx.arc(0,0,24,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,p.skT/K.dur));ctx.stroke();ctx.restore();
+  ctx.strokeStyle=ca(0.35);ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,24,0,7);ctx.stroke();
+  ctx.strokeStyle=col;ctx.beginPath();ctx.arc(0,0,24,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,p.skT/K.dur));ctx.stroke();ctx.restore();
   for(let k=0;k<3;k++){const an=S.t*2.2+k*2.09,sx=X+Math.cos(an)*20,sy=Y-8+Math.sin(an)*9,z=1.6+1.2*Math.abs(Math.sin(S.t*5+k));
-    ctx.fillStyle='rgba(255,240,170,.9)';ctx.beginPath();for(let j=0;j<8;j++){const r=j%2?z*0.4:z*1.4,b=j*Math.PI/4;ctx.lineTo(sx+Math.cos(b)*r,sy+Math.sin(b)*r)}ctx.closePath();ctx.fill()}
+    ctx.fillStyle=shade(col,0.45);ctx.beginPath();for(let j=0;j<8;j++){const r=j%2?z*0.4:z*1.4,b=j*Math.PI/4;ctx.lineTo(sx+Math.cos(b)*r,sy+Math.sin(b)*r)}ctx.closePath();ctx.fill()}
 }
 function skillPop(p,X,Y){
   if(p._popT==null)return;const age=S.t-p._popT;if(age<0||age>0.9){if(age>0.9)p._popT=null;return}
@@ -3022,7 +3025,7 @@ function drawSkillBadge(p,x,y){
   if(act){const a=(S.t*6)%(Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r+2.5,a,a+Math.PI*2*(p.skT/K.dur));ctx.stroke()}
   else if(cd){const f=1-p.skCD/K.cd;ctx.fillStyle='rgba(255,216,74,.45)';ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*f);ctx.closePath();ctx.fill()}
   else{ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.stroke()}
-  ctx.globalAlpha=cd?0.5:1;emoji(K.e,x,y+0.5,11);ctx.globalAlpha=1;
+  ctx.globalAlpha=cd?0.5:1;{const im=skillIconImg(p.skill);if(im){ctx.save();ctx.beginPath();ctx.arc(x,y,r-0.5,0,7);ctx.clip();ctx.drawImage(im,x-r,y-r,r*2,r*2);ctx.restore()}else emoji(K.e,x,y+0.5,11)}ctx.globalAlpha=1;
 }
 // online: friends who joined mid-game wait here (small chefs) until the town's service is over
 function drawWaiting(){
@@ -3674,7 +3677,9 @@ function renderHud(){
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
   {const lp=localP(),K=lp&&skillOf(lp),bs=document.getElementById('bSkill');if(bs&&K){const act=(lp.skT||0)>0,cd=(lp.skCD||0)>0&&!act;
-    bs.textContent=K.e;bs.classList.toggle('act',act);bs.classList.toggle('cd',cd);
+    {const src=typeof CHEF_IMG_SRC==='object'&&skillIconImg(lp.skill)?CHEF_IMG_SRC[SKILL_ANIMAL[lp.skill]+'_icon']:null,key=lp.skill+(src?'i':'e');
+     if(bs._k!==key){bs._k=key;if(src)bs.innerHTML=`<img src="${src}" alt="" style="width:70%;height:70%;pointer-events:none">`;else bs.textContent=K.e}}
+    bs.classList.toggle('act',act);bs.classList.toggle('cd',cd);
     bs.style.setProperty('--f',act?Math.round(lp.skT/K.dur*100)+'%':cd?Math.round((1-lp.skCD/K.cd)*100)+'%':'100%')}}
   infoBtn.hidden=!(phoneView()&&ov.hidden&&S.phase!=='select');infoBtn.classList.toggle('on',PHONE_INFO);
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';

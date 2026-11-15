@@ -1562,7 +1562,7 @@ function ovAction(a,v){
     if(S.eqBought!=null)return;
     const o=S.eqOffers[+v];if(!o)return;
     if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
-    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showEquipShop();
+    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showChoose();
   }
   else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();
@@ -1902,9 +1902,9 @@ function drawItem(it,cx,cy,s,inHand){
       ctx.strokeStyle='#cfc6b3';ctx.lineWidth=1.5;ctx.stroke();
       ctx.strokeStyle='rgba(120,160,190,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,s*0.36,0,7);ctx.stroke()}
     const n=it.items.length;
-    it.items.forEach((x,i)=>{const a=n===1?0:(i/n)*Math.PI*2-Math.PI/2,r=n===1?0:s*0.2;emoji(ingEmoji(x),cx+Math.cos(a)*r,cy+Math.sin(a)*r,s*(n===1?0.55:0.4))});
     const rid=n?matchRecipe(it.items):null;
-    if(rid)emoji(dishIc(rid),cx+s*0.42,cy-s*0.42,s*0.38);
+    if(rid){emoji(dishIc(rid),cx,cy-s*0.04,s*0.72);return}   // finished: the dish fills the plate
+    it.items.forEach((x,i)=>{const a=n===1?0:(i/n)*Math.PI*2-Math.PI/2,r=n===1?0:s*0.2;emoji(ingEmoji(x),cx+Math.cos(a)*r,cy+Math.sin(a)*r,s*(n===1?0.55:0.4))});
     return;
   }
   if(it.kind==='power'){
@@ -2670,8 +2670,12 @@ function drawTables(withSeated){
 }
 // the stool behind a table (the customer sits here): blue cushion to match the cloth
 function drawStool(X,Y){
-  {const im=ST_ART&&fimg('chair');if(im){const w=T*0.66;ctx.drawImage(im,X-w/2,Y-T*0.42-w/2+2,w,w);return}}
+  {const im=false&&fimg('chair');if(im){const w=T*0.66;ctx.drawImage(im,X-w/2,Y-T*0.42-w/2+2,w,w);return}}
   const sy=Y-T*0.42;
+  // the backrest (behind the customer): two posts and a rounded wooden back with a blue pad
+  ctx.fillStyle='#6b4428';for(const s2 of [-1,1])rr(X+s2*8-1.6,sy-18,3.2,18,1.5),ctx.fill();
+  ctx.fillStyle='#7a4e2c';rr(X-11,sy-22,22,11,5);ctx.fill();
+  {const g=ctx.createLinearGradient(0,sy-21,0,sy-12);g.addColorStop(0,'#9fcdf3');g.addColorStop(1,'#4b88c9');ctx.fillStyle=g;rr(X-9,sy-20.5,18,8,4);ctx.fill()}
   ctx.fillStyle='#5a3820';for(const s2 of [-1,1])rr(X+s2*7-1.6,sy,3.2,13,1.5),ctx.fill();   // two legs
   ctx.fillStyle='#7a4e2c';rr(X-11,sy-1,22,5,2.5);ctx.fill();                                  // the wooden seat frame
   const g=ctx.createLinearGradient(0,sy-6,0,sy+1);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');
@@ -3330,7 +3334,7 @@ function drawTopBarPhone(){
   ctx.fillStyle='rgba(16,26,30,.88)';rr(6,4,W-12,36,10);ctx.fill();
   emoji(stIc('status_tip','🪙'),22,y,18);text(S.money+'G',34,y,18,'#ffe08a',800,'left');
   for(let k=0;k<HEART_MAX;k++)text('♥',112+k*17,y,16,k<S.hearts?'#ff6d6d':'#3b5059',800);
-  drawCombo(10,44);
+  drawCombo(10,44,1.4);
   const tw=S.phase==='stop'?S.town:(S.phase==='drive'||(S.phase==='layout'&&S.stop>0))?S.next:null;
   if(tw){const nm=(S.phase==='stop'?'':'→ ')+tw.e+' '+tw.n;ctx.font=`800 15px ${FNT}`;const nw=ctx.measureText(nm).width+20;
     ctx.fillStyle='#2f6f6a';rr(170,9,nw,26,13);ctx.fill();text(nm,180,y,15,'#fff',800,'left')}
@@ -3352,14 +3356,14 @@ function drawTopBarPhone(){
   if(NET.role!=='off'&&NET.code)text('部屋 '+NET.code,14,y2,12,'#ffe08a',800,'left');
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
-function drawCombo(x,y){
+function drawCombo(x,y,zm){zm=zm||1;
   if(S.comboPop!=null)S.comboPop+=1/60;if(S.comboBreak!=null)S.comboBreak+=1/60;
   if(S.phase!=='stop'||!S.combo){
-    if(S.comboBreak!=null&&S.comboBreak<0.5){ctx.globalAlpha=1-S.comboBreak/0.5;ctx.fillStyle='#c0392b';rr(x,y,150,24,12);ctx.fill();text('コンボ終了',x+75,y+12,12,'#fff',800);ctx.globalAlpha=1}
+    if(S.comboBreak!=null&&S.comboBreak<0.5){ctx.globalAlpha=1-S.comboBreak/0.5;ctx.fillStyle='#c0392b';rr(x,y,150*zm,24*zm,12*zm);ctx.fill();text('コンボ終了',x+75*zm,y+12*zm,12*zm,'#fff',800);ctx.globalAlpha=1}
     return}
   const p=S.comboPop!=null&&S.comboPop<0.35?S.comboPop/0.35:1,sc=1+0.35*Math.sin(p*Math.PI)*(p<1?1:0);
   const m=comboMulOf(S.combo),lab='×'+S.combo+' コンボ',mt='チップ'+(Math.round(m*10)/10)+'倍';
-  ctx.save();ctx.translate(x,y+12);ctx.scale(sc,sc);
+  ctx.save();ctx.translate(x,y+12*zm);ctx.scale(sc*zm,sc*zm);
   ctx.font=`900 14px ${FNT}`;const lw=ctx.measureText(lab).width;ctx.font=`800 11px ${FNT}`;const mw=ctx.measureText(mt).width,w=lw+mw+90;
   ctx.fillStyle='rgba(16,26,30,.9)';rr(0,-12,w,24,12);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
   text(lab,10,0,14,'#ffe08a',900,'left');bar(lw+18,-3,56,S.comboT/(S.comboMax||1),'#ffd84a');text(mt,lw+82,0,11,'#7fe0a0',800,'left');
@@ -3370,9 +3374,9 @@ function drawTopBar(){
   ctx.fillStyle='rgba(16,26,30,.85)';rr(8,6,GW*T-16,T*0.8,10);ctx.fill();
   emoji(stIc('status_tip','🪙'),30,y,21);text(S.money+'G',48,y,20,'#ffe08a',800,'left');
   let hx=150;for(let k=0;k<HEART_MAX;k++)text('♥',hx+k*20,y,18,k<S.hearts?'#ff6d6d':'#3b5059',800);
-  text('チップ×'+tipRate().toFixed(2).replace(/0$/,''),252,y,12,'#ffcfcf',800,'left');
+  text('チップ×'+tipRate().toFixed(2).replace(/0$/,''),hx+HEART_MAX*20+2,y,12,'#ffcfcf',800,'left');
   text('町 '+Math.min(S.stop+1,STOPS)+'/'+STOPS,345,y,15,'#f4eedf',800,'left');
-  drawCombo(150,6+T*0.8+4);
+  drawCombo(150,6+T*0.8+4,2);
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'レイアウト '+fmtT(S.timer):'時間切れ';
   else if(S.phase==='drive')ph='🛣 '+kmTxt(Math.min(S.dist,S.route))+' / '+kmTxt(S.route)+' km';
@@ -3381,13 +3385,13 @@ function drawTopBar(){
   // which town: where we are heading (drive, layout before a drive) or where we are open (stop)
   const tw=S.phase==='stop'?S.town:(S.phase==='drive'||(S.phase==='layout'&&S.stop>0))?S.next:null;
   if(tw){
-    const lab=S.phase==='stop'?'ここは':'行き先',nm=tw.e+' '+tw.n;
+    const lab=S.phase==='stop'?'':'行き先',nm=tw.e+' '+tw.n;
     ctx.font=`800 18px ${FNT}`;const nw=ctx.measureText(nm).width;
     ctx.font=`700 12px ${FNT}`;const lw=ctx.measureText(lab).width;
-    const px=412,pw=lw+nw+30;
+    const px=412,pw=lw+nw+(lab?30:22);
     ctx.fillStyle='#2f6f6a';rr(px,y-14,pw,28,14);ctx.fill();ctx.strokeStyle='#7fd6d1';ctx.lineWidth=1.5;ctx.stroke();
     text(lab,px+12,y,12,'#c9f2ee',700,'left');
-    text(nm,px+lw+20,y,18,'#fff',800,'left');
+    text(nm,px+lw+(lab?20:11),y,18,'#fff',800,'left');
     text(payLabel(tw.pay),px+pw+10,y,13,'#cfe0e2',700,'left');
   }
   if(closing()){   // the last 20 seconds: bigger, blinking red / white

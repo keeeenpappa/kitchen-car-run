@@ -62,7 +62,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .skl-btn .skl-n{white-space:nowrap;display:flex;align-items:center;gap:6px}
 .skl-ic{width:30px;height:30px;margin:-6px 0}
 .skl-btn .skl-d{font-weight:400;font-size:.88em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
 #readyBtn[hidden]{display:none}
 .stage{container-type:inline-size}
@@ -3888,7 +3888,8 @@ function scanOnce(){
 }
 function showRoomList(){
   NET.listOpen=true;NET.rooms=NET.rooms||{};
-  paintOv(`<div class="box big"><h2>ロビー</h2><p class="mut">部屋をさがしています…（数秒ごとに更新）</p>
+  const er=NET.err?`<p class="ng">${NET.err}</p>`:'';NET.err='';
+  paintOv(`<div class="box big"><h2>ロビー</h2>${er}<p class="mut">部屋をさがしています…（数秒ごとに更新）</p>
     <div class="rooms" id="roomList"></div>
     <div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div></div>`);
   renderRooms(true);
@@ -3906,6 +3907,7 @@ function renderRooms(force){
       <button class="ovbtn hold" data-act="ljoin" data-v="${i}">参加（${ovkText()}）</button></div>`}).join('')
     :'<p class="mut">今は部屋がありません。ホストが「部屋を作る」と、ここに出ます。</p>';
   if(!force&&el._h===h)return;
+  if(!force&&ovHold.btn&&el.contains(ovHold.btn))return;
   el._h=h;el.innerHTML=h;const n=ovButtons().length;ovSel=Math.max(0,Math.min(ovSel,n-1));markSel();
 }
 function lobbyPick(i){
@@ -3921,6 +3923,7 @@ function lobbyJoin(i,pw){
   const pr=NET.scanner;if(!pr||!pr.open){showRoomList();return}
   const err=t=>{const e=document.getElementById('pwErr');if(e)e.textContent=t;else{NET.err=t;showRoomList()}};
   const c=pr.connect(PEER_PREFIX+'lobby-'+i,{reliable:true});let done=false;
+  if(!document.getElementById('pwErr')){NET.listOpen=false;clearTimeout(NET.scanT);paintOv(`<div class="box"><h2>部屋 ${i+1}</h2><p>部屋につないでいます…</p></div>`)}
   const tm=setTimeout(()=>{if(!done){done=true;err('部屋につながりませんでした。もう一度試してください。')}},6000);
   c.on('open',()=>{try{c.send({t:'join',pw})}catch(_){}});
   c.on('data',m=>{if(done||!m)return;done=true;clearTimeout(tm);try{c.close()}catch(_){}

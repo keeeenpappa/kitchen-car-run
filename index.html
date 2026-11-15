@@ -2923,6 +2923,28 @@ function drawFires(){
       ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(X+ox-w/2,Y);ctx.quadraticCurveTo(X+ox-w*0.6,Y-h*0.5,X+ox+Math.sin(ph)*3,Y-h);ctx.quadraticCurveTo(X+ox+w*0.6,Y-h*0.5,X+ox+w/2,Y);ctx.fill()}
   }
 }
+// skill feedback: a soft golden glow (with a ring showing the time left) at the feet while a skill works,
+// and the animal's icon popping up over the chef the moment it is used (seen from the cooldown jumping up, so guests see it too)
+function skillGlow(p,X,Y){
+  const K=skillOf(p),cd=p.skCD||0;
+  if(p._lcd!=null&&cd>p._lcd+1)p._popT=S.t;p._lcd=cd;
+  const on=(p.skT||0)>0&&K.dur>=1&&K.dur<999;if(!on)return;
+  const a=0.32+0.18*Math.sin(S.t*6),fy=Y+15;
+  const g=ctx.createRadialGradient(X,fy,2,X,fy,30);g.addColorStop(0,`rgba(255,226,110,${a+0.15})`);g.addColorStop(1,'rgba(255,216,74,0)');
+  ctx.save();ctx.translate(X,fy);ctx.scale(1,0.42);ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,30,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(255,216,74,.35)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,24,0,7);ctx.stroke();
+  ctx.strokeStyle='#ffd84a';ctx.beginPath();ctx.arc(0,0,24,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,p.skT/K.dur));ctx.stroke();ctx.restore();
+  for(let k=0;k<3;k++){const an=S.t*2.2+k*2.09,sx=X+Math.cos(an)*20,sy=Y-8+Math.sin(an)*9,z=1.6+1.2*Math.abs(Math.sin(S.t*5+k));
+    ctx.fillStyle='rgba(255,240,170,.9)';ctx.beginPath();for(let j=0;j<8;j++){const r=j%2?z*0.4:z*1.4,b=j*Math.PI/4;ctx.lineTo(sx+Math.cos(b)*r,sy+Math.sin(b)*r)}ctx.closePath();ctx.fill()}
+}
+function skillPop(p,X,Y){
+  if(p._popT==null)return;const age=S.t-p._popT;if(age<0||age>0.9){if(age>0.9)p._popT=null;return}
+  const K=skillOf(p),an=artAn(SKILL_ANIMAL[p.skill]||'beaver'),im=CHEF.img[an+'_icon'],e=Math.min(1,age/0.18),sz=26+26*e,al=age<0.55?1:1-(age-0.55)/0.35;
+  ctx.save();ctx.globalAlpha=Math.max(0,al);const cx=X,cy=Y-30-age*18;
+  ctx.fillStyle='rgba(255,236,150,.85)';ctx.beginPath();ctx.arc(cx,cy,sz*0.62,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  if(im&&im.naturalWidth&&artAn(SKILL_ANIMAL[p.skill])===SKILL_ANIMAL[p.skill])ctx.drawImage(im,cx-sz/2,cy-sz/2,sz,sz);else emoji(K.e,cx,cy,sz*0.7);
+  ctx.restore();
+}
 function drawPlayers(){
   for(const q of S.players)if(q.skill==='herd'&&(q.skT||0)>0){const a=0.5+0.3*Math.sin(S.t*4);ctx.fillStyle='rgba(255,216,74,.10)';ctx.strokeStyle=`rgba(255,216,74,${a})`;ctx.lineWidth=2.5;ctx.setLineDash([6,4]);rr((q.x-HERD_R)*T,(q.y-HERD_R)*T+CHEF_DY,HERD_R*2*T,HERD_R*2*T,14);ctx.fill();ctx.stroke();ctx.setLineDash([])}
   for(const p of S.players){
@@ -2949,9 +2971,11 @@ function drawPlayers(){
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     // held item goes behind the chef when facing away, in front otherwise
     const holdAt=()=>{if(p.hold2)drawItem(p.hold2,X+p.dx*16-(p.dx?0:9),Y+p.dy*14-4+(p.dx?-9:0),T*0.62,true);if(p.hold)drawItem(p.hold,X+p.dx*16+(p.hold2&&!p.dx?9:0),Y+p.dy*14-4+(p.hold2&&p.dx?5:0),T*0.62,true)};
+    skillGlow(p,X,Y);
     if(p.dy===-1)holdAt();
     drawChef(p,X,Y);
     if(p.dy!==-1)holdAt();
+    skillPop(p,X,Y);
     const me=NET.role!=='off'&&NET.mySlot===p.i;
     const lab='P'+(p.i+1)+(me?' あなた':'');
     ctx.font=`800 10px ${FNT}`;const lw=ctx.measureText(lab).width+10;

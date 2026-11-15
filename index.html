@@ -1787,6 +1787,9 @@ function update(dt){
           if(alongX?!hit(pos+st,other):!hit(other,pos+st))return st;}
         return 0};
       if(!okY&&vy&&Math.abs(inp.mx)<0.3)p.x+=ease(p.x,p.y,vy,true);
+      // the notch in front of the driver's lever (between two counters): walking right a little high or low eases into it
+      if(!okX&&vx>0&&Math.abs(inp.my)<0.5&&p.x>LEVER_FRONT[0]-1.6&&p.x<LEVER_FRONT[0]+0.6){const c0=LEVER_FRONT[1]+0.5,d=c0-p.y;
+        if(Math.abs(d)<0.85&&Math.abs(d)>0.001&&!hit(p.x,c0)&&!hit(p.x+vx,c0)){const st=Math.sign(d)*Math.min(Math.abs(d),sp);if(!hit(p.x,p.y+st))p.y+=st}}
       if(Math.abs(inp.mx)>Math.abs(inp.my)){p.dx=Math.sign(inp.mx);p.dy=0}else{p.dx=0;p.dy=Math.sign(inp.my)}
     }
     const tx=Math.floor(p.x)+p.dx, ty=Math.floor(p.y)+p.dy, c=tile(tx,ty);

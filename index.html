@@ -761,10 +761,10 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   wash:{n:'カワウソ',e:'🦦',d:'自分の皿洗いが2倍速',dur:12,cd:40},
   smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
   forage:{n:'リス',e:'🐿️',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
-  haggle:{n:'キツネ',e:'🦊',d:'自分が窓口で買うと道のお店が3割引き',dur:17,cd:45},
+  haggle:{n:'キツネ',e:'🦊',d:'自分が買うと、道のお店も町の市場も3割引き',dur:17,cd:45},
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
-  boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true},
+  boost:{n:'ウマ',e:'🐎',d:'走行中に使うと、10秒間、燃料なしで「急ぐ」より少し速く走る（窓口でお店と並んでいる間はいつもの速さ）',dur:10,cd:40,now:true},
   nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
   tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
@@ -773,6 +773,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
 const HERD=1.3, HERD_R=2.5;
 const herdOn=p=>!!S&&!!p&&S.players.some(q=>q.skill==='herd'&&(q.skT||0)>0&&Math.max(Math.abs(q.x-p.x),Math.abs(q.y-p.y))<=HERD_R);
 const herdMul=p=>herdOn(p)?HERD:1;
+const HORSE=1.2;   // ウマ: this much faster than 急ぐ
 const skillOn=k=>!!S&&S.players.some(q=>q.skill===k&&(q.skT||0)>0);   // someone's skill k is working right now
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
@@ -799,7 +800,7 @@ function skillNow(p,K){
     return true}
   if(K===SKILLS.boost){
     if(S.phase!=='drive'){say(p,'走行中に使う');return false}
-    S.boostN=2;S.prevZone=S.shops.some(inWindowZone);S.toast={text:'🚀 ひとっ走り！ 次の2区間は燃料なしで急ぐ',t:0,life:2.5};
+    S.toast={text:'🐎 ひとっ走り！ 燃料なしで速く走る',t:0,life:2};
     return true}
   if(K===SKILLS.tidy){   // タコ: every dirty plate on the tables comes into this chef's hands
     if(S.phase!=='stop'){say(p,'町の営業中に使う');return false}
@@ -1088,7 +1089,7 @@ function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
 // 値切り上手: road-shop prices 30% off for the one who has the skill working
 const haggling=p=>!!p&&(p.skT||0)>0&&p.skill==='haggle';
-const priceFor=(p,it,shop)=>shop&&haggling(p)?Math.max(1,Math.round(it.price*0.7)):it.price;
+const priceFor=(p,it,shop)=>haggling(p)?Math.max(1,Math.round(it.price*0.7)):it.price;
 function buy(list,p,shop,tx,ty){
   if(!list||!list.length)return;
   const it=list[wrap(p.cur,list.length)],pr=priceFor(p,it,shop);
@@ -1856,8 +1857,8 @@ function update(dt){
     // ひとっ走り: the next stretches between shops at 急ぐ speed, without fuel (each stretch ends where a shop reaches a window)
     if(S.boostN>0&&zone&&!S.prevZone){S.boostN--;if(!S.boostN)for(const q of S.players)if(skillOf(q).perTown)q.skT=0}
     S.prevZone=zone;
-    const boost=S.boostN>0&&!zone;
-    const v=zone?WIN_SPEED:boost?SPEEDS[2]:SPEEDS[lev],d=v*dt;
+    const boost=skillOn('boost')&&!zone;
+    const v=zone?WIN_SPEED:boost?SPEEDS[2]*HORSE:SPEEDS[lev],d=v*dt;
     S.roadOff+=d;S.dist+=d;S.actT+=dt;
     S.refT+=d/(zone?WIN_SPEED:SPEEDS[1]);          // how long ふつう would have taken for the same stretch
     if(!zone&&!boost&&S.fuel>0){S.fuel=Math.max(0,S.fuel-d*FUEL_RATE[S.speed]);
@@ -2321,6 +2322,13 @@ function unitBase(c,X,Y,loose){
   }
 }
 // the driver's seat and steering wheel, seen through the cab window (the seated chef sits between the two)
+function cabSparkle(){
+  if(!S||!skillOn('boost'))return;const t=S.t;
+  for(let k=0;k<7;k++){const a=(t*1.3+k/7)%1,x=16.3*T+((k*37)%60)+4,y=3.5*T-a*1.2*T,z=2.5+2*Math.sin(t*6+k);
+    ctx.globalAlpha=1-a;ctx.fillStyle=k%2?'#fff3a0':'#ffd23a';ctx.beginPath();
+    for(let q=0;q<8;q++){const r=q%2?z*0.4:z*1.5,an=q*Math.PI/4;ctx.lineTo(x+Math.cos(an)*r,y+Math.sin(an)*r)}ctx.closePath();ctx.fill()}
+  ctx.globalAlpha=1;
+}
 function drawCab(front){
   ctx.save();ctx.beginPath();ctx.roundRect(16.25*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.clip();
   if(!front){
@@ -2957,11 +2965,10 @@ function skillArea(p){
   const el=p.skill==='nofire',cx=Math.floor(p.x),cy=Math.floor(p.y),t=S.t;
   const x0=Math.max(2,cx-2)*T,y0=Math.max(2,cy-2)*T,x1=Math.min(16,cx+3)*T,y1=Math.min(7,cy+3)*T,w=x1-x0,h=y1-y0;
   const rgb=el?'90,180,255':'255,196,40';
-  ctx.save();ctx.fillStyle=`rgba(${rgb},.16)`;rr(x0+2,y0+2,w-4,h-4,10);ctx.fill();
-  ctx.strokeStyle=`rgba(${rgb},${0.75+0.2*Math.sin(t*4)})`;ctx.lineWidth=3;ctx.setLineDash([8,6]);ctx.lineDashOffset=-t*12;rr(x0+2,y0+2,w-4,h-4,10);ctx.stroke();ctx.setLineDash([]);
+  ctx.save();ctx.fillStyle=`rgba(${rgb},.145)`;rr(x0+2,y0+2,w-4,h-4,10);ctx.fill();
   for(let k=0;k<16;k++){
     const a=(t*(el?1.4:0.9)+k*0.137)%1,hx=x0+8+((k*53.7)%(w-16)),hy=y0+6+((k*31.3)%(h-22));
-    ctx.globalAlpha=0.95*(1-a*0.8);
+    ctx.globalAlpha=(el?0.76:0.95)*(1-a*0.8);
     if(el){ctx.fillStyle='#5cbcff';ctx.beginPath();ctx.ellipse(hx,hy+a*16,3,4.6,0,0,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(hx-1,hy+a*16-1.5,1,0,7);ctx.fill()}   // water drops falling
     else{const y=hy+12-a*16,z=3.4;ctx.fillStyle='#ffd23a';ctx.beginPath();   // little sparkles rising
       for(let q=0;q<8;q++){const r=q%2?z*0.4:z*1.3,an=q*Math.PI/4;ctx.lineTo(hx+Math.cos(an)*r,y+Math.sin(an)*r)}ctx.closePath();ctx.fill()}
@@ -3600,7 +3607,7 @@ function drawWorld(arr){
   drawCab(false);
   drawFires();
   drawPlayers();
-  drawCab(true);
+  drawCab(true);cabSparkle();
   ctx.restore();
   drawMenus();
   for(const f of S.floats){ctx.globalAlpha=1-f.t/1.4;ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.textAlign='center';const fy=(f.y-f.t*0.8)*T,im=f.ic&&fimg(f.ic);let fx=f.x*T;

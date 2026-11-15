@@ -764,7 +764,12 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
   boost:{n:'ウマ',e:'🐎',d:'次のお店とお店の間2つを、燃料なしで急ぐの速さ（1つの町へ1回）',dur:999,cd:999,now:true,perTown:true},
   nofire:{n:'ゾウ',e:'🐘',d:'12秒間、キッチンの料理が焦げない（焦げかけも止まる）。燃えている火は消えない',dur:12,cd:45},
-  combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45}};
+  combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
+  herd:{n:'ミーアキャット',e:'🐾',d:'10秒間、自分のまわり2マスにいる仲間（自分も）の、切る・洗う・水汲み・走るが1.3倍速。その間にコンロやミキサーへ入れた料理も1.3倍速',dur:10,cd:45}};
+// ミーアキャット: a 5x5-tile area round a meerkat whose skill is working; it does not add up with a chef's own speed skill (the faster one counts)
+const HERD=1.3, HERD_R=2.5;
+const herdOn=p=>!!S&&!!p&&S.players.some(q=>q.skill==='herd'&&(q.skT||0)>0&&Math.max(Math.abs(q.x-p.x),Math.abs(q.y-p.y))<=HERD_R);
+const herdMul=p=>herdOn(p)?HERD:1;
 const skillOn=k=>!!S&&S.players.some(q=>q.skill===k&&(q.skT||0)>0);   // someone's skill k is working right now
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
@@ -894,7 +899,7 @@ function placeOrTake(p,c){
   // a mixer still being filled: empty hand takes the last one back out, a fitting raw ingredient goes in
   if(c.t==='blender'&&it&&it.kind==='mix'){
     if(!h){p.hold=newIng(it.items.pop());if(!it.items.length)c.item=null;return}
-    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);return}
+    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);c.herd=herdOn(p);return}
     say(p,'この組み合わせは混ぜられない');return}
   // a counter holds one plate: empty plates only stack on the plate stand
   if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
@@ -904,8 +909,8 @@ function placeOrTake(p,c){
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';
-      if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c)}}
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
+      if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c);c.herd=herdOn(p)}}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');
     else if(c.t==='blender')say(p,'ミキサーに入れない');
@@ -1114,14 +1119,14 @@ function doAct(p,c,tx,ty,dt){
     if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
     else say(p,'燃えている！ 消火器で消す');
     return}
-  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1);if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt*((p.skT||0)>0&&p.skill==='wash'?2:1);if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
+    p.actT+=dt*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
-    p.actT+=dt;if(p.actT>=FILL*proMul(c)){p.actT=0;p.lock=true;p.hold.water=canCap(p.hold);float(tx+.5,ty,'💧満タン','#9fd8ff');sfx('water')}
+    p.actT+=dt*herdMul(p);if(p.actT>=FILL*proMul(c)){p.actT=0;p.lock=true;p.hold.water=canCap(p.hold);float(tx+.5,ty,'💧満タン','#9fd8ff');sfx('water')}
     return}
   if(c.t==='window'&&S.phase==='drive'){
     const sh=shopAtWindow(tx); if(!sh)return;
@@ -1756,14 +1761,14 @@ function update(dt){
       if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
-    const it=c.item; if(!it){c.fast=false;c.smoke=0;continue}
+    const it=c.item; if(!it){c.fast=false;c.herd=false;c.smoke=0;continue}
     if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!skillOn('nofire'))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
     if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
-      if(nextStep(it)==='cook'){c.prog+=dt*(c.fast?2:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
+      if(nextStep(it)==='cook'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){if(!skillOn('nofire'))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     } else if(c.t==='blender'){
-      if(nextStep(it)==='blend'){c.prog+=dt*(c.fast?2:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
+      if(nextStep(it)==='blend'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){if(!skillOn('nofire'))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     }
   }
@@ -1779,7 +1784,7 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const run=(p.skT||0)>0&&p.skill==='dash'?1.5:1;   // はやあし's skill
+      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p));   // はやあし's skill
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);
@@ -2910,6 +2915,7 @@ function drawFires(){
   }
 }
 function drawPlayers(){
+  for(const q of S.players)if(q.skill==='herd'&&(q.skT||0)>0){const a=0.5+0.3*Math.sin(S.t*4);ctx.fillStyle='rgba(255,216,74,.10)';ctx.strokeStyle=`rgba(255,216,74,${a})`;ctx.lineWidth=2.5;ctx.setLineDash([6,4]);rr((q.x-HERD_R)*T,(q.y-HERD_R)*T+CHEF_DY,HERD_R*2*T,HERD_R*2*T,14);ctx.fill();ctx.stroke();ctx.setLineDash([])}
   for(const p of S.players){
     // the chef is drawn a little lower so the body sits on its own tile and the dotted target frame looks right next to it
     const X=p.x*T,Y=p.y*T+CHEF_DY;
@@ -3014,7 +3020,7 @@ function shade(hex,k){
 const CHEF_DY=8;
 // ----- animal chefs (delivered art): parts on a shared 256x256 grid, feet anchored at (128,240).
 // The player colour is multiplied into the *_tint layers; the animal follows the chef's skill.
-const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion'};
+const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion',herd:'meerkat'};
 // an animal whose pictures have not been delivered yet is drawn with the beaver's until they arrive
 const artAn=an=>typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[an+'_head_front']?an:'beaver';
 const CHEF_K=0.22;            // world units per sprite pixel (the chef is about 48 world units tall)
@@ -3064,7 +3070,7 @@ function drawChefSprite(p,X,Y){
   img(L.over,0,-bob);
 }
 // ---------- character select: every player picks an animal (= skill) at the same time ----------
-const SEL_COLS=6, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
+const SEL_COLS=7, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
 function startSelect(){
   S.phase='select';S.selT=0;S.selHold=0;hideOv();
   for(const p of S.players){const k=SKILL_K.indexOf(p.skill);p.sel={cur:Math.max(0,k),ok:false,last:'0,0',rep:0};p.skill=SKILL_K[p.sel.cur]}

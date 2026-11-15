@@ -1526,7 +1526,7 @@ function ovTimerTick(dt){
 }
 function canPause(){
   if(!S||S.paused)return false;
-  if(['drive','stop','layout'].includes(S.phase))return ov.hidden||!!S.guest;
+  if(['drive','stop','layout','select'].includes(S.phase))return ov.hidden||!!S.guest;
   return ['choose','upgrade','equip'].includes(S.phase);
 }
 function pauseGame(){
@@ -2927,7 +2927,7 @@ function selectUpdate(dt){
     else if(inp.sw&&s.ok){s.ok=false;sfx('put')}
   });
   // everyone OK → a short countdown (anyone taking it back stops it); the host (P1) can also hold 作業 to go at once
-  if(S.players.every(p=>p.sel&&p.sel.ok)){S.selT+=dt;if(S.selT>=SEL_T){finishSelect();return}}else S.selT=0;
+  if(NET.role!=='off'&&S.players.every(p=>p.sel&&p.sel.ok)){S.selT+=dt;if(S.selT>=SEL_T){finishSelect();return}}else S.selT=0;
   if(readInput(0).act){S.selHold+=dt;if(S.selHold>=SEL_HOLD){finishSelect();return}}else S.selHold=0;
 }
 function finishSelect(){
@@ -2988,7 +2988,8 @@ function drawSelect(){
   });
   // footer: what starts the run
   const host=NET.role!=='guest';
-  let foot='全員がOKになったら出発'+(host&&n>1?'（P1は'+AL(S.players[0],'act','作業',1)+'でもすぐ出発）':host?'（'+AL(S.players[0],'act','作業',1)+'でもすぐ出発）':'');
+  let foot=NET.role==='off'?(n>1?'みんな選んだら、P1が'+AL(S.players[0],'act','出発',1):'選んだら '+AL(S.players[0],'act','出発',1))
+    :'全員がOKになったら出発'+(host?'（P1は'+AL(S.players[0],'act','作業',1)+'でもすぐ出発）':'');
   if(S.selT>0)foot='まもなく出発！';
   ctx.font=`800 13px ${FNT}`;const fw=ctx.measureText(foot).width+28;ctx.fillStyle='rgba(16,26,30,.85)';rr(W/2-fw/2,py-36,fw,26,13);ctx.fill();
   text(foot,W/2,py-23,13,S.selT>0?'#ffd84a':'#cfe0e2',800);
@@ -3070,10 +3071,11 @@ function drawGather(p){
   } else if(O.act==='mash'){
     text(O.e+' '+AL(p,'act','連打！'),cx,y+18,12,'#fff',800);bar(x+14,y+32,w-28,g.v/Math.max(1,g.need),'#7fd893');
   } else if(O.act==='timing'){
-    text(AL(p,'act','止める')+' 緑で2個',cx,y+16,10,'#fff',800);
-    const bx=x+14,bw=w-28,by=y+28,z=timingZone();
-    ctx.fillStyle='rgba(255,255,255,.15)';rr(bx,by,bw,14,7);ctx.fill();
-    ctx.fillStyle='rgba(127,216,147,.85)';ctx.fillRect(bx+bw*(0.5-z),by,bw*z*2,14);
+    text(AL(p,'act','止める')+'（緑なら2個）',cx,y+16,10,'#fff',800);
+    const bx=x+14,bw=w-28,by=y+30,z=timingZone();
+    ctx.fillStyle='rgba(255,224,138,.45)';rr(bx,by,bw,14,7);ctx.fill();
+    ctx.fillStyle='rgba(127,216,147,.95)';ctx.fillRect(bx+bw*(0.5-z),by,bw*z*2,14);
+    text('1個',bx+bw*0.2,by+7,9,'#3a2a10',800);text('1個',bx+bw*0.8,by+7,9,'#3a2a10',800);text('2個',bx+bw*0.5,by+22,9,'#bff2c6',800);
     ctx.fillStyle='#ffe08a';ctx.fillRect(bx+bw*g.v-2,by-4,4,22);
   } else if(O.act==='pull'){
     const sh=g.v>0?Math.sin(S.t*40)*g.v*2.5:0;

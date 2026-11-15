@@ -4485,6 +4485,12 @@ requestAnimationFrame(frame);
   document.addEventListener('touchend',e=>{if(!document.body.classList.contains('touch'))return;const n=Date.now();
     if(n-last<350&&!(e.target.closest&&e.target.closest('input,textarea,select,button,.ovbtn,[data-act]')))e.preventDefault();last=n},{passive:false});
   document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
+  // while playing, a touch anywhere but the menus (overlay / info button) never moves or zooms the page
+  const free=t=>t&&t.closest&&t.closest('#ov,#infoBtn,input,textarea,select');
+  const pl=()=>document.body.classList.contains('touch')&&document.body.classList.contains('playing');
+  document.addEventListener('touchstart',e=>{if(pl()&&!free(e.target))e.preventDefault()},{passive:false});
+  document.addEventListener('touchmove',e=>{if(pl()&&!free(e.target))e.preventDefault()},{passive:false});
+  addEventListener('scroll',()=>{if(pl()&&(scrollX||scrollY))scrollTo(0,0)});
 })();
 </script>
 

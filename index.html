@@ -205,7 +205,7 @@ const CUST_SWEAT={"penguin_front":[176,21,57,57],"penguin_side":[182,21,57,57],"
 const T=48, GW=24, GH=14, VH=13.5; // VH: rows shown (24 x 13.5 = 16:9); the last row is only a border // 16:9-ish field: truck top-left, town below and to the right
 const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
-const QX=17, QY=8, QMAX=5, QGAP=1.2, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
+const QX=18, QY=8, QMAX=5, QGAP=1.2, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
 const QSPAN=Math.ceil((QMAX-1)*QGAP)+1;         // tiles the line covers (each tile belongs to the nearest spot)
 const qCX=k=>QX+k*QGAP+0.5;                      // centre x of spot k
 const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the plaza under the truck)
@@ -1663,7 +1663,7 @@ function showChoose(){
       <span class="pay">${MOOD[Math.round((t.pay-1)*100)]||""}<br>${payLabel(t.pay,true).replace(/^[^（]*/,"")}</span>${t.lively?'<span class="sub">駅前なので、にぎわいやすい</span>':''}</button>`).join('');
   showOv(`<div class="box big"><h2>${S.stop+1}つ目の町を選ぶ（全${STOPS}町）</h2>
     <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。</p>${moneyBig()}
-    ${regDish()?`<p>🎫 常連${REG_NAME}のいつもの：${dishOv(regDish())} ${RECIPES[regDish()].n}（どの町でも1回来る）</p>`:''}
+    ${regDish()?`<p>常連：${dishOv(regDish())} ${RECIPES[regDish()].n}</p>`:''}
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
     ${S.stop>0?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
     <div class="cards">${cards}</div>
@@ -2209,14 +2209,14 @@ function unitBase(c,X,Y,loose){
       const cx=X+T/2,top=Y+9,bot=Y+T-5;
       if(!loose)softShadow(cx+2,bot,19,5,.35);
       const sg=ctx.createLinearGradient(cx-18,0,cx+18,0);sg.addColorStop(0,'#a8834f');sg.addColorStop(0.45,'#d6b47c');sg.addColorStop(1,'#8f6a3a');
-      ctx.fillStyle=sg;ctx.beginPath();
-      ctx.moveTo(cx-9,top+8);ctx.bezierCurveTo(cx-21,top+14,cx-20,bot,cx-12,bot);ctx.lineTo(cx+12,bot);ctx.bezierCurveTo(cx+20,bot,cx+21,top+14,cx+9,top+8);ctx.closePath();ctx.fill();
+      const sack=new Path2D();sack.moveTo(cx-9,top+8);sack.bezierCurveTo(cx-21,top+14,cx-20,bot,cx-12,bot);sack.lineTo(cx+12,bot);sack.bezierCurveTo(cx+20,bot,cx+21,top+14,cx+9,top+8);sack.closePath();
+      ctx.fillStyle=sg;ctx.fill(sack);
       // burlap weave
-      ctx.save();ctx.clip();ctx.strokeStyle='rgba(90,60,25,.28)';ctx.lineWidth=1;
+      ctx.save();ctx.clip(sack);ctx.strokeStyle='rgba(90,60,25,.28)';ctx.lineWidth=1;
       for(let k=top+10;k<bot;k+=3.5){ctx.beginPath();ctx.moveTo(cx-22,k);ctx.lineTo(cx+22,k);ctx.stroke()}
       for(let k=-21;k<22;k+=3.5){ctx.beginPath();ctx.moveTo(cx+k,top+8);ctx.lineTo(cx+k,bot);ctx.stroke()}
       ctx.restore();
-      ctx.strokeStyle='rgba(80,50,20,.45)';ctx.lineWidth=1.2;ctx.stroke();
+      ctx.strokeStyle='rgba(80,50,20,.45)';ctx.lineWidth=1.2;ctx.stroke(sack);
       // the frilled open top with seeds inside, and the rope round the neck
       ctx.fillStyle='#c9a46c';ctx.beginPath();ctx.ellipse(cx,top+3,11,4.5,0,0,7);ctx.fill();
       ctx.fillStyle='#5a3a1c';ctx.beginPath();ctx.ellipse(cx,top+3,7.5,2.6,0,0,7);ctx.fill();
@@ -3597,10 +3597,10 @@ function renderHud(){
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
     const SHORT={chop:'切',cook:'焼',blend:'混'};
     const stepTxt=i=>ING[i].mix?'('+mixOf(i).in.map(x=>itok(x)).join('+')+')'+ING[i].steps.map(s=>SHORT[s]).join('→'):itok(i)+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
-    info+=`<b>${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
-    if(regDish())info+=`🎫 常連${REG_NAME}のいつもの：${dtok(regDish())}${RECIPES[regDish()].n}（どの町でも1回来る）<br>`;
+    info+=`<b style="color:#7fd893">${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
+    if(regDish())info+=`常連：${dtok(regDish())}${RECIPES[regDish()].n}（${RECIPES[regDish()].ings.map(stepTxt).join(' ＋ ')}）<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${itok(id)}${n}</span>`}).join(' ');
-    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>dtok(o)).join('')).join(' '):'')+(waiting().length?'　<span class="dim">待ち '+waiting().length+'人</span>':'')}
+    if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>dtok(o)).join('')).join(' '):'')}
     if(S.phase==='drive'){
       const ahead=S.shops.filter(s=>s.x+2+WMARGIN>3.5);
       info+=`　<span class="dim">｜この先のお店 あと${ahead.length}軒</span>`;
@@ -3616,7 +3616,8 @@ function renderHud(){
       `　<span class="dim">｜残り時間は次の町の営業時間にプラス（0になっても続けられます）</span>`;
   }
   const gl=UPS.filter(u=>!u.tgt&&u.id!=='heart'&&u.id!=='plot'&&S.upCount&&S.upCount[u.id]).map(u=>u.e+u.d+(S.upCount[u.id]>1?' ×'+S.upCount[u.id]:''));
-  if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))info='<b style="color:#ffd84a">強化</b>　'+gl.join('　')+'<br>'+info;
+  if(gl.length&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout')){const st='<b style="color:#ffd84a">強化</b>　'+gl.join('　');
+    const k=info.indexOf('必要な食材：');if(k>=0){const e=info.indexOf('<br>',k);info=e>=0?info.slice(0,e)+'<br>'+st+info.slice(e):info+'<br>'+st}else info=info+'<br>'+st}
   readyBtn.hidden=!(S.phase==='layout'&&ov.hidden);
   pauseBtn.hidden=!canPause();
   {const lp=localP(),K=lp&&skillOf(lp),bs=document.getElementById('bSkill');if(bs&&K){const act=(lp.skT||0)>0,cd=(lp.skCD||0)>0&&!act;

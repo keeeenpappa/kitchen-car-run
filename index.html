@@ -825,7 +825,7 @@ function skillNow(p,K){
   if(K.now&&!skillNow(p,K))return;
   p.skT=K.dur;p.skCD=K.cd;sfx('skill');
   // elephant: stoves / mixers within 2 tiles when it is used stay safe for the whole skill
-  if(p.skill==='nofire')for(const c of S.stations)if((c.t==='stove'||c.t==='blender')&&Math.max(Math.abs(c._x-p.tx),Math.abs(c._y-p.ty))<=2){c.nbT=K.dur;float(c._x+.5,c._y,'焦げない','#cdeeff')}
+  if(p.skill==='nofire')for(const c of S.stations)if((c.t==='stove'||c.t==='blender')&&Math.max(Math.abs(c._x-p.tx),Math.abs(c._y-p.ty))<=2)c.nbT=K.dur;
 }
 // button name + this player's key, e.g. 作業（F）. Online every device uses the P1 keys; phones use the on-screen buttons
 const KEYL=[{pick:'Space',act:'F',sw:'Q'},{pick:'/',act:'.',sw:','},{pick:'A',act:'X',sw:'LB'}];
@@ -2923,6 +2923,9 @@ function playHint(p,c){
 function drawFires(){
   if(!S.map)return;const t=S.t||0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
+    // elephant's skill: a blinking water-blue frame on the stoves / mixers that cannot burn
+    if((c.nbT||0)>0){const k=0.5+0.5*Math.sin(t*Math.PI*4);ctx.save();ctx.shadowColor='#7fd4ff';ctx.shadowBlur=8*k;
+      ctx.strokeStyle=`rgba(127,212,255,${0.4+0.6*k})`;ctx.lineWidth=3;rr(x*T+3,y*T+3,T-6,T-6,8);ctx.stroke();ctx.restore()}
     if(!c.fire){if(c.smoke>0&&c.smoke<FIRE_T){const k=c.smoke/FIRE_T;ctx.fillStyle=`rgba(60,60,60,${0.25+0.35*k})`;for(let j=0;j<3;j++){const a=(t*1.5+j*0.33)%1;ctx.beginPath();ctx.arc(x*T+T/2+Math.sin(t*3+j)*6,y*T+T*0.3-a*22,5+a*7*k+3*k,0,7);ctx.fill()}}continue}
     const X=x*T+T/2,Y=y*T+T*0.62;
     for(let j=0;j<5;j++){const ph=t*9+j*1.3,h=T*(0.42+0.16*Math.sin(ph)),w=T*0.2,ox=(j-2)*T*0.14;
@@ -4005,7 +4008,7 @@ function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0,c.fire?1:0,Math.round((c.smoke||0)*10)];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0,c.fire?1:0,Math.round((c.smoke||0)*10),(c.nbT||0)>0?1:0];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -4156,7 +4159,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10,nbT:e[12]?1:0};
   }
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}

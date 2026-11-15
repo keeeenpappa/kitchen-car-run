@@ -2343,7 +2343,6 @@ function drawLever(X,Y){
   ctx.fillStyle='#fff3d6';rr(x+w-11,y+h*0.45,8,3.5,1.7);ctx.fill();                 // handle
   ctx.fillStyle='#8c5a12';rr(x-2,Y+T-8,w+4,5,2);ctx.fill();                          // step
   ctx.fillStyle='rgba(255,255,255,.35)';rr(x-1,Y+T-8,w+2,1.5,1);ctx.fill();
-  emoji('💺',x+w/2-3,y+h*0.42,15);
 }
 function frontLabel(b,t,col){text(t,b.cx,b.fy+b.fh/2-0.5,8,col||'rgba(255,255,255,.9)',800)}
 function drawTile(c,x,y){
@@ -3619,8 +3618,53 @@ function drawRoadIdle(){
   ctx.fillStyle='#3a4248';ctx.fillRect(0,6.6*T,GW*T,0.6*T);
   ctx.fillStyle='#4f7044';ctx.fillRect(0,7.2*T,GW*T,(GH-7.2)*T);
   ctx.fillStyle='#e8e2c8';const off=idleOff%2;for(let x=-2;x<GW+2;x+=2)ctx.fillRect((x-off)*T,6.85*T,T*0.9,4);
-  drawTruckShell();
-  text('ドコドコ・キッチンカー',8.5*T,4*T,40,'#2a1d05',400);
+  // title screen only: a cuter truck that bobs along, with pop lettering on its side
+  const tt=performance.now()/1000,bob=Math.abs(Math.sin(tt*5))*-3;
+  ctx.save();ctx.translate(0,bob);
+  cachedRect('truck',0,0.5*T,GW*T,7.4*T,()=>drawTruckBody());
+  drawTitleDeco(tt);
+  ctx.restore();drawWheels();
+  // little exhaust puffs behind the truck
+  for(let j=0;j<3;j++){const a=(tt*0.8+j/3)%1;ctx.fillStyle=`rgba(230,230,230,${0.45*(1-a)})`;ctx.beginPath();ctx.arc(0.7*T-a*40,6.6*T-a*18,5+a*10,0,7);ctx.fill()}
+  drawTitleText(tt,bob);
+}
+function drawTitleDeco(tt){
+  // cream side panel with pastel polka dots
+  ctx.save();ctx.beginPath();ctx.roundRect(2*T,2*T,14*T,4*T,18);ctx.clip();
+  ctx.fillStyle='#fff4dc';ctx.fillRect(2*T,2*T,14*T,4*T);
+  const dots=['#ffc4cf','#bfe6ff','#c9f0c4','#ffe39a'];
+  for(let y=0;y<6;y++)for(let x=0;x<22;x++){ctx.fillStyle=dots[(x+y)%4];ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(2*T+18+x*32+(y%2)*16,2*T+14+y*32,6,0,7);ctx.fill()}
+  ctx.globalAlpha=1;ctx.restore();
+  ctx.strokeStyle='#e08a2a';ctx.lineWidth=4;rr(2*T,2*T,14*T,4*T,18);ctx.stroke();
+  // striped awning with a scalloped edge over the panel
+  const ax=1.6*T,aw=14.8*T,ay=1.25*T,ah=0.62*T,n=16,sw=aw/n;
+  for(let k=0;k<n;k++){ctx.fillStyle=k%2?'#fff8ec':'#ff7a8a';ctx.fillRect(ax+k*sw,ay,sw+0.5,ah);
+    ctx.beginPath();ctx.arc(ax+k*sw+sw/2,ay+ah,sw/2,0,Math.PI);ctx.fill()}
+  ctx.fillStyle='rgba(0,0,0,.08)';ctx.fillRect(ax,ay+ah-4,aw,4);
+  ctx.fillStyle='#e85d70';rr(ax-4,ay-6,aw+8,9,4);ctx.fill();
+  // a few food stickers round the lettering
+  const st=[['🍔',3.1,5.3,-0.25],['🍰',15,2.9,0.2],['🍎',14.9,5.3,-0.15],['🍳',3.2,2.9,0.2]];
+  for(const [e,x,y,r] of st){ctx.save();ctx.translate(x*T,y*T+Math.sin(tt*3+x)*2);ctx.rotate(r);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,21,0,7);ctx.fill();ctx.strokeStyle='#f3c9a0';ctx.lineWidth=2;ctx.stroke();emoji(e,0,0,26);ctx.restore()}
+  // a smiling cab: the headlight is an eye, plus a cheek and a smile
+  ctx.fillStyle='rgba(255,130,150,.55)';ctx.beginPath();ctx.ellipse(17.35*T,4.6*T,10,6,0,0,7);ctx.fill();
+  ctx.strokeStyle='#8a4a10';ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();ctx.arc(17.25*T,4.85*T,9,0.15*Math.PI,0.85*Math.PI);ctx.stroke();ctx.lineCap='butt';
+}
+function drawTitleText(tt,bob){
+  const F='"Dela Gothic One","M PLUS Rounded 1c",sans-serif',cols=['#ff6b81','#ffb13b','#4cc3ff','#6ad36a','#b98aff','#ff8ad1'];
+  const line=(str,cx,cy,sz,off)=>{
+    ctx.font=`400 ${sz}px ${F}`;const ch=[...str],ws=ch.map(c=>ctx.measureText(c).width*0.94),tot=ws.reduce((a,b)=>a+b,0);
+    let x=cx-tot/2;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+    ch.forEach((c,i)=>{const w=ws[i],y=cy+bob+Math.sin(tt*4-i*0.7)*3,r=((i+off)%2?1:-1)*0.07;
+      ctx.save();ctx.translate(x+w/2,y);ctx.rotate(r);
+      ctx.strokeStyle='#5a2d0c';ctx.lineWidth=sz*0.3;ctx.strokeText(c,0,3);   // dark outline + drop
+      ctx.strokeStyle='#fff';ctx.lineWidth=sz*0.2;ctx.strokeText(c,0,0);
+      ctx.fillStyle=cols[(i+off)%cols.length];ctx.fillText(c,0,0);
+      ctx.fillStyle='rgba(255,255,255,.45)';ctx.save();ctx.beginPath();ctx.rect(-w,-sz/2,w*2,sz*0.38);ctx.clip();ctx.fillText(c,0,0);ctx.restore();
+      ctx.restore();x+=w});
+  };
+  line('ドコドコ',9*T,3.35*T,58,0);
+  line('キッチンカー',9*T,4.85*T,44,4);
 }
 
 // ---------- DOM HUD ----------

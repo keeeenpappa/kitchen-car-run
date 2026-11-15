@@ -433,6 +433,7 @@ function buildMap(){
 let S=null;
 const START_POS=[[4.5,3.5],[11.5,3.5],[4.5,5.5],[11.5,5.5]];
 function newRun(np,mode){
+  LASTRUN=[np,mode];
   S={np,money:40,hearts:HEART_MAX,fuel:FUEL_MAX,speed:1,dist:0,route:1,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
     phase:'choose',view:'road',town:null,next:null,timer:0,sub:'',shops:[],cust:[],spawnT:0,
     earned:0,served:0,missed:0,totalEarned:0,totalServed:0,floats:[],map:buildMap(),players:[],
@@ -1500,7 +1501,7 @@ function resultScreen(title,lead,clear){
     <table class="score">${sc.rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}点</td></tr>`).join('')}<tr class="tot"><td>スコア</td><td>${sc.total}点</td></tr></table>
     ${rec?'<p class="rec">NEW RECORD!</p>':`<p class="mut">${S.np}人のベスト ${old.score}点</p>`}
     ${nxt}${tst}
-    <div class="row"><button class="ovbtn" data-act="title">もう一度</button></div></div>`);
+    <div class="row"><button class="ovbtn" data-act="again">${NET.role==='host'?'続ける（ロビーに残る）':'続ける'}</button><button class="ovbtn" data-act="title">終わる</button></div></div>`);
   if(rec)setTimeout(()=>sfx('record'),900);
 }
 function gameOver(){
@@ -1601,6 +1602,7 @@ function ovAction(a,v){
   }
   else if(a==='end')showEnd();
   else if(a==='title')showTitle();
+  else if(a==='again')playAgain();
   else if(a==='resume')resumeGame();
   else if(a==='ready')finishLayout();
   else if(a==='pause')pauseGame();
@@ -1636,6 +1638,13 @@ function pauseGame(){
 function resumeGame(){
   if(!S)return;S.paused=false;
   if(S.ovSave){const h=S.ovSave;S.ovSave=null;showOv(h)}else hideOv();
+}
+// 続ける on the result screen: online the room stays and everyone is back in the lobby; alone, the same game starts again
+let LASTRUN=[1,'preset'];
+function playAgain(){
+  if(NET.role==='host'){S=null;hideOv();showHostLobby();return}
+  if(NET.role==='guest')return;
+  newRun(LASTRUN[0],LASTRUN[1]);
 }
 function showTitle(){
   scanStop();
@@ -3954,6 +3963,7 @@ function showHostLobby(){
   if(NET.role!=='host'||S)return;
   const g=hostGuests();
   NET.lobby.presence({host:{code:NET.code,n:1+Math.min(3,g.length),open:true}}).catch(()=>{});
+  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(3,g.length)}).catch(()=>{});
   paintOv(`<div class="box"><h2>${NET.peer?'部屋'+(NET.pw?' 🔒':''):'部屋 '+NET.code}</h2>
     <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,3).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大4人）</p>
     <p class="mut">${NET.peer?(NET.beaconSlot!=null?`ロビーに部屋を出しました。フレンドはタイトルの「ロビーへ入る」から参加できます。${NET.pw?'パスワード：<b>'+NET.pw.replace(/[<>&"]/g,'')+'</b>':'パスワードなし'}`:'ロビーに部屋を出しています…'):`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
@@ -3962,6 +3972,7 @@ function showHostLobby(){
 function hostStart(mode){
   const g=hostGuests().slice(0,3);
   NET.slots={};NET.uidSlot={};NET.waiting=[];
+  if(NET.room)NET.room.presence({lb:0}).catch(()=>{});
   g.forEach((p,i)=>bindSlot(p,i+1));
   // the room stays open: friends can still join (they watch, and come in once the town's service is over)
   NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true}}).catch(()=>{});
@@ -4121,10 +4132,16 @@ async function joinRoom(code){
     if(NET.localOv==='conn')guestLocalOv('wait');
   }catch(e){if(NET.role!=='guest')return;leaveOnline();NET.err='部屋 '+code+' が見つかりませんでした。コードを確かめてください。';showTitle()}
 }
+// people in the room (host + guests), as the host reports it
+function guestCount(){
+  if(!NET.room)return 1;
+  const h=NET.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.lb>0);   // the host puts the head count in its lobby
+  return h?Math.max(1,Math.min(4,+h.presence.lb||1)):2;
+}
 function guestLocalOv(kind){
   NET.localOv=kind;NET.mirror=false;NET.shownOv=-1;
   const body=kind==='conn'?`<p>部屋に接続しています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
-    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
+    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/4人</span></p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
     :kind==='late'?`<p>このゲームはもう始まっています。次のゲームから参加してください。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`
     :`<p>ホストが部屋を閉じたか、通信が途切れました。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`;
   paintOv(`<div class="box"><h2>${kind==='lost'?'接続が切れました':NET.peer?'部屋':'部屋 '+NET.code}</h2>${body}</div>`);
@@ -4166,6 +4183,8 @@ function guestFrame(dt){
         if(k!==ovSel){ovSel=k;markSel()}bs.forEach((b,i)=>setP(b,i===k?(+d.os[1]||0)/100:0))}
     }
   }
+  if(!host&&S&&peers.some(p=>!p.sameTab&&p.presence&&p.presence.lb>0)){S=null;NET.seenSnap=-1;guestLocalOv('wait')}
+  if(NET.localOv==='wait'){const el=document.getElementById('waitN'),n=String(guestCount());if(el&&el.firstChild&&el.firstChild.nodeValue!==n)el.firstChild.nodeValue=n}
   if(S&&NET.localOv!=='lost'&&performance.now()-NET.lastSnapAt>4000)guestLocalOv('lost');
   if(S){
     S.t+=dt;

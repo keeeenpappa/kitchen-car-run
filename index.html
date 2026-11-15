@@ -1022,6 +1022,9 @@ function doPick(p,c,tx,ty){
         if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,pendingOrders(f).map(o=>RECIPES[o].e).join('')+' ご注文','#fff');sfx('seat')}
         else say(p,S.sub==='service'?'並んでいるお客さんを案内してくる':'まだ営業前');
         return}
+      // a dirty plate beside a customer who is still there (a big eater's first dish): it can be taken too
+      if(c.item&&c.item.kind==='dirty'&&(!p.hold||p.hold.kind==='dirty')){
+        if(!p.hold)p.hold=c.item;else p.hold.cnt=(p.hold.cnt||1)+(c.item.cnt||1);c.item=null;sfx('pick');return}
       if(g.st==='eat'){say(p,'食事中');return}
       if(f){say(p,'このテーブルはうまっている');return}
       if(p.hold2&&isDish(p.hold)&&!pendingOrders(g).includes(matchRecipe(p.hold.items))&&pendingOrders(g).includes(matchRecipe(p.hold2.items))){const a=p.hold;p.hold=p.hold2;p.hold2=a}

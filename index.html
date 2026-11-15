@@ -988,6 +988,9 @@ function doPick(p,c,tx,ty){
     case 'queue':{
       if(S.phase!=='stop'||S.sub!=='service')return;
       const w=waiting()[c.slot];if(!w)return;
+      if(w.type==='takeout'){
+        if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare&&p.hold.items.length){serve(p,tx,ty,w);return}
+        say(p,'お持ち帰り：'+orderText(w)+'を持ってくる');return}
       if(follower(p)){say(p,'もう1人案内している');return}
       w.st='follow';w.by=p.i;say(p,'空いているテーブルへ案内');sfx('follow');return}
     case 'table':{
@@ -1164,9 +1167,10 @@ function serve(p,tx,ty,c){
   let k=-1;if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
   if(k<0){say(p,'注文は '+orderText(c));return}
   const R=RECIPES[rid];
-  const pay=Math.round(R.price*S.town.pay*S.up.pay), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate()*(CT.tip||1));
+  const pay=Math.round(R.price*S.town.pay*S.up.pay*(CT.pay||1)), tip=Math.round(R.price*0.5*c.pat/c.max*S.up.tip*tipRate()*(CT.tip||1));
   S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;
   if(c.got)c.got[k]=true;
+  if(CT.takeout){startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
   // they start eating once everything they ordered is on the table
   if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1);if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5)}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');
@@ -1256,6 +1260,8 @@ const CTYPE={
   hasty:{n:'せっかち',e:'⚡',w:1.2,pat:0.6,tip:1.6},   // short fuse, tips well
   big:{n:'大食い',e:'🍖',w:1.1,second:true},          // orders a second dish after the first
   family:{n:'子連れ',e:'👶',w:1.1,kid:true},           // the child wanders off while they eat; they can't leave until someone brings it back (持つ near it)
+  takeout:{n:'お持ち帰り',e:'🥡',w:1.1,takeout:true},  // stays in the line: bring the dish there; the plate comes back dirty at once
+  vip:{n:'VIP',e:'👑',w:0.45,pat:0.7,pay:2},          // rare, short fuse, pays double
 };
 const CTYPE_K=Object.keys(CTYPE);
 const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
@@ -2558,9 +2564,11 @@ function drawTables(withSeated){
 }
 // the stool behind a table (the customer sits here): blue cushion to match the cloth
 function drawStool(X,Y){
-  ctx.fillStyle='#6b4428';ctx.fillRect(X-1.5,Y-T*0.38,3,10);
-  const g=ctx.createLinearGradient(0,Y-T*0.5,0,Y-T*0.36);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y-T*0.42,9.5,4.5,0,0,7);ctx.fill();
-  ctx.strokeStyle='rgba(20,50,90,.5)';ctx.lineWidth=1;ctx.stroke();
+  const sy=Y-T*0.42;
+  ctx.fillStyle='#5a3820';for(const s2 of [-1,1])rr(X+s2*7-1.6,sy,3.2,13,1.5),ctx.fill();   // two legs
+  ctx.fillStyle='#7a4e2c';rr(X-11,sy-1,22,5,2.5);ctx.fill();                                  // the wooden seat frame
+  const g=ctx.createLinearGradient(0,sy-6,0,sy+1);g.addColorStop(0,'#8cc2f0');g.addColorStop(1,'#3f7fc4');
+  ctx.fillStyle=g;rr(X-10,sy-6,20,7,3.5);ctx.fill();ctx.strokeStyle='rgba(20,50,90,.5)';ctx.lineWidth=1;ctx.stroke();   // cushion
 }
 // the plate a customer left, dirty, on the table
 function drawTableDirty(c,X,Y){if(c&&c.item&&c.item.kind==='dirty')drawItem(c.item,X,Y-3,T*0.44)}
@@ -2626,6 +2634,15 @@ function drawCustFig(X,FY,an,hue,dir,flip,sc,type){
     if(P&&im){const bob=Math.abs(Math.sin((S?S.t:0)*5))*8;ctx.drawImage(im,(P[0]-128)*k,(P[1]-240+bob)*k,P[2]*k,P[3]*k)}}
   ctx.restore();return FY-118*k;
 }
+function drawVip(X,HY,FY){
+  const t=S?S.t:0;
+  for(let k=0;k<4;k++){const a=t*1.6+k*Math.PI/2,r=17+2*Math.sin(t*3+k),sx=X+Math.cos(a)*r,sy=(HY+FY)/2-4+Math.sin(a)*r*0.9,z=2.2+1.4*Math.abs(Math.sin(t*4+k*1.7));
+    ctx.fillStyle='rgba(255,236,140,.95)';ctx.beginPath();for(let j=0;j<8;j++){const rr2=j%2?z*0.35:z,b=j*Math.PI/4;ctx.lineTo(sx+Math.cos(b)*rr2,sy+Math.sin(b)*rr2)}ctx.closePath();ctx.fill()}
+  const cy=HY-14,w=15;
+  ctx.fillStyle='#f5c431';ctx.strokeStyle='#a87a10';ctx.lineWidth=1;ctx.beginPath();
+  ctx.moveTo(X-w/2,cy+5);ctx.lineTo(X-w/2,cy-3);ctx.lineTo(X-w/4,cy+1);ctx.lineTo(X,cy-5);ctx.lineTo(X+w/4,cy+1);ctx.lineTo(X+w/2,cy-3);ctx.lineTo(X+w/2,cy+5);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e2504a';ctx.beginPath();ctx.arc(X,cy+2,1.6,0,7);ctx.fill();ctx.fillStyle='#fff8c8';for(const s2 of [-1,1]){ctx.beginPath();ctx.arc(X+s2*w/2,cy-3,1.2,0,7);ctx.fill()}
+}
 function custIcon(X,HY,type){
   const ic=CICON[type],im=ic&&cimg(ic);if(!im)return false;
   ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-18,HY-13,11,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1.2;ctx.stroke();
@@ -2643,6 +2660,7 @@ function drawCustBody(X,Y,c){
     if(CT.kid&&!c.kidAway)drawCustFig(X+(seat?15:14),seat?Y+12:Y+18,c.an,KID_HUE(c.hue),'front',false,0.6,'normal');
     if(!seat)softShadow(X,Y+15,12,4,.3);
     const HY=drawCustFig(X,FY,c.an,c.hue,dir,flip,1,c.type);
+    if(c.type==='vip'&&HY!=null)drawVip(X,HY,FY);
     if(CT.e&&!custIcon(X,HY,c.type)){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,7.5,0,7);ctx.fill();emoji(CT.e,X-16,HY-11.5,10)}
     return}
   if(CT.kid&&!c.kidAway)drawKid(X+13,Y+5,c);   // 子連れ: a small child beside the parent (unless it has wandered off)
@@ -2693,6 +2711,8 @@ function drawCustomers(){
       continue}
     const Y=py*T;
     drawCustBody(X,Y,c);
+    if(c.st==='wait'&&c.type==='takeout'){const top=Y-58,bs=30;ctx.fillStyle='#fff';rr(X-bs/2,top,bs,bs,8);ctx.fill();
+      ctx.beginPath();ctx.moveTo(X-4,top+bs);ctx.lineTo(X+4,top+bs);ctx.lineTo(X,top+bs+5);ctx.fill();emoji(dishIc(c.order),X,top+bs/2,20)}
     if(c.st==='leave'){if(c.mad)emoji(stIc('status_angry','😠'),X+12,Y-14,16);continue}
     bar(X-17,Y+15,34,f,col);
   }
@@ -2762,10 +2782,10 @@ function drawPlayers(){
     const c=tile(p.tx,p.ty);
     const furnSpot=c&&(((c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&p.hold.st!=='table'&&inTruck(p.tx,p.ty))||(c.t==='ground'&&!c.item&&p.hold&&p.hold.kind==='station'&&p.hold.st==='table'&&inTblZone(p.tx,p.ty)));
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
-    if(c&&c.t==='queue'&&S.phase==='stop'&&S.sub==='service'&&waiting()[c.slot]&&!follower(p)){
+    if(c&&c.t==='queue'&&S.phase==='stop'&&S.sub==='service'&&waiting()[c.slot]&&(waiting()[c.slot].type==='takeout'||!follower(p))){
       const QXc=qCX(c.slot)*T;ctx.strokeStyle='#fff';ctx.lineWidth=6;rr(QXc-T/2+2,p.ty*T-T*0.55,T-4,T*1.5,9);ctx.stroke();ctx.strokeStyle='#1e7bf0';ctx.lineWidth=3.5;ctx.stroke();
       const me=NET.role==='off'||NET.mySlot===p.i;
-      if(me){const m=AL(p,'pick','案内');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;ctx.fillStyle=PCOL[p.i];rr(QXc-w/2,p.ty*T-T*0.55-20,w,17,8);ctx.fill();text(m,QXc,p.ty*T-T*0.55-11.5,11,'#fff',800)}}
+      if(me){const m=AL(p,'pick',waiting()[c.slot].type==='takeout'?'渡す':'案内');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;ctx.fillStyle=PCOL[p.i];rr(QXc-w/2,p.ty*T-T*0.55-20,w,17,8);ctx.fill();text(m,QXc,p.ty*T-T*0.55-11.5,11,'#fff',800)}}
     if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me||p.seat){const msg=p.seat?AL(p,'act','スピード切替')+'　'+AL(p,'pick','降りる'):AL(p,'pick','運転席に座る');
@@ -2927,7 +2947,7 @@ function selectUpdate(dt){
     else if(inp.sw&&s.ok){s.ok=false;sfx('put')}
   });
   // everyone OK → a short countdown (anyone taking it back stops it); the host (P1) can also hold 作業 to go at once
-  if(NET.role!=='off'&&S.players.every(p=>p.sel&&p.sel.ok)){S.selT+=dt;if(S.selT>=SEL_T){finishSelect();return}}else S.selT=0;
+  S.selT=0;
   if(readInput(0).act){S.selHold+=dt;if(S.selHold>=SEL_HOLD){finishSelect();return}}else S.selHold=0;
 }
 function finishSelect(){
@@ -2989,7 +3009,7 @@ function drawSelect(){
   // footer: what starts the run
   const host=NET.role!=='guest';
   let foot=NET.role==='off'?(n>1?'みんな選んだら、P1が'+AL(S.players[0],'act','出発',1):'選んだら '+AL(S.players[0],'act','出発',1))
-    :'全員がOKになったら出発'+(host?'（P1は'+AL(S.players[0],'act','作業',1)+'でもすぐ出発）':'');
+    :host?'みんな選んだら、ホストが'+AL(S.players[0],'act','出発',1):'ホストが出発するのを待っています';
   if(S.selT>0)foot='まもなく出発！';
   ctx.font=`800 13px ${FNT}`;const fw=ctx.measureText(foot).width+28;ctx.fillStyle='rgba(16,26,30,.85)';rr(W/2-fw/2,py-36,fw,26,13);ctx.fill();
   text(foot,W/2,py-23,13,S.selT>0?'#ffd84a':'#cfe0e2',800);

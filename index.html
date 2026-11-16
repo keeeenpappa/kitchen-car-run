@@ -557,6 +557,9 @@ function newRun(np,mode){
    const reach=(x,y)=>DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='floor'});
    let done=false;for(const y of [6,2,3,4,5])for(let x=2;x<=15&&!done;x++){const t=S.map[y][x];if(t.t==='counter'&&!t.item&&reach(x,y)){t.item={kind:'ext'};done=true}}}
   planTicket();
+  /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
+  if(TESTGEAR)putOutside([{kind:'station',st:'warp',pro:0},{kind:'station',st:'lucky',pro:0},{kind:'station',st:'board',pro:2},
+    ...[1,2,3,4,5].map(pro=>({kind:'station',st:'counter',pro}))]);
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
@@ -584,6 +587,7 @@ const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 // spots outside for things handed over at layout time: first the row just outside the door (the door's own column stays free;
 // row 7 is reached from the walkway under it), then further out. Kept off the table plaza (rows 8-10, x1-17) and the waiting line
 const TABLE_SPOT=[19,9];   // the table pile waits under the queue
+const TESTGEAR=(()=>{try{return new URLSearchParams(location.search).has('testgear')}catch(_){return false}})();
 const GROUND_SPOTS=[[19,9],[5,7],[7,7],[5,9],[7,9],[9,7],[3,9],[9,9],[11,7],[11,9],[13,7],[13,9],[1,9],[15,7],[15,9],[17,9],[5,11],[7,11],[3,11],[9,11],[1,11],[11,11],[13,11],[15,11],[17,11],[19,11],[21,11],[21,9],[19,10],[21,10]];
 const storable=it=>!!it&&['station','can','basket','power','ext'].includes(it.kind);
 // put objects on free spots outside; same-kind counters/planters join one pile

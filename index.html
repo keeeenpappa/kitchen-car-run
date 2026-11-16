@@ -488,12 +488,13 @@ function buildMap(){
   for(let x=1;x<=16;x++)set(x,1,'wall');
   for(let y=1;y<=6;y++){set(1,y,'wall');set(16,y,'wall')}
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++)set(x,y,'floor');
-  const top=['counter','fridge','seedbox','sink','board','counter','counter','stove','counter','blender','counter','plates','trash','counter'];   /* one knife board and one stove to start: more come from the equipment shop */
+  /* the ready-made kitchen holds exactly what a self-made layout gets: COUNTERS_GIVEN counters, PLANTERS_GIVEN planters, one of each unit */
+  const top=['floor','fridge','seedbox','sink','board','counter','floor','stove','counter','blender','counter','plates','trash','floor'];
   top.forEach((t,i)=>set(2+i,2,t));
-  for(let y=3;y<=5;y++){if(y<5)set(2,y,'planter',{plant:null});set(15,y,'counter')}   /* 2 planters to start */
-  set(15,4,'floor');set(16,4,'lever');
-  for(let x=7;x<=10;x++)set(x,4,'counter');
-  const bot=['counter','window','counter','counter','counter','counter','counter','counter','counter','counter','counter','window','counter','counter'];
+  set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
+  set(15,3,'counter');set(16,4,'lever');
+  set(8,4,'counter');set(9,4,'counter');
+  const bot=['gap','window','gap','gap','gap','gap','gap','gap','gap','gap','gap','window','gap','gap'];
   bot.forEach((t,i)=>set(2+i,6,t));
   {const dx=DOOR_XS[rnd(DOOR_XS.length)];set(dx,6,'door');DOOR_FRONT=[dx,5]}   /* the door is somewhere new on the outer row every trip (never a window) */
   m[6][3].win='後'; m[6][13].win='前';
@@ -514,8 +515,8 @@ function newRun(np,mode){
     roadOff:0,gatherLeft:[0,0],market:[],paused:false,t:0,
     up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],townIds:[],reg:null};
-  S.map[6][4].item={kind:'can',water:3};
-  S.map[6][5].item={kind:'basket',items:[]};
+  S.map[3][15].item={kind:'can',water:3};
+  S.map[2][12].item={kind:'basket',items:[]};
   {// the extinguisher: the first free counter a chef can reach (a walkable floor tile next to it)
    const reach=(x,y)=>DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='floor'});
    let done=false;for(const y of [6,2,3,4,5])for(let x=2;x<=15&&!done;x++){const t=S.map[y][x];if(t.t==='counter'&&!t.item&&reach(x,y)){t.item={kind:'ext'};done=true}}}
@@ -539,7 +540,7 @@ const inTruck=(x,y)=>x>=2&&x<=15&&y>=2&&y<=6;
 const FIXED=new Set(['door','window','serve']);
 const FURN=['counter','planter','table','warp',...MOVABLE];
 const PILE=['counter','planter','table'];          // these come stacked in one pile outside
-const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_XS=[2,4,5,6,7,8,9,10,11,12,14];
+const COUNTERS_GIVEN=6, PLANTERS_GIVEN=2, DOOR_XS=[2,4,5,6,7,8,9,10,11,12,14];
 let DOOR_FRONT=[6,5];
 const syncDoor=()=>{for(let x=2;x<=15;x++)if(S.map[6][x].t==='door')DOOR_FRONT=[x,5]};   /* guests: the door's spot comes with the map */
 const emptyT=y=>y===6?'gap':'floor';

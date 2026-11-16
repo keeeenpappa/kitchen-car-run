@@ -113,6 +113,7 @@ body.touch #pauseBtn{display:none}
 .town .ok{color:var(--good)} .town .ng{color:var(--bad)} .town .sub{color:var(--muted)}
 .town .pay{color:var(--truck)}
 .ovbtn.dim{opacity:.45}
+.money .mv img.coin{width:1.15em;height:1.15em;vertical-align:-.2em}
 .rarebadge{display:inline-block;align-self:flex-start;background:linear-gradient(90deg,#ff4fa3,#9b5cff);color:#fff;font-weight:800;font-size:15px;letter-spacing:.12em;padding:3px 12px;border-radius:999px;box-shadow:0 0 0 2px #fff3,0 0 14px #ff4fa388}
 .box .mut{color:var(--muted)} .box .good{color:var(--good)}
 .netrow{align-items:center} .netrow .lab{min-width:9em}
@@ -1538,7 +1539,9 @@ function addPlanter(){S.pendingEquip.push({id:'planter',pro:0})}
 const TGTN={stove:'コンロ',board:'まな板',blender:'ミキサー',planter:'菜園',can:'じょうろ',basket:'カゴ'};
 const upById=id=>UPS.find(u=>u.id===id);
 // the money, big, on the screens between towns
-const moneyBig=extra=>`<div class="money"><span class="mk">所持金</span><span class="mv">🪙 ${S.money}G</span>${extra?`<span class="mx">${extra}</span>`:''}</div>`;
+/* the same gold coin picture as the money on the game screen (the 🪙 emoji is silver on some devices) */
+const coinHtml=()=>typeof CUST_IMG_SRC==='object'&&CUST_IMG_SRC.status_tip?`<img class="coin" src="${CUST_IMG_SRC.status_tip}" alt="">`:'🪙';
+const moneyBig=extra=>`<div class="money"><span class="mk">所持金</span><span class="mv">${coinHtml()} ${S.money}G</span>${extra?`<span class="mx">${extra}</span>`:''}</div>`;
 function showUpgrade(){
   S.phase='upgrade';
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));

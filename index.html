@@ -3285,6 +3285,11 @@ try{const v=JSON.parse(localStorage.getItem('kcr-save')||'null');if(v&&typeof v=
   SV.own=Array.isArray(v.own)?v.own.filter(k=>SKINS[k]):[];
   if(v.eq&&typeof v.eq==='object')for(const sk in v.eq)if(SKILLS[sk]){SV.eq[sk]={};for(const sl of SLOTS){const k=v.eq[sk]&&v.eq[sk][sl];if(SKINS[k]&&SKINS[k].sk===sk&&SKINS[k].slot===sl&&SV.own.includes(k))SV.eq[sk][sl]=k}}}}catch(_){}
 const saveSV=()=>{try{localStorage.setItem('kcr-save',JSON.stringify(SV))}catch(_){}};
+// test links: ?tickets=20 adds tickets once (the address is cleaned so a reload does not add more), ?resetsave=1 clears tickets / shards / skins
+try{const q=new URLSearchParams(location.search);let ch=false;
+  if(q.has('tickets')){SV.t+=Math.max(0,Math.min(50,parseInt(q.get('tickets'),10)||0));q.delete('tickets');ch=true}
+  if(q.has('resetsave')){SV={t:0,sh:0,own:[],eq:{},dry:0};q.delete('resetsave');ch=true}
+  if(ch){saveSV();const r=q.toString();history.replaceState(null,'',location.pathname+(r?'?'+r:'')+location.hash)}}catch(_){}
 // skins worn by a chef with skill sk, from an equip map (only real, matching ids)
 const skinList=(eq,sk)=>{const e=eq&&eq[sk];if(!e||typeof e!=='object')return [];return SLOTS.map(sl=>e[sl]).filter(k=>SKINS[k]&&SKINS[k].sk===sk)};
 // what a player wears: this device's own set for local players, the guest's set (from its presence) for remote ones, the host's word on a guest

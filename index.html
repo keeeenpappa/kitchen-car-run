@@ -553,8 +553,8 @@ const storable=it=>!!it&&['station','can','basket','power','ext'].includes(it.ki
 // put objects on free spots outside; same-kind counters/planters join one pile
 function putOutside(objs){
   for(const o of objs){
-    if(o.kind==='station'&&PILE.includes(o.st)&&!o.plant&&!o.pro&&!upTotal(o)){
-      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.plant&&!it.pro&&!upTotal(it));
+    if(o.kind==='station'&&PILE.includes(o.st)&&!o.top&&!o.plant&&!o.pro&&!upTotal(o)){
+      const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.top&&!it.plant&&!it.pro&&!upTotal(it));
       if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
     }
     const free=([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item;
@@ -683,21 +683,20 @@ function furnPick(p,c,tx,ty){
   if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
     if(tx===LEVER_FRONT[0]&&ty===LEVER_FRONT[1]){say(p,'運転席の前はあけておく');return true}
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0};p.hold=null;rebuildStations();return true;
+    S.map[ty][tx]={t:h.st,item:h.top||null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
   // (in layout anything; otherwise cooking equipment for cooking equipment). Tools on counters are never swapped.
   if(holdsFurn(p)&&h.st!=='table'&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
-    if(c.item){say(p,'上の物をどけてから');return true}
-    // a sink takes its plates (dirty and washed) along
-    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0};
-    S.map[ty][tx]={t:h.st,item:null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0};
+    if(c.item&&!lay){say(p,'上の物をどけてから');return true}
+    // a sink takes its plates (dirty and washed) along; in layout whatever is on a unit moves with it
+    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,top:c.item||null};
+    S.map[ty][tx]={t:h.st,item:h.top||null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0};
     p.hold=old;rebuildStations();return true;
   }
-  // layout: pick up furniture from the truck (a counter only when nothing is on it; a planter takes its crop along)
+  // layout: pick up furniture from the truck; whatever sits on it (tools, plates...) moves along with it, a planter takes its crop
   if(lay&&!h&&FURN.includes(c.t)&&inTruck(tx,ty)){
-    if(c.item){if(c.t==='counter')return false;say(p,'上の物をどけてから');return true}
-    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0};
+    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,top:c.item||null};
     S.map[ty][tx]=blankTile(ty);rebuildStations();return true;
   }
   // outside (layout, or the town stop): equipment and tools can be set down and picked up
@@ -708,7 +707,7 @@ function furnPick(p,c,tx,ty){
       else{p.hold=it;c.item=null;delete it.n}
       return true}
     if(h&&!it){if(!storable(h)){say(p,'外には置けない');return true}c.item=h;p.hold=null;return true}
-    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.plant&&!it.plant&&!h.pro&&!it.pro&&!upTotal(h)&&!upTotal(it)){it.n=(it.n||1)+1;p.hold=null;return true}
+    if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.top&&!it.top&&!h.plant&&!it.plant&&!h.pro&&!it.pro&&!upTotal(h)&&!upTotal(it)){it.n=(it.n||1)+1;p.hold=null;return true}
   }
   if(holdsFurn(p)){say(p,h.st==='table'?'テーブルは外の広場に置く':'トラックの床に置く');return true}
   return false;
@@ -2084,7 +2083,8 @@ function drawItem(it,cx,cy,s,inHand){
     ctx.save();ctx.translate(cx-s/2,cy-s/2);ctx.scale(s/T,s/T);
     drawTile({t:it.st,pro:it.pro,ups:it.ups,item:null,prog:0,burn:0,plant:it.plant||null},0,0);
     ctx.restore();
-    if(it.st==='counter'&&s>=T*0.8)text('台',cx,cy,13,'#8a7550',800);
+    if(it.top)drawItem(it.top,cx,cy-s*0.22,s*0.62);
+    else if(it.st==='counter'&&s>=T*0.8)text('台',cx,cy,13,'#8a7550',800);
     if(it.n>1){ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.65)';ctx.textAlign='center';ctx.strokeText('×'+it.n,cx+s*0.28,cy+s*0.36);text('×'+it.n,cx+s*0.28,cy+s*0.36,14,'#fff',800)}
     return;
   }
@@ -4415,7 +4415,7 @@ function encItem(it){
     case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id)),encUps(it)];
     case 'power':return [6,UPK.indexOf(it.up)];
     case 'seed':return [4,ING_K.indexOf(it.id)];
-    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant),encUps(it)];
+    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant),encUps(it),it.top?encItem(it.top):0];
   }
   return 0;
 }
@@ -4628,7 +4628,7 @@ function decItem(a){
     case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean),ups:decUps(a[3])};
     case 6:return UPK[a[1]]?{kind:'power',up:UPK[a[1]]}:null;
     case 4:return {kind:'seed',id:ING_K[a[1]]||'lettuce'};
-    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4]),ups:decUps(a[5])};if(a[3])o.n=+a[3];return o}
+    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4]),ups:decUps(a[5])};if(a[3])o.n=+a[3];if(a[6])o.top=decItem(a[6]);return o}
   }
   return null;
 }

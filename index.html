@@ -315,16 +315,26 @@ const RECIPES={
   bakedapple:{n:'焼きりんご',e:'🥧',ings:['apple'],price:14},
   curry:{n:'カレーライス',e:'🍛',ings:['rice','meat','carrot'],price:34},
   yakiguri:{n:'焼きぐり',e:'🌰',ings:['chestnut'],price:14},
+  // each town's third dish: on the menu from the 3rd town of the trip on
+  kaisendon:{n:'海鮮丼',e:'🍣',ings:['rice','fish','shrimp'],price:36},
+  kinokocheese:{n:'キノコのチーズ焼き',e:'🫕',ings:['mushroom','cheese'],price:22},
+  cheeseburger:{n:'チーズバーガー',e:'🍔',ings:['bread','meat','cheese'],price:28},
+  omurice:{n:'オムライス',e:'🍙',ings:['rice','egg','tomato'],price:30},
+  salad:{n:'サラダ',e:'🥗',ings:['lettuce','tomato'],price:14},
+  applepie:{n:'アップルパイ',e:'🥮',ings:['batter','apple'],price:30},
+  kinokogohan:{n:'キノコご飯',e:'🍚',ings:['rice','mushroom'],price:22},
 };
 // sell price (pay) and crowd (rate) are rolled each time a town is offered: see showChoose
+const EXTRA_FROM=2;   // from the 3rd town of the trip, each town's menu has its extra dish too
+const townMenuOn=(k,withExtra)=>withExtra&&TOWNS[k].extra?TOWNS[k].menu.concat([TOWNS[k].extra]):TOWNS[k].menu.slice();
 const TOWNS={
-  port:{n:'港町',e:'⚓',menu:['fishset','soup'],ground:'#cdb886',deco:'#4f97b8'},
-  forest:{n:'森の町',e:'🌲',menu:['risotto','applejuice'],ground:'#6e9450',deco:'#3f6b35'},
-  ranch:{n:'牧場の町',e:'🐄',menu:['omelet','smilk'],ground:'#9db866',deco:'#d9e6b0'},
-  busy:{n:'駅前の町',e:'🚉',menu:['burger','fries'],lively:true,ground:'#aaa59a',deco:'#6d6a63'},
-  farm:{n:'畑の町',e:'🌾',menu:['sandwich','fries'],ground:'#c39f68',deco:'#8a6a3c'},
-  sweets:{n:'スイーツの町',e:'🍰',menu:['shortcake','bakedapple'],ground:'#e3c3b8',deco:'#c77f9a'},
-  mountain:{n:'山の町',e:'⛰️',menu:['curry','yakiguri'],ground:'#8fa36a',deco:'#5e6f45'},
+  port:{n:'港町',e:'⚓',menu:['fishset','soup'],extra:'kaisendon',ground:'#cdb886',deco:'#4f97b8'},
+  forest:{n:'森の町',e:'🌲',menu:['risotto','applejuice'],extra:'kinokocheese',ground:'#6e9450',deco:'#3f6b35'},
+  ranch:{n:'牧場の町',e:'🐄',menu:['omelet','smilk'],extra:'cheeseburger',ground:'#9db866',deco:'#d9e6b0'},
+  busy:{n:'駅前の町',e:'🚉',menu:['burger','fries'],extra:'omurice',lively:true,ground:'#aaa59a',deco:'#6d6a63'},
+  farm:{n:'畑の町',e:'🌾',menu:['sandwich','fries'],extra:'salad',ground:'#c39f68',deco:'#8a6a3c'},
+  sweets:{n:'スイーツの町',e:'🍰',menu:['shortcake','bakedapple'],extra:'applepie',ground:'#e3c3b8',deco:'#c77f9a'},
+  mountain:{n:'山の町',e:'⛰️',menu:['curry','yakiguri'],extra:'kinokogohan',ground:'#8fa36a',deco:'#5e6f45'},
 };
 const pack=id=>({type:'pack',id,qty:3,price:Math.max(3,ING[id].price+rnd(4)-2)});
 const seedItem=id=>({type:'seed',id,qty:2,price:ING[id].seed+rnd(2)});
@@ -1701,7 +1711,7 @@ function showChoose(){
     // the station town is busy by nature: it never rolls a quiet mood
     const roll=TOWNS[k].lively?[1.1,1.2,1.2,1.3,1.3]:[0.9,1,1,1.1,1.1,1.2,1.2,1.3];
     const pay=roll[rnd(roll.length)];
-    return Object.assign({},TOWNS[k],{id:k,pay,rate:crowdOf(pay)})});
+    return Object.assign({},TOWNS[k],{id:k,pay,rate:crowdOf(pay),menu:townMenuOn(k,S.stop>=EXTRA_FROM)})});
   const cards=chooseOpts.map((t,i)=>`<button class="ovbtn town hold" data-act="town" data-v="${i}">
       <span class="tn">${t.e} ${t.n}</span>
       <span class="menu">${t.menu.map(r=>dishOv(r)+' '+RECIPES[r].n).join('<br>')}</span>
@@ -4133,7 +4143,7 @@ function sendSnap(){
   const mk=k=>k==='fridge'?1:k==='seedbox'?2:0;
   const d={q:++NET.seq,ph:S.phase,v:S.view,sb:S.sub,tm:Math.round(S.timer*10),m:S.money,h:S.hearts,st:S.stop,np:S.np,
     ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,o:ov.hidden?0:NET.ovId,
-    tw:S.town?[S.town.id,Math.round(S.town.pay*100)]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100)]:0,
+    tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
     sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
@@ -4274,7 +4284,7 @@ function applySnap(d){
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;
   S.waitN=Math.max(0,Math.min(3,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
-  const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100}):null;
+  const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>2)}):null;
   S.town=town(d.tw);S.next=town(d.nx);
   const u=Array.isArray(d.up)?d.up:[];
   S.up={cook:n(u[0])||1,chop:n(u[1])||1,blend:n(u[2])||1,burn:n(u[3]),gatherSpd:n(u[4])||1,canCap:n(u[5])||3,basketCap:n(u[6])||4,pay:n(u[7])||1,tip:n(u[8])||1};

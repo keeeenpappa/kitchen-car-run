@@ -810,7 +810,7 @@ function solid(x,y){
     case 'floor':case 'warp':return false;
     case 'counter':return c.pro!==3;   /* ★透過カウンター can be walked over */
     case 'door':return !out;
-    case 'ground':return !out||y>=GH-1||x<=0||(x>=GW-1&&y!==QY+1)||!!c.item;   /* the right edge is open just below the line, to reach its last spot */
+    case 'ground':return !out||y>=GH-1||!!c.item;   /* the left and right edge columns are on screen: open; only the half-shown bottom row is closed */
     case 'gather':if(!out)return true;return !lay;
     case 'market':return !lay;
     case 'queue':if(!out)return true;if(lay)return false;return !!waiting()[c.slot]; // only the spot where a customer stands blocks

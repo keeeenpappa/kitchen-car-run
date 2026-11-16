@@ -63,10 +63,29 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .skl-ic{width:30px;height:30px;margin:-6px 0}
 .skl-btn .skl-d{font-weight:400;font-size:.88em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rchefs{display:flex;justify-content:center;gap:4px;margin:-4px 0 -10px}.rch{width:96px;height:96px;background-size:contain;background-repeat:no-repeat;background-position:center}
-.skgrid{display:flex;flex-direction:column;gap:6px}.skrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.skn{min-width:8.5em;font-weight:800}
-.skc{display:inline-flex;flex-direction:column;align-items:flex-start;font-size:13px;padding:5px 10px;line-height:1.25}.skc small{font-size:10.5px;opacity:.8}.skc.on{border-color:#ffd84a;background:rgba(255,216,74,.18)}
-.skc.no{border:2px dashed rgba(157,179,180,.45);border-radius:10px;color:rgba(200,215,215,.6);min-width:7em;justify-content:center;align-items:center;padding:8px 10px}
-.gres{display:flex;gap:14px;align-items:center;background:rgba(255,216,74,.10);border:2px solid #ffd84a;border-radius:12px;padding:8px 14px}.gres img{width:110px;height:110px}
+.gcount{font-size:18px}.gchars{display:flex;flex-wrap:wrap;gap:6px}
+.gch{display:flex;flex-direction:column;align-items:center;padding:4px;width:58px;font-size:22px;line-height:1}.gch img{width:44px;height:44px}.gch small{font-size:10px;height:12px;color:#ffe08a}
+.dress{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.dress>img{width:200px;height:200px;background:rgba(255,255,255,.06);border-radius:16px}
+.dlist{display:flex;flex-direction:column;gap:8px;flex:1;min-width:12em}
+.dsk{display:flex;flex-direction:column;align-items:flex-start;font-size:15px;padding:8px 12px;line-height:1.3;text-align:left}.dsk small{font-size:11px;opacity:.8}.dsk.on{border-color:#ffd84a;background:rgba(255,216,74,.18)}
+.dsk.no{border:2px dashed rgba(157,179,180,.45);border-radius:10px;color:rgba(200,215,215,.6)}
+/* gacha pull: its own dark screen in front, capsule → burst → prize */
+#ov:has(.gbox){background:rgba(6,10,14,.92)}
+.box.gbox{border-color:#ffd84a;align-items:center;text-align:center;background:radial-gradient(circle at 50% 40%,#2c4652,#14222a);min-height:380px;justify-content:space-between}
+.gstage{position:relative;width:100%;height:300px}
+.gcap{position:absolute;left:50%;top:40%;width:110px;height:110px;margin:-55px 0 0 -55px;animation:gdrop .5s cubic-bezier(.3,1.6,.6,1) both,gshake .9s .5s ease-in-out both,gfade .2s 1.4s forwards}
+.gcap span{position:absolute;left:0;width:110px;height:55px}.gtop{top:0;border-radius:55px 55px 0 0;background:var(--c);box-shadow:inset -8px 6px 0 rgba(255,255,255,.35)}
+.gbot{bottom:0;border-radius:0 0 55px 55px;background:#f4eedf;border-top:4px solid rgba(0,0,0,.15)}
+.gburst{position:absolute;left:50%;top:40%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:radial-gradient(circle,#fff,#ffe27a 40%,rgba(255,226,122,0) 70%);opacity:0;animation:gburst .7s 1.35s ease-out forwards}
+.gprize{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transform:scale(.4);animation:gpop .5s 1.55s cubic-bezier(.3,1.5,.6,1) forwards}
+.gprize img{width:170px;height:170px}.gprize b{font-size:22px;color:#ffe08a}.gprize span{font-size:13px}
+.gok{opacity:0;animation:gin .3s 1.9s forwards}
+@keyframes gdrop{from{transform:translateY(-260px)}to{transform:none}}
+@keyframes gshake{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-9deg)}80%{transform:rotate(6deg)}}
+@keyframes gfade{to{opacity:0;transform:scale(1.4)}}
+@keyframes gburst{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(30)}}
+@keyframes gpop{to{opacity:1;transform:none}}
+@keyframes gin{to{opacity:1}}
 .ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
 #readyBtn[hidden]{display:none}
@@ -1616,7 +1635,10 @@ function doOv(a,v){
   if(a==='ctypes'){paintOv(ctypesHtml());play('confirm');return}
   if(a==='gacha'&&!S){paintOv(gachaHtml());play('confirm');return}
   if(a==='gpull'&&!S){gachaPull();return}
-  if(a==='skeq'&&!S){skinToggle(String(v));return}
+  if(a==='skchar'&&!S){dressOpen(String(v));return}
+  if(a==='dtog'&&!S){dressToggle(String(v));return}
+  if(a==='dok'&&!S){dressDone(true);return}
+  if(a==='dback'&&!S){dressDone(false);return}
   if(a==='pback'){paintOv(pauseHtml());if(NET.role==='guest')localizeOv();play('confirm');return}
   if(a==='skl'){cycleSkill(+v||0);const r=document.getElementById('skillRow');if(r){r.innerHTML=skillRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='skl'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
@@ -3339,42 +3361,58 @@ function drawSkinPart(g,k,dir){
   g.save();g.font=`${at[2]}px ${EMO}`;g.textAlign='center';g.textBaseline='middle';g.fillStyle='#000';g.fillText(S0.e,at[0],at[1]);g.restore();
 }
 // ---------- gacha screen (from the title) ----------
-function skinPreview(k,size){   // the chef wearing this skin, as a data URL for the overlay
+function skinPreview(sk,skins,size){   // a chef wearing these skins, as a data URL for the overlay
   if(!CHEF.ready)return '';
-  const S0=SKINS[k],an=artAn(SKILL_ANIMAL[S0.sk]),c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');
-  const L=chefLayers(an,PCOL[0],'front',[k]);
+  const an=artAn(SKILL_ANIMAL[sk]),c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');
+  const L=chefLayers(an,PCOL[0],'front',skins);
   g.drawImage(L.under,0,0,size,size);const shoe=chefTint('shoe_front_tint',PCOL[0]);for(const s of [-1,1])g.drawImage(shoe,s*12*size/256,0,size,size);g.drawImage(L.over,0,0,size,size);
   return c.toDataURL();
 }
-function gachaHtml(res){
-  const own=new Set(SV.own);
-  const rows=SKILL_K.map(sk=>{const K=SKILLS[sk],ks=SKIN_K.filter(k=>SKINS[k].sk===sk);
-    return `<div class="skrow"><span class="skn">${K.e} ${K.n}</span>${ks.map(k=>{const S0=SKINS[k];
-      if(!own.has(k))return `<span class="skc no">？</span>`;
-      const on=(SV.eq[sk]||{})[S0.slot]===k;
-      return `<button class="ovbtn skc${on?' on':''}" data-act="skeq" data-v="${k}">${S0.e} ${S0.n}<small>${SLOTN[S0.slot]}${on?'・つけている':'・外している'}</small></button>`}).join('')}</div>`}).join('');
-  const R=res&&SKINS[res.k];
-  const rh=R?`<div class="gres">${res.img?`<img src="${res.img}" alt="">`:''}<div><b>${R.e} ${R.n}</b><br><span class="mut">${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span><br>${res.dup?`<span class="ng">もう持っている → かけら +1${res.conv?'（かけら4つでチケット1枚になった！）':''}</span>`:'<span class="perf">NEW!</span>'}</div></div>`:'';
+const chefIcon=sk=>{const an=artAn(SKILL_ANIMAL[sk]);const u=typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[an+'_icon'];return u?`<img src="${u}" alt="">`:SKILLS[sk].e};
+function gachaHtml(){
+  const chars=SKILL_K.map(sk=>{const n=SKIN_K.filter(k=>SKINS[k].sk===sk&&SV.own.includes(k)).length;
+    return `<button class="ovbtn gch" data-act="skchar" data-v="${sk}">${chefIcon(sk)}<small>${n?n+'/2':''}</small></button>`}).join('');
   return `<div class="box big"><h2>🎫 ガチャ</h2>
-    <p>チケット <b>${SV.t}</b>枚　／　かけら <b>${SV.sh}</b>/${SHARDS_PER}<span class="mut">（同じスキンが出るとかけらに。4つでチケット1枚）</span></p>
-    ${rh}
+    <p class="gcount">チケット <b>${SV.t}</b>枚　　かけら <b>${SV.sh}</b>/${SHARDS_PER}</p>
+    <p class="mut">持っているスキンがまた出ると、かけらになります（どのスキンでも共通）。かけら${SHARDS_PER}つでチケット1枚。</p>
     <div class="row"><button class="ovbtn${SV.t?' autofocus':''}" data-act="gpull">${SV.t?'ガチャを回す（チケット1枚）':'チケットがない'}</button><button class="ovbtn" data-act="title">もどる</button></div>
-    <p class="mut">チケットは営業中に、たまにお客さんが置いていきます。手に入れたスキンは押すとつけ外しでき、キャラ選択のときに反映されます（${SV.own.length}/${SKIN_K.length}）。</p>
-    <div class="skgrid">${rows}</div></div>`;
+    <p class="mut">着せ替え：キャラを選んでください（手に入れたスキン ${SV.own.length}/${SKIN_K.length}）</p>
+    <div class="gchars">${chars}</div></div>`;
 }
+// the pull: a capsule drops and shakes, bursts open, and the prize comes out (CSS animation on its own screen)
 function gachaPull(){
   if(SV.t<=0){play('nope');return}
   SV.t--;const k=SKIN_K[rnd(SKIN_K.length)],dup=SV.own.includes(k);let conv=false;
   if(dup){SV.sh++;if(SV.sh>=SHARDS_PER){SV.sh-=SHARDS_PER;SV.t++;conv=true}}
   else{SV.own.push(k);const sk=SKINS[k].sk;SV.eq[sk]=SV.eq[sk]||{};if(!SV.eq[sk][SKINS[k].slot])SV.eq[sk][SKINS[k].slot]=k}
-  saveSV();play(dup?'coin':'record');
-  paintOv(gachaHtml({k,dup,conv,img:skinPreview(k,160)}));
+  saveSV();play('tick');setTimeout(()=>play(dup?'coin':'record'),1500);
+  const R=SKINS[k],col=['#ff7a8a','#7ac8ff','#ffd23a','#8fe08a','#c39bff'][rnd(5)];
+  paintOv(`<div class="box gbox"><div class="gstage">
+      <div class="gcap" style="--c:${col}"><span class="gtop"></span><span class="gbot"></span></div>
+      <div class="gburst"></div>
+      <div class="gprize"><img src="${skinPreview(R.sk,[k],200)}" alt=""><b>${R.e} ${R.n}</b><span>${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span>
+        ${dup?`<span class="ng">もう持っている → かけら +1${conv?'<br>かけら4つでチケット1枚になった！':''}</span>`:'<span class="perf">NEW!</span>'}</div></div>
+    <div class="row gok"><button class="ovbtn autofocus" data-act="gacha">OK</button>${SV.t?'<button class="ovbtn" data-act="gpull">もう1回</button>':''}</div></div>`);
 }
-function skinToggle(k){
-  const S0=SKINS[k];if(!S0||!SV.own.includes(k))return;const e=SV.eq[S0.sk]=SV.eq[S0.sk]||{};
-  if(e[S0.slot]===k)delete e[S0.slot];else e[S0.slot]=k;saveSV();play('confirm');
-  const sc=ov.scrollTop;paintOv(gachaHtml());ov.scrollTop=sc;ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.v===k));markSel();
-  if(NET.room&&NET.role==='guest')NET.room.presence({skn:SV.eq}).catch(()=>{});
+// dressing room for one chef: try skins on, 確定 keeps them, もどる throws the try-on away
+let DRESS=null;
+function dressHtml(){
+  const sk=DRESS.sk,K=SKILLS[sk],ks=SKIN_K.filter(k=>SKINS[k].sk===sk),wear=SLOTS.map(sl=>DRESS.eq[sl]).filter(Boolean);
+  const items=ks.map(k=>{const S0=SKINS[k];if(!SV.own.includes(k))return `<span class="dsk no">？<small>まだ持っていない</small></span>`;
+    const on=DRESS.eq[S0.slot]===k;return `<button class="ovbtn dsk${on?' on':''}" data-act="dtog" data-v="${k}">${S0.e} ${S0.n}<small>${SLOTN[S0.slot]}・${on?'つけている':'外している'}</small></button>`}).join('');
+  return `<div class="box big"><h2>${K.e} ${K.n}の着せ替え</h2>
+    <div class="dress"><img src="${skinPreview(sk,wear,220)}" alt=""><div class="dlist">${items}</div></div>
+    <div class="row"><button class="ovbtn autofocus" data-act="dok">確定</button><button class="ovbtn" data-act="dback">もどる</button></div></div>`;
+}
+function dressOpen(sk){if(!SKILLS[sk])return;DRESS={sk,eq:Object.assign({},SV.eq[sk]||{})};paintOv(dressHtml());play('confirm')}
+function dressToggle(k){
+  const S0=SKINS[k];if(!DRESS||!S0||S0.sk!==DRESS.sk||!SV.own.includes(k))return;
+  if(DRESS.eq[S0.slot]===k)delete DRESS.eq[S0.slot];else DRESS.eq[S0.slot]=k;play('tick');
+  paintOv(dressHtml());ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.v===k));markSel();
+}
+function dressDone(keep){
+  if(keep&&DRESS){SV.eq[DRESS.sk]=DRESS.eq;saveSV();if(NET.room&&NET.role==='guest')NET.room.presence({skn:SV.eq}).catch(()=>{})}
+  DRESS=null;paintOv(gachaHtml());play('confirm');
 }
 function drawSelect(){
   const W=GW*T,H=VH*T;

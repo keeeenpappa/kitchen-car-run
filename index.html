@@ -62,6 +62,10 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .skl-btn .skl-n{white-space:nowrap;display:flex;align-items:center;gap:6px}
 .skl-ic{width:30px;height:30px;margin:-6px 0}
 .skl-btn .skl-d{font-weight:400;font-size:.88em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skgrid{display:flex;flex-direction:column;gap:6px}.skrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.skn{min-width:8.5em;font-weight:800}
+.skc{display:inline-flex;flex-direction:column;align-items:flex-start;font-size:13px;padding:5px 10px;line-height:1.25}.skc small{font-size:10.5px;opacity:.8}.skc.on{border-color:#ffd84a;background:rgba(255,216,74,.18)}
+.skc.no{border:2px dashed rgba(157,179,180,.45);border-radius:10px;color:rgba(200,215,215,.6);min-width:7em;justify-content:center;align-items:center;padding:8px 10px}
+.gres{display:flex;gap:14px;align-items:center;background:rgba(255,216,74,.10);border:2px solid #ffd84a;border-radius:12px;padding:8px 14px}.gres img{width:110px;height:110px}
 .ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
 #readyBtn[hidden]{display:none}
@@ -469,6 +473,7 @@ function newRun(np,mode){
   {// the extinguisher: the first free counter a chef can reach (a walkable floor tile next to it)
    const reach=(x,y)=>DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='floor'});
    let done=false;for(const y of [6,2,3,4,5])for(let x=2;x<=15&&!done;x++){const t=S.map[y][x];if(t.t==='counter'&&!t.item&&reach(x,y)){t.item={kind:'ext'};done=true}}}
+  planTicket();
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
@@ -1270,8 +1275,9 @@ function serve(p,tx,ty,c){
   if(CT.reg&&S.reg&&S.reg.st==='cand')S.reg.st='on';
   S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;
   if(c.got)c.got[k]=true;
-  if(CT.takeout){startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
+  if(CT.takeout){ticketCheck(tx+.5,ty);startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
   // they start eating once everything they ordered is on the table
+  ticketCheck(tx+.5,ty);
   if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1);if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5)}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');
 }
@@ -1529,10 +1535,12 @@ function resultScreen(title,lead,clear){
   if(rec)setTimeout(()=>sfx('record'),900);
 }
 function gameOver(){
+  ticketGameEnd();
   S.phase='over';sfx('over');
   resultScreen('評判がなくなった…',`${S.stop+1}つ目の町でお店をたたむことになりました。`,false);
 }
 function showEnd(){
+  ticketGameEnd();
   S.phase='end';sfx('finish');
   resultScreen('旅の終わり',`${STOPS}つの町を回りきりました。`,true);
 }
@@ -1596,6 +1604,9 @@ ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
   if(a==='ctypes'){paintOv(ctypesHtml());play('confirm');return}
+  if(a==='gacha'&&!S){paintOv(gachaHtml());play('confirm');return}
+  if(a==='gpull'&&!S){gachaPull();return}
+  if(a==='skeq'&&!S){skinToggle(String(v));return}
   if(a==='pback'){paintOv(pauseHtml());if(NET.role==='guest')localizeOv();play('confirm');return}
   if(a==='skl'){cycleSkill(+v||0);const r=document.getElementById('skillRow');if(r){r.innerHTML=skillRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='skl'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
@@ -1688,6 +1699,7 @@ function showTitle(){
     <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
     <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
     <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
+    <div class="row"><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button></div>
     ${bestLine()}
     <div id="netTitle">${netTitleHtml()}</div></div>`);
 }
@@ -1925,7 +1937,7 @@ function update(dt){
         c.pat-=c.st==='wait'?dt/WAIT_PAT:dt;   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
-      if(S.timer<=0){S.sub='closing';S.closeT=2;sfx('close');S.toast={text:'営業終了！',t:0,life:2}}
+      if(S.timer<=0){S.sub='closing';S.closeT=2;sfx('close');S.toast={text:'営業終了！',t:0,life:2};ticketCheck(null)}
     }
   }
   if(S.toast){S.toast.t+=dt;if(S.toast.t>S.toast.life)S.toast=null}
@@ -3147,9 +3159,9 @@ function chefTint(key,col){   // a *_tint layer multiplied by the player colour,
   CHEF.cache.set(ck,c);return c;
 }
 // what goes under the shoes (bee wings, a tail seen from the side) and over them (clothes, paws, head, hat), per animal / colour / direction
-function chefLayers(an,col,dir){
-  an=artAn(an);
-  const ck='l|'+an+'|'+col+'|'+dir;let L=CHEF.cache.get(ck);if(L)return L;
+function chefLayers(an,col,dir,sk){
+  an=artAn(an);sk=(sk||[]).filter(k=>SKINS[k]);
+  const ck='l|'+an+'|'+col+'|'+dir+'|'+sk.join(',');let L=CHEF.cache.get(ck);if(L)return L;
   const mk=()=>{const c=document.createElement('canvas');c.width=c.height=CSZ;const g=c.getContext('2d');g.scale(CSZ/256,CSZ/256);return [c,g]};
   const [uc,ug]=mk(),[oc,og]=mk(),I=k=>CHEF.img[k],put=(g,k,dx,dy,flip)=>{const im=I(k);if(!im||!im.naturalWidth)return;
     if(flip){g.save();g.translate(256,0);g.scale(-1,1);g.drawImage(im,-(dx||0),dy||0,256,256);g.restore()}else g.drawImage(im,dx||0,dy||0,256,256)};
@@ -3166,7 +3178,9 @@ function chefLayers(an,col,dir){
         og.drawImage(chefTint('body_side_tint',col),...sl,88,180,32,25);const bi=I('body_side_base');if(bi&&bi.naturalWidth)og.drawImage(bi,...sl,88,180,32,25)}}
     else paws()}
   put(og,an+'_head_'+dir);
-  og.drawImage(chefTint('hat_'+dir+'_tint',col),0,hy,256,256);put(og,'hat_'+dir+'_base',0,hy);
+  const hat=sk.find(k=>SKINS[k].slot==='hat');
+  if(hat)drawSkinPart(og,hat,dir);else{og.drawImage(chefTint('hat_'+dir+'_tint',col),0,hy,256,256);put(og,'hat_'+dir+'_base',0,hy)}
+  for(const k of sk)if(SKINS[k].slot!=='hat')drawSkinPart(og,k,dir);
   L={under:uc,over:oc};CHEF.cache.set(ck,L);return L;
 }
 function drawChefSprite(p,X,Y){
@@ -3176,7 +3190,7 @@ function drawChefSprite(p,X,Y){
   const ph=S.t*14+p.i,bob=mv?Math.abs(Math.sin(ph))*2.6:Math.sin(S.t*3+p.i)*0.7,st=mv?Math.sin(ph)*2.2:0;
   {const sg=ctx.createRadialGradient(X,Y+15,1,X,Y+15,16);sg.addColorStop(0,'rgba(30,20,10,.38)');sg.addColorStop(1,'rgba(30,20,10,0)');
    ctx.fillStyle=sg;ctx.beginPath();ctx.ellipse(X,Y+15,17,6,0,0,7);ctx.fill()}
-  const L=chefLayers(an,col,dir),W=256*CHEF_K,ox=X-128*CHEF_K,oy=Y+16-240*CHEF_K;
+  const L=chefLayers(an,col,dir,skinsOf(p)),W=256*CHEF_K,ox=X-128*CHEF_K,oy=Y+16-240*CHEF_K;
   const img=(c,dx,dy)=>{if(flip){ctx.save();ctx.translate(X,0);ctx.scale(-1,1);ctx.drawImage(c,-W/2+(dx||0),oy+(dy||0),W,W);ctx.restore()}else ctx.drawImage(c,ox+(dx||0),oy+(dy||0),W,W)};
   img(L.under,0,-bob);
   // the two shoes step while walking (the only part drawn every frame on its own)
@@ -3226,14 +3240,126 @@ function wrapText(t,x,y,w,lh,size,col,weight,maxLines){
   let line='',n=0;for(const ch of graphemes(t)){if(ctx.measureText(line+ch).width>w&&line){ctx.fillText(line,x,y+n*lh);line='';if(++n>=(maxLines||9))return}line+=ch}
   if(line)ctx.fillText(line,x,y+n*lh);
 }
-function drawChefBig(an,col,cx,feetY,size,t){   // a large front view for the select screen
+function drawChefBig(an,col,cx,feetY,size,t,sk){   // a large front view for the select screen
   const an0=an;an=artAn(an);
   if(!CHEF.ready){emoji(SKILLS[Object.keys(SKILL_ANIMAL).find(k=>SKILL_ANIMAL[k]===an)||'knife'].e,cx,feetY-size*0.4,size*0.5);return}
-  const L=chefLayers(an,col,'front'),bob=Math.sin(t*3)*size*0.012,ox=cx-size/2,oy=feetY-size*240/256;
+  const L=chefLayers(an,col,'front',sk),bob=Math.sin(t*3)*size*0.012,ox=cx-size/2,oy=feetY-size*240/256;
   ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(cx,feetY-2,size*0.2,size*0.05,0,0,7);ctx.fill();
   ctx.drawImage(L.under,ox,oy-bob,size,size);
   const shoe=chefTint('shoe_front_tint',col);for(const s of [-1,1])ctx.drawImage(shoe,ox+s*12*size/256,oy,size,size);
   ctx.drawImage(L.over,ox,oy-bob,size,size);
+}
+// ---------- skins & gacha tickets (saved on this device) ----------
+// each chef (by skill) has 2 skins; a slot is the hat, around the face, or something worn on the front (the coat keeps the player colour)
+const SKINS={
+  beaver_helmet:{sk:'knife',slot:'hat',n:'工事のヘルメット',e:'⛑️'},  beaver_apron:{sk:'knife',slot:'front',n:'どんぐりのエプロン',e:'🌰'},
+  bee_crown:{sk:'grow',slot:'hat',n:'お花のかんむり',e:'🌼'},       bee_shades:{sk:'grow',slot:'face',n:'ハートのサングラス',e:'💗'},
+  rabbit_cap:{sk:'dash',slot:'hat',n:'にんじんキャップ',e:'🥕'},     rabbit_goggles:{sk:'dash',slot:'face',n:'スポーツゴーグル',e:'🥽'},
+  otter_swim:{sk:'wash',slot:'hat',n:'水泳ぼうし',e:'🏊'},          otter_shell:{sk:'wash',slot:'front',n:'貝がらのエプロン',e:'🐚'},
+  cat_ribbon:{sk:'smile',slot:'hat',n:'大きなリボン',e:'🎀'},        cat_koban:{sk:'smile',slot:'front',n:'小判のエプロン',e:'🪙'},
+  squirrel_acorn:{sk:'forage',slot:'hat',n:'どんぐりぼうし',e:'🌰'},  squirrel_glasses:{sk:'forage',slot:'face',n:'まるメガネ',e:'👓'},
+  fox_travel:{sk:'haggle',slot:'hat',n:'旅人の帽子',e:'🎩'},         fox_monocle:{sk:'haggle',slot:'face',n:'片メガネ',e:'🧐'},
+  gorilla_bandana:{sk:'tray',slot:'hat',n:'バンダナ',e:'🧣'},        gorilla_bowtie:{sk:'tray',slot:'front',n:'蝶ネクタイ',e:'🎀'},
+  dragon_helm:{sk:'fire',slot:'hat',n:'騎士のかぶと',e:'⚔️'},        dragon_goggles:{sk:'fire',slot:'face',n:'ほのおのゴーグル',e:'🔥'},
+  horse_cowboy:{sk:'boost',slot:'hat',n:'カウボーイハット',e:'🤠'},   horse_scarf:{sk:'boost',slot:'front',n:'旅のスカーフ',e:'🧣'},
+  elephant_fire:{sk:'nofire',slot:'hat',n:'消防ぼうし',e:'🚒'},     elephant_dots:{sk:'nofire',slot:'front',n:'水玉エプロン',e:'💧'},
+  lion_ribbon:{sk:'combo',slot:'hat',n:'たてがみリボン',e:'🎀'},     lion_shades:{sk:'combo',slot:'face',n:'サングラス',e:'🕶️'},
+  meerkat_explorer:{sk:'herd',slot:'hat',n:'探検ぼうし',e:'🧭'},     meerkat_binoculars:{sk:'herd',slot:'front',n:'双眼鏡',e:'🔭'},
+  octopus_sailor:{sk:'tidy',slot:'hat',n:'セーラーぼうし',e:'⚓'},   octopus_anchor:{sk:'tidy',slot:'front',n:'いかりのエプロン',e:'🦑'},
+};
+const SKIN_K=Object.keys(SKINS), SLOTS=['hat','face','front'], SLOTN={hat:'帽子',face:'顔まわり',front:'体の前'};
+const TICKET_P=0.5, PITY=3, SHARDS_PER=4;
+let SV={t:0,sh:0,own:[],eq:{},dry:0};
+try{const v=JSON.parse(localStorage.getItem('kcr-save')||'null');if(v&&typeof v==='object'){
+  SV.t=Math.max(0,+v.t||0);SV.sh=Math.max(0,+v.sh||0);SV.dry=Math.max(0,+v.dry||0);
+  SV.own=Array.isArray(v.own)?v.own.filter(k=>SKINS[k]):[];
+  if(v.eq&&typeof v.eq==='object')for(const sk in v.eq)if(SKILLS[sk]){SV.eq[sk]={};for(const sl of SLOTS){const k=v.eq[sk]&&v.eq[sk][sl];if(SKINS[k]&&SKINS[k].sk===sk&&SKINS[k].slot===sl&&SV.own.includes(k))SV.eq[sk][sl]=k}}}}catch(_){}
+const saveSV=()=>{try{localStorage.setItem('kcr-save',JSON.stringify(SV))}catch(_){}};
+// skins worn by a chef with skill sk, from an equip map (only real, matching ids)
+const skinList=(eq,sk)=>{const e=eq&&eq[sk];if(!e||typeof e!=='object')return [];return SLOTS.map(sl=>e[sl]).filter(k=>SKINS[k]&&SKINS[k].sk===sk)};
+// what a player wears: this device's own set for local players, the guest's set (from its presence) for remote ones, the host's word on a guest
+function skinsOf(p){
+  if(!p)return [];
+  if(NET.role==='guest')return Array.isArray(p.skn)?p.skn.filter(k=>SKINS[k]&&SKINS[k].sk===p.skill):[];
+  if(NET.role==='host'&&p.i>0)return skinList(p.rskn,p.skill);
+  return skinList(SV.eq,p.skill);
+}
+// a ticket: decided when the run starts (about every other game; never more than PITY games in a row without one).
+// It drops at a random moment of one town's service, next to the customer just served (or a table if nobody is).
+function planTicket(){
+  S.tkGot=false;S.tkPlan=null;
+  if(NET.role==='guest')return;
+  if(SV.dry>=PITY||Math.random()<TICKET_P)S.tkPlan={stop:rnd(STOPS),at:0.2+Math.random()*0.6};
+}
+function ticketCheck(x,y){
+  const P=S.tkPlan;if(!P||S.tkGot||S.stop!==P.stop||!(S.sub==='service'||(x==null&&S.sub==='closing')))return;
+  if(x!=null&&S.timer>(1-P.at)*Math.max(60,SERVICE))return;   // not yet (x==null: the service is ending, drop it now)
+  S.tkGot=true;S.tkSeq=(S.tkSeq||0)+1;SV.t++;SV.dry=0;saveSV();
+  if(x==null){const tb=tablesList();const t=tb[rnd(tb.length)];x=t[0]+.5;y=t[1]}
+  S.tkPop={x,y,t:0};sfx('mystery');S.toast={text:'🎫 ガチャチケットを手に入れた！',t:0,life:3};
+}
+function ticketGameEnd(){if(NET.role==='guest'||!S||S.tkEnded)return;S.tkEnded=true;if(!S.tkGot){SV.dry++;saveSV()}}
+// the ticket floats up from the table and shines
+function drawTicketPop(){
+  const P=S.tkPop;if(!P)return;P.t+=1/60;if(P.t>2.6){S.tkPop=null;return}
+  const k=Math.min(1,P.t/0.35),x=P.x*T,y=P.y*T-T*0.6-Math.min(P.t,1.2)*T*0.5,al=P.t<2?1:1-(P.t-2)/0.6,sc=0.6+0.5*k+0.06*Math.sin(P.t*10);
+  ctx.save();ctx.globalAlpha=Math.max(0,al);ctx.translate(x,y);ctx.scale(sc,sc);ctx.rotate(-0.12);
+  const g=ctx.createRadialGradient(0,0,4,0,0,46);g.addColorStop(0,'rgba(255,240,150,.8)');g.addColorStop(1,'rgba(255,240,150,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,46,0,7);ctx.fill();
+  drawTicketShape(0,0,1);ctx.restore();
+}
+function drawTicketShape(x,y,s){
+  const im=fimg('ticket');if(im){const w=64*s;ctx.drawImage(im,x-w/2,y-w/2,w,w);return}
+  const w=54*s,h=30*s;ctx.save();ctx.translate(x,y);
+  ctx.fillStyle='#ff8a5c';ctx.beginPath();ctx.roundRect(-w/2,-h/2,w,h,6*s);ctx.fill();
+  ctx.fillStyle='#fff3d6';for(const sx of [-1,1]){ctx.beginPath();ctx.arc(sx*w/2,0,5*s,0,7);ctx.fill()}
+  ctx.strokeStyle='#fff3d6';ctx.lineWidth=2*s;ctx.setLineDash([3*s,3*s]);ctx.beginPath();ctx.moveTo(w*0.22,-h/2+3*s);ctx.lineTo(w*0.22,h/2-3*s);ctx.stroke();ctx.setLineDash([]);
+  text('ガチャ',-w*0.12,0,10*s,'#fff',900);ctx.restore();
+}
+// skin pictures: art skins/{id}_{front|side|back}.png once delivered; until then an emoji stands in at the slot
+const SKIN_AT={hat:{front:[128,40,78],side:[128,40,72],back:[128,40,78]},face:{front:[128,120,56],side:[164,118,42]},front:{front:[128,196,40],side:[146,196,32]}};
+function drawSkinPart(g,k,dir){
+  const im=CHEF.img['skin_'+k+'_'+dir];if(im&&im.naturalWidth){g.drawImage(im,0,0,256,256);return}
+  if(CHEF.img['skin_'+k+'_front'])return;   // art delivered: nothing in a direction it does not show
+  const S0=SKINS[k],at=SKIN_AT[S0.slot][dir];if(!at)return;
+  g.save();g.font=`${at[2]}px ${EMO}`;g.textAlign='center';g.textBaseline='middle';g.fillStyle='#000';g.fillText(S0.e,at[0],at[1]);g.restore();
+}
+// ---------- gacha screen (from the title) ----------
+function skinPreview(k,size){   // the chef wearing this skin, as a data URL for the overlay
+  if(!CHEF.ready)return '';
+  const S0=SKINS[k],an=artAn(SKILL_ANIMAL[S0.sk]),c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');
+  const L=chefLayers(an,PCOL[0],'front',[k]);
+  g.drawImage(L.under,0,0,size,size);const shoe=chefTint('shoe_front_tint',PCOL[0]);for(const s of [-1,1])g.drawImage(shoe,s*12*size/256,0,size,size);g.drawImage(L.over,0,0,size,size);
+  return c.toDataURL();
+}
+function gachaHtml(res){
+  const own=new Set(SV.own);
+  const rows=SKILL_K.map(sk=>{const K=SKILLS[sk],ks=SKIN_K.filter(k=>SKINS[k].sk===sk);
+    return `<div class="skrow"><span class="skn">${K.e} ${K.n}</span>${ks.map(k=>{const S0=SKINS[k];
+      if(!own.has(k))return `<span class="skc no">？</span>`;
+      const on=(SV.eq[sk]||{})[S0.slot]===k;
+      return `<button class="ovbtn skc${on?' on':''}" data-act="skeq" data-v="${k}">${S0.e} ${S0.n}<small>${SLOTN[S0.slot]}${on?'・つけている':'・外している'}</small></button>`}).join('')}</div>`}).join('');
+  const R=res&&SKINS[res.k];
+  const rh=R?`<div class="gres">${res.img?`<img src="${res.img}" alt="">`:''}<div><b>${R.e} ${R.n}</b><br><span class="mut">${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span><br>${res.dup?`<span class="ng">もう持っている → かけら +1${res.conv?'（かけら4つでチケット1枚になった！）':''}</span>`:'<span class="perf">NEW!</span>'}</div></div>`:'';
+  return `<div class="box big"><h2>🎫 ガチャ</h2>
+    <p>チケット <b>${SV.t}</b>枚　／　かけら <b>${SV.sh}</b>/${SHARDS_PER}<span class="mut">（同じスキンが出るとかけらに。4つでチケット1枚）</span></p>
+    ${rh}
+    <div class="row"><button class="ovbtn${SV.t?' autofocus':''}" data-act="gpull">${SV.t?'ガチャを回す（チケット1枚）':'チケットがない'}</button><button class="ovbtn" data-act="title">もどる</button></div>
+    <p class="mut">チケットは営業中に、たまにお客さんが置いていきます。手に入れたスキンは押すとつけ外しでき、キャラ選択のときに反映されます（${SV.own.length}/${SKIN_K.length}）。</p>
+    <div class="skgrid">${rows}</div></div>`;
+}
+function gachaPull(){
+  if(SV.t<=0){play('nope');return}
+  SV.t--;const k=SKIN_K[rnd(SKIN_K.length)],dup=SV.own.includes(k);let conv=false;
+  if(dup){SV.sh++;if(SV.sh>=SHARDS_PER){SV.sh-=SHARDS_PER;SV.t++;conv=true}}
+  else{SV.own.push(k);const sk=SKINS[k].sk;SV.eq[sk]=SV.eq[sk]||{};if(!SV.eq[sk][SKINS[k].slot])SV.eq[sk][SKINS[k].slot]=k}
+  saveSV();play(dup?'coin':'record');
+  paintOv(gachaHtml({k,dup,conv,img:skinPreview(k,160)}));
+}
+function skinToggle(k){
+  const S0=SKINS[k];if(!S0||!SV.own.includes(k))return;const e=SV.eq[S0.sk]=SV.eq[S0.sk]||{};
+  if(e[S0.slot]===k)delete e[S0.slot];else e[S0.slot]=k;saveSV();play('confirm');
+  const sc=ov.scrollTop;paintOv(gachaHtml());ov.scrollTop=sc;ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.v===k));markSel();
+  if(NET.room&&NET.role==='guest')NET.room.presence({skn:SV.eq}).catch(()=>{});
 }
 function drawSelect(){
   const W=GW*T,H=VH*T;
@@ -3260,7 +3386,7 @@ function drawSelect(){
     ctx.fillStyle=PCOL[i];rr(x,py,pw,28,[16,16,0,0]);ctx.fill();
     const me=NET.role!=='off'&&NET.mySlot===i;text('P'+(i+1)+(me?'　あなた':''),x+14,py+14,14,'#fff',800,'left');
     text(ok?'OK!':'えらび中…',x+pw-14,py+14,13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
-    drawChefBig(an,PCOL[i],x+70,py+176,150,S.t+i);
+    drawChefBig(an,PCOL[i],x+70,py+176,150,S.t+i,skinsOf(p));
     text(K.e+' '+K.n,x+136,py+52,17,'#fff',800,'left');
     wrapText(K.d,x+136,py+80,pw-148,19,12.5,'#d8e6e7',600,5);
     text(selSkillLine(K),x+136,py+ph-26,11.5,'#ffe08a',700,'left');
@@ -3633,6 +3759,7 @@ function drawWorld(arr){
   drawCab(false);
   drawFires();
   drawPlayers();
+  drawTicketPop();
   drawCab(true);cabSparkle();
   ctx.restore();
   drawMenus();
@@ -4099,6 +4226,7 @@ function hostFrame(dt){
     const i=NET.slots[p.peer]; if(!i)continue;
     const pr=p.presence||{};
     if(Array.isArray(pr.in))NET.inputs[i]=pr.in;
+    if(S&&S.players[i])S.players[i].rskn=pr.skn&&typeof pr.skn==='object'?pr.skn:null;
     if(Array.isArray(pr.oc)&&pr.oc[0]!==NET.lastOc[p.peer]){NET.lastOc[p.peer]=pr.oc[0];guestAction(String(pr.oc[1]),pr.oc[2],i)}
   }
   // presses made while a screen was up are dropped
@@ -4155,11 +4283,12 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k))]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an)]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100),f.ic||'']),
+    tk:S.tkSeq||0,tp:S.tkPop?[Math.round(S.tkPop.x*100),Math.round(S.tkPop.y*100)]:0,
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
     sc:S.phase==='select'?Math.round((S.selT||0)*10):-1,sh2:S.phase==='select'?Math.round((S.selHold||0)*100):0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
@@ -4183,7 +4312,7 @@ async function joinRoom(code){
     if(NET.role!=='guest'){room.leave().catch(()=>{});return}
     NET.room=room;
     room.on('ov',onOvMsg,()=>{});
-    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null],uid:myUid(),skill:PSKILL[0]}).catch(()=>{});
+    room.presence({g:1,in:[0,0,0,0,0],oc:[0,'',null],uid:myUid(),skill:PSKILL[0],skn:SV.eq}).catch(()=>{});
     if(NET.localOv==='conn')guestLocalOv('wait');
   }catch(e){if(NET.role!=='guest')return;leaveOnline();NET.err='部屋 '+code+' が見つかりませんでした。コードを確かめてください。';showTitle()}
 }
@@ -4309,13 +4438,16 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null,skn:Array.isArray(a[19])?a[19].slice(0,3).map(x=>SKIN_K[n(x)]).filter(Boolean):[]});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])]}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100,ic:/^status_[a-z_]{1,20}$/.test(a[5])?a[5]:''}));
+  // a ticket dropped on the host: everyone in the room gets one
+  {const tk=n(d.tk);if(NET.tkSeen==null||tk<NET.tkSeen)NET.tkSeen=tk;else if(tk>NET.tkSeen){SV.t+=tk-NET.tkSeen;NET.tkSeen=tk;saveSV();
+    if(Array.isArray(d.tp))S.tkPop={x:n(d.tp[0])/100,y:n(d.tp[1])/100,t:0};play('mystery')}}
   S.toast=Array.isArray(d.to)?{text:String(d.to[0]||''),t:n(d.to[1])/10,life:n(d.to[2])/10}:null;
   // the host's sound events since the last snapshot
   const fresh=AU.fxSeen>0;

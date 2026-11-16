@@ -113,6 +113,7 @@ body.touch #pauseBtn{display:none}
 .town .ok{color:var(--good)} .town .ng{color:var(--bad)} .town .sub{color:var(--muted)}
 .town .pay{color:var(--truck)}
 .ovbtn.dim{opacity:.45}
+.dsk img.skp{width:2.2em;height:2.2em;vertical-align:middle}
 .tn img.upic,b img.upic{width:1.3em;height:1.3em;vertical-align:-.3em}
 .money .mv img.coin{width:1.15em;height:1.15em;vertical-align:-.2em}
 .rarebadge{display:inline-block;align-self:flex-start;background:linear-gradient(90deg,#ff4fa3,#9b5cff);color:#fff;font-weight:800;font-size:15px;letter-spacing:.12em;padding:3px 12px;border-radius:999px;box-shadow:0 0 0 2px #fff3,0 0 14px #ff4fa388}
@@ -195,8 +196,8 @@ body.touch .pconly{display:none}
     <canvas id="cv" width="864" height="576" aria-label="ゲーム画面"></canvas>
     <button id="readyBtn" class="ovbtn" type="button" hidden>準備完了（R長押し）</button>
     <div id="ov"></div>
-    <button id="pauseBtn" class="ovbtn" type="button" hidden>⏸ 中断（Esc）</button>
-    <button id="infoBtn" class="ovbtn" type="button" hidden>📋 情報</button>
+    <button id="pauseBtn" class="ovbtn" type="button" hidden>中断（Esc）</button>
+    <button id="infoBtn" class="ovbtn" type="button" hidden>情報</button>
   </div>
   <div id="stock"></div>
   <p class="narrow">キーボードかゲームパッドで遊ぶ試作版です。PCでの操作をおすすめします。</p>
@@ -308,7 +309,40 @@ const tokHtml=h=>h.replace(/([^]+)/g,(m,k)=>FOOD.img[k]?`<img class="fic" src
 const fiH=k=>FOOD.img[k]?`<span class="fi fk-${k}"></span>`:'';
 const ingOv=id=>fiH(ingKey(id,0))||ING[id].e;
 const dishOv=r=>fiH('d_'+r)||RECIPES[r].e;
-function fillFood(root){for(const el of root.querySelectorAll('span.fi')){const m=/fk-(\S+)/.exec(el.className),im=m&&(FOOD.img[m[1]]||CUST.img[m[1]]);if(im)el.style.backgroundImage=`url("${im.src}")`}}
+function fillFood(root){for(const el of root.querySelectorAll('span.fi')){const m=/fk-(\S+)/.exec(el.className);if(!m)continue;let src='';
+  if(m[1].startsWith('chef--')){const u=typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[artAn(m[1].slice(6))+'_icon'];src=u||''}else{const im=FOOD.img[m[1]]||CUST.img[m[1]];src=im?im.src:''}
+  if(src)el.style.backgroundImage=`url("${src}")`}}
+// ---------- emoji → delivered pictures, everywhere (HTML screens and canvas text) ----------
+// one meaning per emoji: ingredients, dishes, customer types, game-screen icons, equipment/UI stand-ins, power-ups, chefs
+const EMO_EXTRA={'🔪':'up_chop','🔥':'up_cook','🌀':'up_blend','🪑':'up_pat','🪴':'up_plot','🍽':'tool_plate','🧺':'tool_basket','💰':'status_tip','🪙':'status_tip',
+  '👣':'status_coming','😋':'status_eating','😠':'status_angry','🛣':'up_drive','❤':'up_heart'};
+let EMO_MAP=null,EMO_RX=null,EMO_RX1=null;const EMO_HAS=new Map();
+const emoNorm=e=>e.replace(/️/g,'');
+function emoBuild(){
+  if(EMO_MAP)return;const m={},put=(e,k)=>{if(e&&k){e=emoNorm(e);if(!m[e])m[e]=k}};
+  for(const id in ING)put(ING[id].e,ingKey(id,0));
+  for(const r in RECIPES)put(RECIPES[r].e,'d_'+r);
+  for(const k in CTYPE)if(k!=='regular')put(CTYPE[k].e,CICON[k]);
+  for(const e in EMO_IC)put(e,EMO_IC[e]);
+  for(const e in EMO_EXTRA)put(e,EMO_EXTRA[e]);
+  for(const u of UPS)put(u.e,'up_'+u.id);
+  for(const k in SKILLS)put(SKILLS[k].e,'chef:'+SKILL_ANIMAL[k]);
+  const has=k=>k.startsWith('chef:')||(typeof FOOD_IMG_SRC==='object'&&FOOD_IMG_SRC[k])||(typeof CUST_IMG_SRC==='object'&&CUST_IMG_SRC[k]);
+  EMO_MAP={};for(const e in m)if(has(m[e]))EMO_MAP[e]=m[e];
+  const src='('+Object.keys(EMO_MAP).sort((a,b)=>b.length-a.length).map(e=>e.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')\ufe0f?';
+  EMO_RX=new RegExp(src,'gu');EMO_RX1=new RegExp(src,'u');
+}
+const emoHas=t=>{let v=EMO_HAS.get(t);if(v===undefined){emoBuild();v=EMO_RX1.test(t);if(EMO_HAS.size>3000)EMO_HAS.clear();EMO_HAS.set(t,v)}return v};
+function emoHtml(h){emoBuild();return String(h).split(/(<[^>]*>)/).map((p,i)=>i%2?p:p.replace(EMO_RX,(m0,e)=>{const k=EMO_MAP[emoNorm(e)];return k?`<span class="fi fk-${k.replace(':','--')}"></span>`:m0})).join('')}
+function emoImg(e){const k=EMO_MAP&&EMO_MAP[emoNorm(e)];if(!k)return null;if(k.startsWith('chef:')){const im=CHEF.img[artAn(k.slice(5))+'_icon'];return im&&im.complete&&im.naturalWidth?im:null}return fimg(k)}
+// canvas text with the pictures in place of the emoji (stroke: outline the text parts with the current strokeStyle)
+function richText(t,x,y,s,col,w,align,stroke){
+  emoBuild();const parts=t.split(EMO_RX),f=`${w||700} ${s}px ${FNT}`,iw=s*1.25;ctx.font=f;
+  const ws=parts.map((p,i)=>i%2?iw:ctx.measureText(p).width),tot=ws.reduce((a,b)=>a+b,0);
+  let cx=align==='left'?x:align==='right'?x-tot:x-tot/2;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=col;
+  parts.forEach((p,i)=>{if(i%2){const im=emoImg(p),z=s*1.15;if(im)ctx.drawImage(im,cx+(iw-z)/2,y-z/2,z,z);else{ctx.font=`${s}px ${EMO}`;ctx.fillStyle='#000';ctx.fillText(p,cx,y);ctx.font=f;ctx.fillStyle=col}}
+    else if(p){if(stroke)ctx.strokeText(p,cx,y);ctx.fillText(p,cx,y)}cx+=ws[i]});
+}
 const ingHtml=id=>{const s=FOOD.img[ingKey(id,0)];return s?`<img class="fic" src="${s.src}" alt="${ING[id].e}">`:ING[id].e};
 const ingEmoji=it=>{const I=ING[it.id];return FOOD.img[ingKey(it.id,it.step)]?ingIc(it.id,it.step):I.doneE&&isDone(it)?I.doneE:I.e};
 const BUYABLE=()=>Object.keys(ING).filter(k=>!ING[k].mix);
@@ -362,7 +396,7 @@ const TOWNS={
   forest:{n:'森の町',e:'🌲',menu:['kinokocheese','applejuice'],extra:'risotto',ground:'#6e9450',deco:'#3f6b35'},
   ranch:{n:'牧場の町',e:'🐄',menu:['omelet','smilk'],extra:'cheeseburger',ground:'#9db866',deco:'#d9e6b0'},
   busy:{n:'駅前の町',e:'🚉',menu:['burger','fries'],extra:'omurice',lively:true,ground:'#aaa59a',deco:'#6d6a63'},
-  farm:{n:'畑の町',e:'🌾',menu:['sandwich','fries'],extra:'salad',ground:'#c39f68',deco:'#8a6a3c'},
+  farm:{n:'畑の町',e:'🌻',menu:['sandwich','fries'],extra:'salad',ground:'#c39f68',deco:'#8a6a3c'},
   sweets:{n:'スイーツの町',e:'🍰',menu:['shortcake','bakedapple'],extra:'applepie',ground:'#e3c3b8',deco:'#c77f9a'},
   mountain:{n:'山の町',e:'⛰️',menu:['kinokogohan','yakiguri'],extra:'curry',ground:'#8fa36a',deco:'#5e6f45'},
   snow:{n:'雪の町',e:'❄️',menu:['gratin','montblanc'],extra:'stew',ground:'#dfe8ee',deco:'#7fa6c2'},
@@ -371,13 +405,13 @@ const pack=id=>({type:'pack',id,qty:3,price:Math.max(3,ING[id].price+rnd(4)-2)})
 const seedItem=id=>({type:'seed',id,qty:2,price:ING[id].seed+rnd(2)});
 const SHOPTYPES=[
   {n:'八百屋',e:'🥕',c:'#4f9a4c',w:3,gen:()=>pickN(['lettuce','tomato','potato','strawberry','apple','carrot'],2+rnd(2)).map(pack)},
-  {n:'パンと米の店',e:'🥖',c:'#c98d3e',w:3,gen:()=>pickN(['bread','rice','egg','flour'],2+rnd(2)).map(pack)},
-  {n:'肉とチーズの店',e:'🍖',c:'#b9484a',w:2,gen:()=>pickN(['meat','cheese','milk'],2).map(pack)},
-  {n:'魚屋',e:'🐠',c:'#3a7fae',w:1,gen:()=>['fish','shrimp'].map(pack)},
+  {n:'パンと米の店',e:'🍞',c:'#c98d3e',w:3,gen:()=>pickN(['bread','rice','egg','flour'],2+rnd(2)).map(pack)},
+  {n:'肉とチーズの店',e:'🥩',c:'#b9484a',w:2,gen:()=>pickN(['meat','cheese','milk'],2).map(pack)},
+  {n:'魚屋',e:'🐟',c:'#3a7fae',w:1,gen:()=>['fish','shrimp'].map(pack)},
   {n:'種屋',e:'🌱',c:'#6f8f2f',w:3,gen:()=>pickN(['lettuce','tomato','strawberry'],2+rnd(2)).map(seedItem)},
 ];
 // not part of the 3–4 food shops: an occasional bonus stall, and the gas station that always comes last
-const MYSTERY_SHOP={n:'あやしい露店',e:'🎲',c:'#6d4f9e',w:0,gen:()=>[{type:'mystery',price:9},{type:'mystery',price:9}]};
+const MYSTERY_SHOP={n:'あやしい露店',e:'🎁',c:'#6d4f9e',w:0,gen:()=>[{type:'mystery',price:9},{type:'mystery',price:9}]};
 const GAS_SHOP={n:'ガソリンスタンド',e:'⛽',c:'#c0392b',w:0,gas:true,gen:()=>[{type:'fuel',qty:2,price:8},{type:'fuel',qty:5,price:18}]};
 const ALLSHOPS=[...SHOPTYPES,MYSTERY_SHOP,GAS_SHOP];
 // ---------- driving: distance, speed lever, fuel ----------
@@ -671,7 +705,7 @@ function furnPick(p,c,tx,ty){
     else if(c.item&&c.item.kind===tg)target=c.item;   // a watering can / basket on a counter or outside
     if(target){
       target.ups=Object.assign({},target.ups||{});target.ups[h.up]=(target.ups[h.up]||0)+1;
-      p.hold=null;float(tx+.5,ty,'⬆ '+U.n+'！','#ffe08a');return true}
+      p.hold=null;float(tx+.5,ty,'↑ '+U.n+'！','#ffe08a');return true}
     if(!(c.t==='ground'&&!c.item)){say(p,(TGTN[tg]||'器具')+'に重ねる');return true}
   }
   // tables: set down / pick up on the plaza (layout time)
@@ -961,7 +995,7 @@ function localizeOv(){
   for(const el of ov.querySelectorAll('.kn'))el.textContent=el.dataset.v==='menu'?keyName(0,'menu'):ovkText();
   // the rows lose their id in the copy: find them by their buttons, give the id back, show this device's settings
   for(const [act,id,inner] of [['dev','devRow',devRowInner],['snd','sndRow',sndRowInner]]){
-    const b=ov.querySelector(`[data-act="${act}"]`);if(!b)continue;const row=b.parentElement;row.id=id;row.innerHTML=inner()}
+    const b=ov.querySelector(`[data-act="${act}"]`);if(!b)continue;const row=b.parentElement;row.id=id;row.innerHTML=emoHtml(inner());fillFood(row)}
 }
 function BL(p,k){
   if(isTouch&&(NET.role!=='off'||!p||p.i===0))return BTN_N[k];
@@ -1551,7 +1585,7 @@ function showUpgrade(){
   const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
   const cards=S.offers.map((u,i)=>`<button class="ovbtn town hold" data-act="up" data-v="${i}">
       <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}</span>
-      <span class="needs">${u.tgt?`<span class="pay">⬆ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
+      <span class="needs">${u.tgt?`<span class="pay">↑ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>${moneyBig()}
     <div class="cards">${cards}</div>
@@ -1630,7 +1664,7 @@ function showEnd(){
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
 function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
-function paintOv(html){ov.innerHTML=html;fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
+function paintOv(html){ov.innerHTML=emoHtml(html);fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
 // 1.5x on a full-HD screen (game area about 1815 px wide), smaller windows scale down, never taller than the game area
 function fitOv(){
   const b=ov.querySelector('.box.big');if(!b)return;
@@ -1747,7 +1781,7 @@ const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べ
   takeout:'席に座らず列で待つ。料理を列まで持っていって渡す（皿はその場で汚れた皿になる）',vip:'たまに来る。王冠をかぶっている。待てる時間は短いけど、料金が2倍',
   regular:'ポイントカードを持ったタヌキ。最初の町のどこかで来て、そのとき頼んだ料理を「いつもの」として、ほかの町でも毎回頼む（その町のメニューになくても）。町を進むほどチップが増える。怒らせると来なくなる'};
 const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
-  return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:(C.e||'🙂')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
+  return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:k==='normal'&&CUST.img.dog_front_base?'<span class="fi fk-dog_front_base"></span>':(C.e||'')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
   <div class="row"><button class="ovbtn autofocus" data-act="pback">もどる</button><button class="ovbtn" data-act="resume">つづける</button></div></div>`;
 function pauseGame(){
   if(!S||S.paused||!canPause())return;
@@ -2046,7 +2080,7 @@ function emoji(e,x,y,s){
   if(e&&e[0]===FTOK){const j=e.indexOf(FTOK,1),im=fimg(e.slice(1,j));if(im){const w=s*1.25;ctx.drawImage(im,x-w/2,y-w/2,w,w);return}e=e.slice(j+1)}
   ctx.font=`${s}px ${EMO}`;ctx.fillStyle='#000';  // an opaque fill: a translucent one fades colour emoji
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(e,x,y)}
-function text(t,x,y,s,col,w,align){ctx.font=`${w||700} ${s}px ${FNT}`;ctx.fillStyle=col;ctx.textAlign=align||'center';ctx.textBaseline='middle';ctx.fillText(t,x,y)}
+function text(t,x,y,s,col,w,align){if(typeof t==='string'&&emoHas(t))return richText(t,x,y,s,col,w,align);ctx.font=`${w||700} ${s}px ${FNT}`;ctx.fillStyle=col;ctx.textAlign=align||'center';ctx.textBaseline='middle';ctx.fillText(t,x,y)}
 function bar(x,y,w,f,col){ctx.fillStyle='rgba(0,0,0,.55)';rr(x,y,w,6,3);ctx.fill();ctx.fillStyle=col;rr(x,y,Math.max(2,w*Math.min(1,f)),6,3);ctx.fill()}
 // one plate seen from above: clean (white) or dirty (grey with sauce smears)
 // a tool picture (dl/food-assets.js, tools/*), drawn w = s*mul wide; false while it is not there
@@ -2083,12 +2117,12 @@ function drawItem(it,cx,cy,s,inHand){
     return;
   }
   if(it.kind==='power'){
-    const U=upById(it.up)||{e:'⬆'},g=0.5+0.5*Math.sin((S?S.t:0)*5);
+    const U=upById(it.up)||{e:'↑'},g=0.5+0.5*Math.sin((S?S.t:0)*5);
     ctx.fillStyle=`rgba(255,216,74,${0.25+0.25*g})`;rr(cx-s*0.44,cy-s*0.44,s*0.88,s*0.88,10);ctx.fill();
     ctx.fillStyle='#ffd84a';rr(cx-s*0.36,cy-s*0.36,s*0.72,s*0.72,8);ctx.fill();
     ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
     emoji(U.id&&fimg('up_'+U.id)?FTOK+'up_'+U.id+FTOK+U.e:U.e,cx,cy+s*0.02,s*0.36);
-    text('⬆',cx+s*0.26,cy-s*0.25,13,'#c0392b',800);
+    text('↑',cx+s*0.26,cy-s*0.25,13,'#c0392b',800);
     return;
   }
   if(it.kind==='station'){
@@ -2112,7 +2146,7 @@ function drawItem(it,cx,cy,s,inHand){
      ctx.font=`800 ${f}px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.7)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.strokeText(t2,cx,cy+s*0.2);
      text(t2,cx,cy+s*0.2,f,it.items.length>=basketCap(it)?'#ffd84a':'#fff',800)}
     if(it.bonus)text('★',cx+s*0.36,cy-s*0.3,12,'#ff4fa3',800);
-    if(upTotal(it))text('⬆'+upTotal(it),cx-s*0.34,cy-s*0.32,11,'#ffd84a',800);
+    if(upTotal(it))text('↑'+upTotal(it),cx-s*0.34,cy-s*0.32,11,'#ffd84a',800);
     return;
   }
   if(it.kind==='ext'){   // a red extinguisher with a black hose
@@ -2138,7 +2172,7 @@ function drawItem(it,cx,cy,s,inHand){
      ctx.fillStyle='rgba(255,255,255,.6)';rr(cx-s*0.24,cy-s*0.12,s*0.06,s*0.24,s*0.03);ctx.fill()}
     const cap=canCap(it);
     if(it.bonus)text('★',cx+s*0.36,cy-s*0.34,12,'#ff4fa3',800);
-    if(upTotal(it))text('⬆'+upTotal(it),cx-s*0.34,cy-s*0.34,11,'#ffd84a',800);
+    if(upTotal(it))text('↑'+upTotal(it),cx-s*0.34,cy-s*0.34,11,'#ffd84a',800);
     for(let k=0;k<cap;k++){const dx=cx-s*0.06-(cap-1)*4+k*8,dy=cy+s*0.36;
       ctx.fillStyle=k<it.water?'#1565d8':'rgba(0,0,0,.45)';ctx.beginPath();ctx.arc(dx,dy,3.4,0,7);ctx.fill();
       ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=1;ctx.stroke()}
@@ -2575,10 +2609,10 @@ function drawTile(c,x,y){
       emoji(ingIc(c.plant.id),X+12,Y+12.5,13);
       if(!wet&&Math.sin(S.t*6)>-0.3)emoji('💧',X+T-10,Y+11,14);
     }}
-  // powered-up unit: yellow frame + ⬆count; rare unit: pink ★
+  // powered-up unit: yellow frame + ↑count; rare unit: pink ★
   const nu=upTotal(c);
   if(nu){ctx.strokeStyle='#ffd84a';ctx.lineWidth=3.5;rr(X+2.5,Y+2.5,T-5,T-5,7);ctx.stroke();
-    ctx.fillStyle='#ffd84a';rr(X+1,Y+T-15,22,13,6);ctx.fill();text('⬆'+nu,X+12,Y+T-8.5,10,'#7a4b00',800)}
+    ctx.fillStyle='#ffd84a';rr(X+1,Y+T-15,22,13,6);ctx.fill();text('↑'+nu,X+12,Y+T-8.5,10,'#7a4b00',800)}
   if(c.pro){ctx.strokeStyle='#ff4fa3';ctx.lineWidth=2;rr(X+(nu?6:3),Y+(nu?6:3),T-(nu?12:6),T-(nu?12:6),5);ctx.stroke();text('★',X+T-9,Y+9,12,'#ff4fa3',800)}
   if(c.item){
     drawItem(c.item,X+T/2,b&&b.cy!=null?b.cy:Y+T/2,T*0.76);
@@ -3531,7 +3565,7 @@ function gachaPull(){
   paintOv(`<div class="box gbox"><div class="gstage">
       <div class="gcap" style="--c:${col}"><span class="gtop"></span><span class="gbot"></span></div>
       <div class="gburst"></div>
-      <div class="gprize"><img src="${skinPreview(R.sk,[k],200)}" alt=""><b>${R.e} ${R.n}</b><span>${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span>
+      <div class="gprize"><img src="${skinPreview(R.sk,[k],200)}" alt=""><b>${R.n}</b><span>${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span>
         ${dup?`<span class="ng">もう持っている → かけら +1${conv?'<br>かけら4つでチケット1枚になった！':''}</span>`:'<span class="perf">NEW!</span>'}</div></div>
     <div class="row gok"><button class="ovbtn autofocus" data-act="gacha">終わる</button>${SV.t?'<button class="ovbtn" data-act="gpull">もう1回</button>':''}<span class="gleft">チケット <b>${SV.t}</b>枚　かけら <b>${SV.sh}</b>/${SHARDS_PER}</span></div></div>`);
 }
@@ -3540,7 +3574,7 @@ let DRESS=null;
 function dressHtml(){
   const sk=DRESS.sk,K=SKILLS[sk],ks=SKIN_K.filter(k=>SKINS[k].sk===sk),wear=SLOTS.map(sl=>DRESS.eq[sl]).filter(Boolean);
   const items=ks.map(k=>{const S0=SKINS[k];if(!SV.own.includes(k))return `<span class="dsk no">？<small>まだ持っていない</small></span>`;
-    const on=DRESS.eq[S0.slot]===k;return `<button class="ovbtn dsk${on?' on':''}" data-act="dtog" data-v="${k}">${S0.e} ${S0.n}<small>${SLOTN[S0.slot]}</small></button>`}).join('');
+    const on=DRESS.eq[S0.slot]===k;return `<button class="ovbtn dsk${on?' on':''}" data-act="dtog" data-v="${k}">${skinPreview(S0.sk,[k],48)?`<img class="skp" src="${skinPreview(S0.sk,[k],48)}" alt="">`:''} ${S0.n}<small>${SLOTN[S0.slot]}</small></button>`}).join('');
   return `<div class="box big"><h2>${K.e} ${K.n}の着せ替え</h2>
     <div class="dress"><img src="${skinPreview(sk,wear,220)}" alt=""><div class="dlist">${items}</div></div>
     <div class="row"><button class="ovbtn autofocus" data-act="dok">確定</button><button class="ovbtn" data-act="dback">もどる</button></div></div>`;
@@ -3960,7 +3994,7 @@ function drawWorld(arr){
   drawMenus();
   for(const f of S.floats){ctx.globalAlpha=1-f.t/1.4;ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.textAlign='center';const fy=(f.y-f.t*0.8)*T,im=f.ic&&fimg(f.ic);let fx=f.x*T;
     if(im){const tw=f.text?ctx.measureText(f.text).width:0,sz=f.text?20:26;fx+=(sz+2)/2;ctx.drawImage(im,fx-tw/2-sz-2,fy-sz/2-1,sz,sz)}
-    if(f.text){ctx.strokeText(f.text,fx,fy);ctx.fillStyle=f.col;ctx.fillText(f.text,fx,fy)}ctx.globalAlpha=1}
+    if(f.text){if(emoHas(f.text))richText(f.text,fx,fy,14,f.col,800,'center',true);else{ctx.strokeText(f.text,fx,fy);ctx.fillStyle=f.col;ctx.fillText(f.text,fx,fy)}}ctx.globalAlpha=1}
 }
 // the old info strip, drawn in the space right of the truck: <br> / 　 / ｜ start a new line, long lines wrap
 const GRAPH=(typeof Intl!=='undefined'&&Intl.Segmenter)?new Intl.Segmenter('ja',{granularity:'grapheme'}):null;
@@ -4064,7 +4098,7 @@ const upsText=o=>Object.entries(o.ups||{}).filter(([,n])=>n>0).map(([k,n])=>{con
 function upInfo(){
   const ps=[localP(),...S.players].filter(Boolean);
   const hp=ps.find(q=>q.hold&&q.hold.kind==='power');
-  if(hp){const U=upById(hp.hold.up);if(U)return `<br><b style="color:#ffd84a">⬆ ${upIcHtml(U)} ${U.n}</b>：${U.d}。<b>${TGTN[U.tgt]}</b>に重ねると、その1台だけ強くなります`}
+  if(hp){const U=upById(hp.hold.up);if(U)return `<br><b style="color:#ffd84a">↑ ${upIcHtml(U)} ${U.n}</b>：${U.d}。<b>${TGTN[U.tgt]}</b>に重ねると、その1台だけ強くなります`}
   const p=localP();if(!p)return '';
   // the unit in hand first, otherwise the one being faced
   const h=p.hold, held=h&&(h.kind==='station'||h.kind==='can'||h.kind==='basket');
@@ -4074,7 +4108,7 @@ function upInfo(){
   const t=upsText(o),rare=o.pro?proInfo(id,o.pro):o.bonus?proInfo(id,1):null;
   if(!t&&!rare)return '';
   return `<br><span class="dim">${held?'持っている':'この'}${TGTN[id]||(EQUIP[id]&&EQUIP[id].n)||'器具'}：</span>`+
-    (rare?`<b style="color:#ff79b8">★レア ${rare.n}</b>（${rare.d}）　`:'')+(t?'<b style="color:#ffd84a">⬆</b> '+t:'');
+    (rare?`<b style="color:#ff79b8">★レア ${rare.n}</b>（${rare.d}）　`:'')+(t?'<b style="color:#ffd84a">↑</b> '+t:'');
 }
 const readyBtn=document.getElementById('readyBtn');
 const pauseBtn=document.getElementById('pauseBtn');
@@ -4131,9 +4165,9 @@ function renderHud(){
     bs.classList.toggle('act',act);bs.classList.toggle('cd',cd);
     bs.style.setProperty('--f',act?Math.round(lp.skT/K.dur*100)+'%':cd?Math.round((1-lp.skCD/K.cd)*100)+'%':'100%')}}
   infoBtn.hidden=!(phoneView()&&ov.hidden&&S.phase!=='select');infoBtn.classList.toggle('on',PHONE_INFO);
-  if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='⏸ 中断（'+keyName(0,'menu')+'）';
+  if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
-  {const h=tokHtml(info)||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=h}}S.sideInfo=info;
+  {const h=tokHtml(info)||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=emoHtml(h);fillFood(infoEl)}}S.sideInfo=info;
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
   const ch=ids.map(k=>{const n=S.stock[k]||0;return `<span class="chip${n?'':' zero'}">${ingHtml(k)} ${ING[k].n} ${n}</span>`}).join('');
@@ -4297,7 +4331,7 @@ function renderRooms(force){
   const ks=Object.keys(NET.rooms||{}).map(Number).sort((a,b)=>a-b);
   const icon=an=>{const src=typeof CHEF_IMG_SRC==='object'&&an?CHEF_IMG_SRC[an+'_icon']:null;return src?`<img src="${src}" alt="">`:''};
   const h=ks.length?ks.map(i=>{const r=NET.rooms[i],n=Math.max(1,Math.min(4,+r.n||1));
-    return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' 🔒':''}</span><span class="rp">${n}/4人</span>
+    return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' <small>（パスワード付き）</small>':''}</span><span class="rp">${n}/4人</span>
       <span class="rs">${[r.where,r.ph].filter(Boolean).map(x=>String(x).replace(/[<>&"]/g,'')).join('・')}</span>
       <span class="rc">${(Array.isArray(r.ch)?r.ch:[]).slice(0,4).map(a=>icon(String(a).replace(/[^a-z]/g,''))).join('')}</span>
       <button class="ovbtn hold" data-act="ljoin" data-v="${i}">参加（${ovkText()}）</button></div>`}).join('')
@@ -4959,6 +4993,7 @@ function frame(now){
 }
 showTitle();
 requestAnimationFrame(frame);
+{const h=document.querySelector('.help');if(h){h.innerHTML=emoHtml(h.innerHTML);fillFood(h)}}   /* the how-to text below the game: pictures instead of emoji */
 // phones: no double-tap or pinch zoom (it got stuck zoomed in near the stick)
 (function(){let last=0;
   document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});

@@ -391,7 +391,7 @@ const EQUIP={
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
   counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.25倍（スキルと重ねがけOK）'},{n:'寝かせカウンター',d:'町が終わったとき上にある食材が、次の町で1段階すすみ、冷蔵庫に同じ食材が1個増える'}]},
-  warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
+  warp:{n:'ワープゲート',e:'🌌',price:25,noShop:true},
   plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
@@ -409,7 +409,7 @@ function equipOffer(id,priceMul,proChance){
 // a rare version is stored as a number: 1 = first variant, 2 = second (the planter has two)
 const proList=id=>EQUIP[id]?(EQUIP[id].pros||(EQUIP[id].pro?[EQUIP[id].pro]:[])):[];
 const proInfo=(id,pro)=>proList(id)[(pro||1)-1]||{n:'',d:''};
-const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n+(id==='plates'?'（皿5枚つき）':'');
+const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n+(id==='plates'?'（皿5枚つき）':id==='counter'?' ×2個':'');
 const PLATES_PER_STAND=5;   // a plate stand bought from a shop comes with 5 more plates (added to the clean pool)
 function makeEquip(id,pro){
   if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
@@ -422,10 +422,13 @@ const upN=(o,k)=>(o&&o.ups&&o.ups[k])||0;
 const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
 const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
 const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
-const WARP_P=0.2, FAST_MUL=1.25, WARP_OUT=[20,10], WARP_CD=3;   /* ★足速カウンター speed; the warp gate's fixed exit (under the 3rd spot of the line) and wait */
+const WARP_P=0.2, FAST_MUL=1.25, WARP_OUT=[20,10], WARP_CD=3, WARP_HOLD=1;   /* WARP_HOLD: seconds standing on the gate before it sends the chef */   /* ★足速カウンター speed; the warp gate's fixed exit (under the 3rd spot of the line) and wait */
 const nearFast=p=>{const x0=Math.floor(p.x),y0=Math.floor(p.y);for(let y=y0-1;y<=y0+1;y++)for(let x=x0-1;x<=x0+1;x++){const c=tile(x,y);if(c&&c.t==='counter'&&c.pro===4)return true}return false};
+let DT_NOW=0;
 function warpCheck(p){   /* stepping on the gate (only while stopped in a town) sends the chef to the exit; one way */
-  if(S.phase!=='stop'||(p.wpCD||0)>0)return;const c=tile(Math.floor(p.x),Math.floor(p.y));if(!c||c.t!=='warp')return;
+  const c=S.phase==='stop'&&!((p.wpCD||0)>0)?tile(Math.floor(p.x),Math.floor(p.y)):null;
+  if(!c||c.t!=='warp'){p.wpT=0;return}
+  p.wpT=(p.wpT||0)+DT_NOW;if(p.wpT<WARP_HOLD)return;p.wpT=0;
   float(p.x,p.y-0.5,'🌌','#d6c2ff');p.x=WARP_OUT[0]+0.5;p.y=WARP_OUT[1]+0.5;p.dx=0;p.dy=1;p.wpCD=WARP_CD;sfx('mystery');float(p.x,p.y-0.6,'ワープ！','#d6c2ff')}
 const hasWarp=()=>S.map.some(r=>r.some(c=>c.t==='warp'||(c.item&&c.item.st==='warp')))||S.players.some(p=>p.hold&&p.hold.st==='warp')||S.pendingEquip.some(o=>o.id==='warp')||S.stored.some(o=>o.st==='warp');
 const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 15% faster (one counter's worth, never stacked) */
@@ -1680,7 +1683,7 @@ function ovAction(a,v){
     if(S.eqBought!=null)return;
     const o=S.eqOffers[+v];if(!o)return;
     if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
-    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showChoose();
+    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showChoose();
   }
   else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();
@@ -1932,7 +1935,7 @@ function update(dt){
         if(Math.abs(d)>0.001&&!hit(c0,p.y+vy)&&!hit(c0,p.y)){const st=Math.sign(d)*Math.min(Math.abs(d),sp);if(!hit(p.x+st,p.y))p.x+=st}}
       if(Math.abs(inp.mx)>Math.abs(inp.my)){p.dx=Math.sign(inp.mx);p.dy=0}else{p.dx=0;p.dy=Math.sign(inp.my)}
     }
-    warpCheck(p);
+    DT_NOW=dt;warpCheck(p);
     const tx=Math.floor(p.x)+p.dx, ty=Math.floor(p.y)+p.dy, c=tile(tx,ty);
     p.tx=tx;p.ty=ty;
     if(inp.sw)p.cur++;
@@ -3051,7 +3054,10 @@ function drawWarpGate(X,Y,k){   /* a purple swirl: k=1 the gate, k<1 the faint e
   if(k<1){ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(200,170,255,.9)';ctx.beginPath();ctx.ellipse(X,Y,T*0.46,T*0.34,0,0,7);ctx.stroke();ctx.setLineDash([])}
   ctx.restore();
 }
-function drawWarpExit(){if(S.map&&S.map.some(r=>r.some(c=>c.t==='warp')))drawWarpGate(WARP_OUT[0]*T+T/2,WARP_OUT[1]*T+T/2,0.6)}
+function drawWarpExit(){if(S.map&&S.map.some(r=>r.some(c=>c.t==='warp')))drawWarpGate(WARP_OUT[0]*T+T/2,WARP_OUT[1]*T+T/2,0.6);
+  for(const p of S.players){const f=(p.wpT||0)/WARP_HOLD;if(!(f>0))continue;   /* the ring fills while the chef waits on the gate */
+    const c=tile(Math.floor(p.x),Math.floor(p.y));if(!c||c.t!=='warp')continue;const X=Math.floor(p.x)*T+T/2,Y=Math.floor(p.y)*T+T/2;
+    ctx.save();ctx.strokeStyle='#e0d0ff';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.arc(X,Y,T*0.4,-Math.PI/2,-Math.PI/2+f*Math.PI*2);ctx.stroke();ctx.restore()}}
 function drawExtFx(){
   const t=S.t||0,now=performance.now()/1000;
   for(const k in FX_OUT){const [x,y]=k.split(',').map(Number),c=S.map[y]&&S.map[y][x];if(c&&!c.fire){delete FX_OUT[k];FX_PUFF[k]=now}}
@@ -4397,7 +4403,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k))]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100)]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an)]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -4552,7 +4558,7 @@ function applySnap(d){
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
-      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null,skn:Array.isArray(a[19])?a[19].slice(0,3).map(x=>SKIN_K[n(x)]).filter(Boolean):[]});
+      g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null,skn:Array.isArray(a[19])?a[19].slice(0,3).map(x=>SKIN_K[n(x)]).filter(Boolean):[],wpT:n(a[20])/100});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])]}));

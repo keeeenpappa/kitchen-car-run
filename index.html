@@ -2897,7 +2897,7 @@ function drawTables(withSeated){
 // the stool behind a table (the customer sits here): blue cushion to match the cloth
 function drawStool(X,Y){
   // the delivered chair (front view, backrest): its back top (y15 of 256) and leg tips (y232) span the same height as the drawn stool
-  {const im=fimg('chair');if(im){const sy=Y-T*0.42,w=35*256/217,lg=lightGround();if(lg){ctx.save();ctx.shadowColor='rgba(30,50,75,.85)';ctx.shadowBlur=4}ctx.drawImage(im,X-w/2,sy-22-15*w/256,w,w);if(lg)ctx.restore();return}}
+  {const im=clothImg('chair');if(im){const sy=Y-T*0.42,w=35*256/217,lg=lightGround();if(lg){ctx.save();ctx.shadowColor='rgba(30,50,75,.85)';ctx.shadowBlur=4}ctx.drawImage(im,X-w/2,sy-22-15*w/256,w,w);if(lg)ctx.restore();return}}
   const sy=Y-T*0.42;
   // the backrest (behind the customer): two posts and a rounded wooden back with a blue pad
   ctx.fillStyle='#6b4428';for(const s2 of [-1,1])rr(X+s2*8-1.6,sy-18,3.2,18,1.5),ctx.fill();
@@ -2910,11 +2910,26 @@ function drawStool(X,Y){
 }
 // the plate a customer left, dirty, on the table
 function drawTableDirty(c,X,Y){if(c&&c.item&&c.item.kind==='dirty')drawItem(c.item,X,Y-3,T*0.44)}
+// each town's colour for the tablecloth / chair check: the light-blue parts of the pictures are re-tinted [hue, saturation x, lightness +]
+const CLOTH={forest:[125,0.9,-0.02],ranch:[0,1.5,-0.06],busy:[225,1.1,-0.22],farm:[46,2.3,-0.04],sweets:[335,1.2,0],mountain:[24,2.1,-0.07],snow:[355,1.7,-0.08]};
+const CLOTH_CACHE={};
+function clothImg(k){
+  const im=fimg(k);if(!im)return null;const id=S&&S.town&&S.town.id,P=CLOTH[id];if(!P)return im;
+  const ck=k+'|'+id;if(CLOTH_CACHE[ck])return CLOTH_CACHE[ck];
+  const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const g=c.getContext('2d');g.drawImage(im,0,0);
+  const D=g.getImageData(0,0,c.width,c.height),d=D.data;
+  for(let i=0;i<d.length;i+=4){if(!d[i+3])continue;const r=d[i]/255,gg=d[i+1]/255,b=d[i+2]/255,mx=Math.max(r,gg,b),mn=Math.min(r,gg,b),dd=mx-mn;let l=(mx+mn)/2;if(dd<0.0001)continue;
+    let s0=dd/(1-Math.abs(2*l-1)),h=mx===r?((gg-b)/dd)%6:mx===gg?(b-r)/dd+2:(r-gg)/dd+4;h=(h*60+360)%360;
+    if(s0<0.1||h<170||h>265)continue;   // only the blue check: the white squares and the wooden legs stay
+    const S2=Math.min(1,s0*P[1]);l=Math.max(0,Math.min(1,l+P[2]));const C=(1-Math.abs(2*l-1))*S2,X=C*(1-Math.abs((P[0]/60)%2-1)),m=l-C/2,q=Math.floor(P[0]/60)%6;
+    const [R1,G1,B1]=[[C,X,0],[X,C,0],[0,C,X],[0,X,C],[X,0,C],[C,0,X]][q];d[i]=(R1+m)*255;d[i+1]=(G1+m)*255;d[i+2]=(B1+m)*255}
+  g.putImageData(D,0,0);return CLOTH_CACHE[ck]=c;
+}
 const lightGround=()=>!!(S&&S.town&&S.town.id==='snow');   /* white snow: tables and chairs get a dark outline to stand out */
 function drawTableShape(X,Y,noStool){
   const lg=lightGround();softShadow(X+3,Y+T*0.46,T*0.52,9,lg?.6:.38);
   if(!noStool)drawStool(X,Y);
-  {const im=ST_ART&&fimg('table');if(im){const w=T*1.02;if(lg){ctx.save();ctx.shadowColor='rgba(30,50,75,.85)';ctx.shadowBlur=4}ctx.drawImage(im,X-w/2,Y+2-w*100/256,w,w);if(lg)ctx.restore();return}}   // the cloth's middle at the tile centre, low enough to show the customer's chest
+  {const im=ST_ART&&clothImg('table');if(im){const w=T*1.02;if(lg){ctx.save();ctx.shadowColor='rgba(30,50,75,.85)';ctx.shadowBlur=4}ctx.drawImage(im,X-w/2,Y+2-w*100/256,w,w);if(lg)ctx.restore();return}}   // the cloth's middle at the tile centre, low enough to show the customer's chest
   // thick wooden top with a dark rim so it reads on any ground
   const R=T*0.46,ry=T*0.26,cy=Y+1;
   // four legs: the back two (further away) are shorter and darker, the front two splay a little

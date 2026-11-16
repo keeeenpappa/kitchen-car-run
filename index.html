@@ -390,6 +390,7 @@ const EQUIP={
   board:{n:'まな板',e:'🔪',price:20,pro:{n:'よく切れるまな板',d:'切る時間 -40%'}},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
+  counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'}]},
   plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
@@ -420,7 +421,14 @@ const upN=(o,k)=>(o&&o.ups&&o.ups[k])||0;
 const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
 const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
 const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
-const proMul=c=>c.pro?(PRO_MUL[c.t]||1):1;
+const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 15% faster (one counter's worth, never stacked) */
+const proMul=c=>(c.pro?(PRO_MUL[c.t]||1):1)*(c.help?HELP_MUL:1);
+function helpRefresh(){   /* marks the units standing next to a ★お手伝いカウンター (run on host and guests alike) */
+  if(!S||!S.map)return;
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
+    c.help=HELP_T.has(c.t)&&DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='counter'&&t.pro===1})}
+}
+const HELP_T=new Set(['stove','board','blender','sink','planter']);
 const cookT=c=>COOK*proMul(c)*Math.pow(0.75,upN(c,'cook'));
 const chopT=c=>CHOP*proMul(c)*Math.pow(0.7,upN(c,'chop'));
 const blendT=c=>BLEND*proMul(c)*Math.pow(0.6,upN(c,'blend'));
@@ -1422,6 +1430,7 @@ function clearKitchen(){
     if(!c.item)continue;
     if(TOOL[c.item.kind]){if(c.item.kind==='basket'){lost+=c.item.items.length;c.item.items=[]}continue}
     if(c.item.kind==='station')continue; // bought equipment not installed yet is kept
+    if(c.t==='counter'&&c.pro===2)continue; // ★持ち越しカウンター: whatever is on it goes on to the next town
     // plates stay where they are: empty / dirty ones as they are, a dish loses its food and is left dirty
     if(emptyPlate(c.item)||c.item.kind==='dirty')continue;
     if(c.item.kind==='plate'&&!c.item.bare){lost++;c.item={kind:'dirty',cnt:1};continue}
@@ -1851,13 +1860,13 @@ function update(dt){
     for(const f of S.floats)f.t+=dt;return}
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
-  fireUpdate(dt);
+  fireUpdate(dt);helpRefresh();
   const growBoost=c=>(c.boostT||0)>0?2:1;
   for(const c of S.stations){if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);if(c.nbT>0)c.nbT=Math.max(0,c.nbT-dt)}
   for(const c of S.stations){
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*Math.pow(1.3,upN(c,'grow'));
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*(c.help?1/HELP_MUL:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
     const it=c.item; if(!it){c.fast=false;c.herd=false;c.smoke=0;continue}
@@ -3032,8 +3041,10 @@ function drawExtFx(){
   ctx.restore();
 }
 function drawFires(){
-  if(!S.map)return;const t=S.t||0;
+  if(!S.map)return;const t=S.t||0;helpRefresh();
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
+    if(c.t==='counter'&&c.pro){ctx.globalAlpha=0.9;emoji(c.pro===1?'🤝':'📦',x*T+10,y*T+T-10,13);ctx.globalAlpha=1}
+    if(c.help){const b=Math.sin(t*4+x)*1.5;ctx.fillStyle='#4fd27a';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x*T+T-14,y*T+T-8+b);ctx.lineTo(x*T+T-8,y*T+T-16+b);ctx.lineTo(x*T+T-2,y*T+T-8+b);ctx.closePath();ctx.stroke();ctx.fill()}
     // elephant's skill: a blinking water-blue frame on the stoves / mixers that cannot burn
     if((c.nbT||0)>0){const k=0.5+0.5*Math.sin(t*Math.PI*4);ctx.save();ctx.shadowColor='#7fd4ff';ctx.shadowBlur=8*k;
       ctx.strokeStyle=`rgba(127,212,255,${0.4+0.6*k})`;ctx.lineWidth=3;rr(x*T+3,y*T+3,T-6,T-6,8);ctx.stroke();ctx.restore()}

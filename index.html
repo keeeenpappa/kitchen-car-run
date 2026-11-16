@@ -387,10 +387,11 @@ const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
 // A rare "pro" version (★) exists for some of them.
 const EQUIP={
-  board:{n:'まな板',e:'🔪',price:20,pro:{n:'よく切れるまな板',d:'切る時間 -40%'}},
+  board:{n:'まな板',e:'🔪',price:20,pros:[{n:'よく切れるまな板',d:'切る時間 -40%'},{n:'自動まな板',d:'置いておくと自動で切れる（人の半分の速さ）'}]},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
-  counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'}]},
+  counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.25倍（スキルと重ねがけOK）'},{n:'寝かせカウンター',d:'町が終わったとき上にある食材が、次の町で1段階すすみ、冷蔵庫に同じ食材が1個増える'}]},
+  warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
   plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
@@ -421,8 +422,14 @@ const upN=(o,k)=>(o&&o.ups&&o.ups[k])||0;
 const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
 const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
 const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
+const WARP_P=0.2, FAST_MUL=1.25, WARP_OUT=[20,10], WARP_CD=3;   /* ★足速カウンター speed; the warp gate's fixed exit (under the 3rd spot of the line) and wait */
+const nearFast=p=>{const x0=Math.floor(p.x),y0=Math.floor(p.y);for(let y=y0-1;y<=y0+1;y++)for(let x=x0-1;x<=x0+1;x++){const c=tile(x,y);if(c&&c.t==='counter'&&c.pro===4)return true}return false};
+function warpCheck(p){   /* stepping on the gate (only while stopped in a town) sends the chef to the exit; one way */
+  if(S.phase!=='stop'||(p.wpCD||0)>0)return;const c=tile(Math.floor(p.x),Math.floor(p.y));if(!c||c.t!=='warp')return;
+  float(p.x,p.y-0.5,'🌌','#d6c2ff');p.x=WARP_OUT[0]+0.5;p.y=WARP_OUT[1]+0.5;p.dx=0;p.dy=1;p.wpCD=WARP_CD;sfx('mystery');float(p.x,p.y-0.6,'ワープ！','#d6c2ff')}
+const hasWarp=()=>S.map.some(r=>r.some(c=>c.t==='warp'||(c.item&&c.item.st==='warp')))||S.players.some(p=>p.hold&&p.hold.st==='warp')||S.pendingEquip.some(o=>o.id==='warp')||S.stored.some(o=>o.st==='warp');
 const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 15% faster (one counter's worth, never stacked) */
-const proMul=c=>(c.pro?(PRO_MUL[c.t]||1):1)*(c.help?HELP_MUL:1);
+const proMul=c=>(c.pro===1?(PRO_MUL[c.t]||1):1)*(c.help?HELP_MUL:1);
 function helpRefresh(){   /* marks the units standing next to a ★お手伝いカウンター (run on host and guests alike) */
   if(!S||!S.map)return;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
@@ -520,7 +527,7 @@ const inTruck=(x,y)=>x>=2&&x<=15&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
 // only tools (watering can, basket) and food go on top of a counter.
 const FIXED=new Set(['door','window','serve']);
-const FURN=['counter','planter','table',...MOVABLE];
+const FURN=['counter','planter','table','warp',...MOVABLE];
 const PILE=['counter','planter','table'];          // these come stacked in one pile outside
 const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_FRONT=[6,5];
 const emptyT=y=>y===6?'gap':'floor';
@@ -593,9 +600,10 @@ function finishLayout(){
 function showEquipShop(){
   S.phase='equip';
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
-  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&(!EQUIP[k].rareOnly||Math.random()<0.15)),3).map(id=>equipOffer(id,1,EQUIP[id].rareOnly?1:0.15));   /* one of each is enough: the mixer and sink only come as rare ★ versions */
+  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&(!EQUIP[k].rareOnly||Math.random()<0.15)),3).map(id=>equipOffer(id,1,EQUIP[id].rareOnly?1:0.15));
+  if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)S.eqOffers.push(equipOffer('warp',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
-    const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
+    const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
@@ -619,7 +627,7 @@ function layoutLeft(){
 // equipment that no free floor reachable from the door touches (a plain counter may sit in a corner)
 const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
 function reachFloor(){
-  const ok=new Set(),q=[],walk=(x,y)=>inTruck(x,y)&&S.map[y][x].t==='floor';
+  const ok=new Set(),q=[],walk=(x,y)=>inTruck(x,y)&&(S.map[y][x].t==='floor'||S.map[y][x].t==='warp'||(S.map[y][x].t==='counter'&&S.map[y][x].pro===3));
   const [dx0,dy0]=DOOR_FRONT;
   if(walk(dx0,dy0)){q.push([dx0,dy0]);ok.add(dx0+','+dy0)}
   while(q.length){const [x,y]=q.shift();for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy,k=nx+','+ny;if(!ok.has(k)&&walk(nx,ny)){ok.add(k);q.push([nx,ny])}}}
@@ -630,7 +638,7 @@ function unreachable(){
   const ok=reachFloor(),bad=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const c=S.map[y][x];
-    if(c.t==='floor'||c.t==='gap'||c.t==='counter')continue;
+    if(c.t==='floor'||c.t==='gap'||c.t==='counter'||c.t==='warp')continue;
     if(!touchesFloor(ok,x,y))bad.push([x,y]);
   }
   if(S.map[LEVER[1]][LEVER[0]].t==='lever'&&!ok.has(LEVER_FRONT.join(',')))bad.push(LEVER);
@@ -790,7 +798,8 @@ function solid(x,y){
   const c=tile(x,y); if(!c)return true;
   const lay=S.phase==='layout', out=S.phase==='stop'||lay;
   switch(c.t){
-    case 'floor':return false;
+    case 'floor':case 'warp':return false;
+    case 'counter':return c.pro!==3;   /* ★透過カウンター can be walked over */
     case 'door':return !out;
     case 'ground':return !out||y>=GH-1||x<=0||x>=GW-1||!!c.item;
     case 'gather':if(!out)return true;return !lay;
@@ -1421,6 +1430,7 @@ function spawnCust(){
   S.cust.push(c);sfx('bell');
 }
 function clearKitchen(){
+  const rested=[];
   for(const r of S.map)for(const c of r){c.fire=0;c.smoke=0}S.fireWarn=false;
   // leftovers from this town are thrown away (planters keep growing)
   // tools (watering can, basket) are kept; whatever is still in the basket is lost
@@ -1431,6 +1441,8 @@ function clearKitchen(){
     if(TOOL[c.item.kind]){if(c.item.kind==='basket'){lost+=c.item.items.length;c.item.items=[]}continue}
     if(c.item.kind==='station')continue; // bought equipment not installed yet is kept
     if(c.t==='counter'&&c.pro===2)continue; // ★持ち越しカウンター: whatever is on it goes on to the next town
+    if(c.t==='counter'&&c.pro===5&&c.item.kind==='ing'&&!c.item.burnt){   // ★寝かせカウンター: one step on, and one more of it in the fridge
+      if(nextStep(c.item))c.item.step++;if(!ING[c.item.id].mix){S.stock[c.item.id]=(S.stock[c.item.id]||0)+1;rested.push(ING[c.item.id].e)}continue}
     // plates stay where they are: empty / dirty ones as they are, a dish loses its food and is left dirty
     if(emptyPlate(c.item)||c.item.kind==='dirty')continue;
     if(c.item.kind==='plate'&&!c.item.bare){lost++;c.item={kind:'dirty',cnt:1};continue}
@@ -1452,6 +1464,7 @@ function clearKitchen(){
       p.hold=null;
       continue}
     lost++;p.hold=null}
+  if(rested.length)S.toast={text:'🌙 寝かせカウンター：冷蔵庫に '+rested.join('')+' +1',t:0,life:4};
   return lost;
 }
 function endStop(){
@@ -1861,6 +1874,8 @@ function update(dt){
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
   fireUpdate(dt);helpRefresh();
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];   /* ★自動まな板 chops on its own at half a chef's speed */
+    if(c.t==='board'&&c.pro===2&&c.item&&!c.fire&&S.phase!=='layout'&&nextStep(c.item)==='chop'){c.prog+=dt*0.5;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}}}
   const growBoost=c=>(c.boostT||0)>0?2:1;
   for(const c of S.stations){if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);if(c.nbT>0)c.nbT=Math.max(0,c.nbT-dt)}
   for(const c of S.stations){
@@ -1885,7 +1900,7 @@ function update(dt){
     const inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);
-    if(!horseWait)p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);
+    if(!horseWait)p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);p.wpCD=Math.max(0,(p.wpCD||0)-dt);
     if(inp.sk&&(S.phase==='drive'||S.phase==='stop'))useSkill(p);
     if(p.menu){const h0=p.hold,s0=p.menu.sel;menuInput(p,inp,dt);if(p.hold!==h0)sfx('pick');else if(p.menu&&p.menu.sel!==s0)sfx('tick');p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     if(p.mk){const c0=p.cur;marketInput(p,inp,dt);if(p.mk&&p.cur!==c0)sfx('tick');if(p.msgT>0)p.msgT-=dt;return}
@@ -1894,7 +1909,7 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p));   // はやあし's skill
+      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1);   // はやあし's skill; ★足速カウンター multiplies on top
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);
@@ -1917,6 +1932,7 @@ function update(dt){
         if(Math.abs(d)>0.001&&!hit(c0,p.y+vy)&&!hit(c0,p.y)){const st=Math.sign(d)*Math.min(Math.abs(d),sp);if(!hit(p.x+st,p.y))p.x+=st}}
       if(Math.abs(inp.mx)>Math.abs(inp.my)){p.dx=Math.sign(inp.mx);p.dy=0}else{p.dx=0;p.dy=Math.sign(inp.my)}
     }
+    warpCheck(p);
     const tx=Math.floor(p.x)+p.dx, ty=Math.floor(p.y)+p.dy, c=tile(tx,ty);
     p.tx=tx;p.ty=ty;
     if(inp.sw)p.cur++;
@@ -2473,6 +2489,7 @@ function drawTile(c,x,y){
     else{ctx.fillStyle='#c8862a';ctx.fillRect(X,Y,T,T);ctx.fillStyle='#f6d36a';ctx.beginPath();ctx.arc(X+T*0.78,Y+T*0.5,3,0,7);ctx.fill()}
     text('ドア',X+T/2,Y+T*0.5,11,(S.phase==='stop'||S.phase==='layout')?'#8a7550':'#fff3d6');return}
   if(c.t==='lever'){drawLever(X,Y);return}
+  if(c.t==='warp'){drawWarpGate(X+T/2,Y+T/2,1);return}
   const col=TCOL[c.t]; if(!col)return;
   const loose=x<1;                        // drawn in someone's hands / as an item: no background
   const onFloor=!loose&&y<=5&&inTruck(x,y);
@@ -3025,6 +3042,16 @@ function playHint(p,c){
 // extinguisher powder: a white cloud blowing from the nozzle while spraying, and a cloud that hangs on a tile just put out
 const FX_OUT={},FX_PUFF={};
 function puffBlob(x,y,r,a){ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
+function drawWarpGate(X,Y,k){   /* a purple swirl: k=1 the gate, k<1 the faint exit mark */
+  const t=S.t||0;ctx.save();ctx.globalAlpha=k<1?0.75:1;
+  const g=ctx.createRadialGradient(X,Y,2,X,Y,T*0.42);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(0.35,k<1?'rgba(190,160,255,.35)':'rgba(170,120,255,.9)');g.addColorStop(1,'rgba(120,70,220,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y,T*0.42,T*0.3,0,0,7);ctx.fill();
+  ctx.strokeStyle=k<1?'rgba(200,170,255,.9)':'#fff';ctx.lineWidth=2;
+  for(let j=0;j<3;j++){ctx.beginPath();const a0=t*3+j*2.1;ctx.ellipse(X,Y,T*(0.14+j*0.08),T*(0.1+j*0.06),0,a0,a0+2.2);ctx.stroke()}
+  if(k<1){ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(200,170,255,.9)';ctx.beginPath();ctx.ellipse(X,Y,T*0.46,T*0.34,0,0,7);ctx.stroke();ctx.setLineDash([])}
+  ctx.restore();
+}
+function drawWarpExit(){if(S.map&&S.map.some(r=>r.some(c=>c.t==='warp')))drawWarpGate(WARP_OUT[0]*T+T/2,WARP_OUT[1]*T+T/2,0.6)}
 function drawExtFx(){
   const t=S.t||0,now=performance.now()/1000;
   for(const k in FX_OUT){const [x,y]=k.split(',').map(Number),c=S.map[y]&&S.map[y][x];if(c&&!c.fire){delete FX_OUT[k];FX_PUFF[k]=now}}
@@ -3043,7 +3070,7 @@ function drawExtFx(){
 function drawFires(){
   if(!S.map)return;const t=S.t||0;helpRefresh();
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
-    if(c.t==='counter'&&c.pro){ctx.globalAlpha=0.9;emoji(c.pro===1?'🤝':'📦',x*T+10,y*T+T-10,13);ctx.globalAlpha=1}
+    if((c.t==='counter'&&c.pro)||(c.t==='board'&&c.pro===2)){ctx.globalAlpha=0.9;emoji(c.t==='board'?'⚙️':['','🤝','📦','🔀','💨','🌙'][c.pro],x*T+10,y*T+T-10,13);ctx.globalAlpha=1}
     if(c.help){const b=Math.sin(t*4+x)*1.5;ctx.fillStyle='#4fd27a';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x*T+T-14,y*T+T-8+b);ctx.lineTo(x*T+T-8,y*T+T-16+b);ctx.lineTo(x*T+T-2,y*T+T-8+b);ctx.closePath();ctx.stroke();ctx.fill()}
     // elephant's skill: a blinking water-blue frame on the stoves / mixers that cannot burn
     if((c.nbT||0)>0){const k=0.5+0.5*Math.sin(t*Math.PI*4);ctx.save();ctx.shadowColor='#7fd4ff';ctx.shadowBlur=8*k;
@@ -3843,7 +3870,7 @@ function drawWorld(arr){
   if(S.view==='road')drawShops();
   ctx.save();ctx.translate(0,-bounce);
   drawCab(false);
-  drawFires();
+  drawFires();drawWarpExit();
   drawPlayers();
   drawExtFx();
   drawTicketPop();
@@ -4038,7 +4065,7 @@ const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:
   mySlot:0,seq:0,ovId:0,ovHtml:'',ovSentAt:0,snapT:0,mirror:false,hostPeer:null,wantOv:0,ovParts:{},shownOv:-1,
   pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
 const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
-const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table'];
+const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp'];
 const OFFER_K=['pack','seed','mystery','equip','fuel'];
 const r2=v=>Math.round(v*100)/100;
 (async function initNet(){

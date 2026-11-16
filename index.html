@@ -2141,7 +2141,7 @@ function drawItem(it,cx,cy,s,inHand){
     drawTile({t:it.st,pro:it.pro,ups:it.ups,item:null,prog:0,burn:0,plant:it.plant||null},0,0);
     ctx.restore();
     if(it.top)drawItem(it.top,cx,cy-s*0.22,s*0.62);
-    else if(it.st==='counter'&&s>=T*0.8)text('台',cx,cy,13,'#8a7550',800);
+    {const mk=proMark(it.st,it.pro);if(mk)emoji(mk,cx-s*0.3,cy+s*0.3,Math.max(9,s*0.27))}   /* a ★ unit shows its mark wherever it is (in hand, outside) */
     if(it.n>1){ctx.font=`800 14px ${FNT}`;ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.65)';ctx.textAlign='center';ctx.strokeText('×'+it.n,cx+s*0.28,cy+s*0.36);text('×'+it.n,cx+s*0.28,cy+s*0.36,14,'#fff',800)}
     return;
   }
@@ -3158,6 +3158,7 @@ function drawLuckyBox(c,X,Y){   /* a rainbow box with a ?, shaking while it work
   if(c.item&&!(c.prog>0)&&!loose)drawItem(c.item,X+T/2,Y+T*0.28,T*0.5);
   if(c.prog>0&&!loose)bar(X+6,Y+T-9,T-12,c.prog/LUCKY_T,'#ff9fd0');
 }
+const proMark=(st,pro)=>st==='counter'&&pro?['','🤝','📦','🔀','💨','🌙'][pro]:st==='board'&&pro===2?'⚙️':'';   /* the mark of a ★ unit with an effect */
 function drawWarpGate(X,Y,k){   /* a purple swirl: k=1 the gate, k<1 the faint exit mark */
   const t=S.t||0;ctx.save();ctx.globalAlpha=k<1?0.75:1;
   const g=ctx.createRadialGradient(X,Y,2,X,Y,T*0.42);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(0.35,k<1?'rgba(190,160,255,.35)':'rgba(170,120,255,.9)');g.addColorStop(1,'rgba(120,70,220,0)');
@@ -3189,7 +3190,7 @@ function drawExtFx(){
 function drawFires(){
   if(!S.map)return;const t=S.t||0;helpRefresh();
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
-    if((c.t==='counter'&&c.pro)||(c.t==='board'&&c.pro===2)){ctx.globalAlpha=0.9;emoji(c.t==='board'?'⚙️':['','🤝','📦','🔀','💨','🌙'][c.pro],x*T+10,y*T+T-10,13);ctx.globalAlpha=1}
+    if(proMark(c.t,c.pro)){ctx.globalAlpha=0.9;emoji(proMark(c.t,c.pro),x*T+10,y*T+T-10,13);ctx.globalAlpha=1}
     if(c.help){const b=Math.sin(t*4+x)*1.5;ctx.fillStyle='#4fd27a';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x*T+T-14,y*T+T-8+b);ctx.lineTo(x*T+T-8,y*T+T-16+b);ctx.lineTo(x*T+T-2,y*T+T-8+b);ctx.closePath();ctx.stroke();ctx.fill()}
     // elephant's skill: a blinking water-blue frame on the stoves / mixers that cannot burn
     if((c.nbT||0)>0){const k=0.5+0.5*Math.sin(t*Math.PI*4);ctx.save();ctx.shadowColor='#7fd4ff';ctx.shadowBlur=8*k;

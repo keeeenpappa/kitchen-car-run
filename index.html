@@ -62,6 +62,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .skl-btn .skl-n{white-space:nowrap;display:flex;align-items:center;gap:6px}
 .skl-ic{width:30px;height:30px;margin:-6px 0}
 .skl-btn .skl-d{font-weight:400;font-size:.88em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rchefs{display:flex;justify-content:center;gap:4px;margin:-4px 0 -10px}.rch{width:96px;height:96px;background-size:contain;background-repeat:no-repeat;background-position:center}
 .skgrid{display:flex;flex-direction:column;gap:6px}.skrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.skn{min-width:8.5em;font-weight:800}
 .skc{display:inline-flex;flex-direction:column;align-items:flex-start;font-size:13px;padding:5px 10px;line-height:1.25}.skc small{font-size:10.5px;opacity:.8}.skc.on{border-color:#ffd84a;background:rgba(255,216,74,.18)}
 .skc.no{border:2px dashed rgba(157,179,180,.45);border-radius:10px;color:rgba(200,215,215,.6);min-width:7em;justify-content:center;align-items:center;padding:8px 10px}
@@ -1519,6 +1520,14 @@ function bestLine(){
   const xs=[1,2,3,4].filter(n=>BEST[n]).map(n=>`${n}人 <b>${BEST[n].score}点</b> <span class="stars sm">${starsHtml(BEST[n].stars)}</span>`);
   return xs.length?`<p class="best">ベスト　${xs.join('　')}</p>`:'';
 }
+// the chefs (with their skins) at the top of the last result; overlay HTML keeps only class names, so each device draws them itself
+function chefPic(p,size){
+  if(!CHEF.ready||!p)return '';const an=artAn(SKILL_ANIMAL[p.skill]||'beaver'),col=PCOL[p.i]||PCOL[0];
+  const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d'),L=chefLayers(an,col,'front',skinsOf(p));
+  g.drawImage(L.under,0,0,size,size);const sh=chefTint('shoe_front_tint',col);for(const s0 of [-1,1])g.drawImage(sh,s0*12*size/256,0,size,size);g.drawImage(L.over,0,0,size,size);
+  return c.toDataURL();
+}
+function fillChefs(root){for(const el of root.querySelectorAll('span.rch')){const m=/rp(\d)/.exec(el.className),p=m&&S&&S.players[+m[1]];const u=p&&chefPic(p,192);if(u)el.style.backgroundImage=`url("${u}")`}}
 function resultScreen(title,lead,clear){
   const sc=runScore(clear), stars=tripStars();
   const old=BEST[S.np], rec=!old||sc.total>old.score;
@@ -1526,6 +1535,7 @@ function resultScreen(title,lead,clear){
   const nxt=stars>=5?'<p class="perf">最高評価！</p>':'';
   const tst=S.townStars.length?`<p class="mut">町ごとの評価</p><p class="townstars">${S.townStars.map((v,i)=>{const T0=TOWNS[(S.townIds||[])[i]];return `<span>${T0?T0.e+' '+T0.n:(i+1)+'つ目の町'}　<span class="stars sm">${starsHtml(v)}</span></span>`}).join('')}</p>`:'';
   showOv(`<div class="box"><h2>${title}</h2><p>${lead}</p>
+    <div class="rchefs">${S.players.map((p,i)=>`<span class="rch rp${i}"></span>`).join('')}</div>
     <div class="stars big" style="text-align:center">${starsHtml(stars)}</div>
     <div class="bigscore">${sc.total}<span>点</span></div>
     <table class="score">${sc.rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}点</td></tr>`).join('')}<tr class="tot"><td>スコア</td><td>${sc.total}点</td></tr></table>
@@ -1549,7 +1559,7 @@ function showEnd(){
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
 function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
-function paintOv(html){ov.innerHTML=html;fillFood(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
+function paintOv(html){ov.innerHTML=html;fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
 // 1.5x on a full-HD screen (game area about 1815 px wide), smaller windows scale down, never taller than the game area
 function fitOv(){
   const b=ov.querySelector('.box.big');if(!b)return;
@@ -1937,7 +1947,7 @@ function update(dt){
         c.pat-=c.st==='wait'?dt/WAIT_PAT:dt;   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
-      if(S.timer<=0){S.sub='closing';S.closeT=2;sfx('close');S.toast={text:'営業終了！',t:0,life:2};ticketCheck(null)}
+      if(S.timer<=0){S.sub='closing';S.closeT=2;sfx('close');S.toast={text:'営業終了！',t:0,life:2};if(S.served>0)ticketCheck(null)}   /* not a single dish served in that town: no ticket */
     }
   }
   if(S.toast){S.toast.t+=dt;if(S.toast.t>S.toast.life)S.toast=null}

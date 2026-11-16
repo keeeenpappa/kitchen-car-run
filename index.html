@@ -238,7 +238,7 @@ const TBL_ZONE={x0:1,x1:17,y0:8,y1:10};          // where tables can stand (the 
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
 const PRESET_TABLES=[[4,9],[9,9],[14,9]];
 const tableOK=(x,y)=>inTblZone(x,y)&&!(y===QY&&x>=QX-1)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
-const FIRE_T=3, FIRE_SPREAD=5, EXT_T=0.8;   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
+const FIRE_T=3, FIRE_SPREAD=8, EXT_T=0.5, WET_T=6;   /* WET_T: a tile just put out cannot catch fire again for this long */   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
 const FLAMMABLE=['counter','board','stove','blender','plates','serve'];
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
@@ -1160,7 +1160,7 @@ function buy(list,p,shop,tx,ty){
 }
 // ---------- fire ----------
 function igniteTile(c){
-  if(c.fire||!FLAMMABLE.includes(c.t))return;
+  if(c.fire||!FLAMMABLE.includes(c.t)||(c.wet||0)>0)return;
   c.fire=0.01;c.smoke=0;c.prog=0;
   if(c.item&&c.item.kind==='ing')c.item.burnt=true;
   sfx('burnt');
@@ -1171,7 +1171,7 @@ function fireUpdate(dt){
     for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
       if(c.fire&&Math.max(Math.abs(x-p.tx),Math.abs(y-p.ty))<=2){c.fire=0;c.smoke=0;sfx('water');float(x+.5,y,'消えた！','#cdeeff')}}
     if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}
-  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];if(!c.fire)continue;
+  for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];if(c.wet>0)c.wet-=dt;if(!c.fire)continue;
     const before=c.fire;c.fire+=dt;
     if(Math.floor(c.fire/FIRE_SPREAD)>Math.floor(before/FIRE_SPREAD)){
       const nb=DIRS.map(([dx,dy])=>tile(x+dx,y+dy)).filter(t=>t&&!t.fire&&FLAMMABLE.includes(t.t));
@@ -1183,7 +1183,7 @@ function doAct(p,c,tx,ty,dt){
   if(p.actKey!==key){p.actKey=key;p.actT=0}
   if(p.lock)return;
   if(c.fire){
-    if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
+    if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;c.wet=WET_T;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
     else say(p,'燃えている！ 消火器で消す');
     return}
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
@@ -1861,7 +1861,7 @@ function update(dt){
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
     const it=c.item; if(!it){c.fast=false;c.herd=false;c.smoke=0;continue}
-    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!((c.nbT||0)>0))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
+    if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!((c.nbT||0)>0)&&!((c.wet||0)>0))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
     if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
       if(nextStep(it)==='cook'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
@@ -3013,6 +3013,24 @@ function playHint(p,c){
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop')return AL(p,'act','切る',1);
   return '';
 }
+// extinguisher powder: a white cloud blowing from the nozzle while spraying, and a cloud that hangs on a tile just put out
+const FX_OUT={},FX_PUFF={};
+function puffBlob(x,y,r,a){ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
+function drawExtFx(){
+  const t=S.t||0,now=performance.now()/1000;
+  for(const k in FX_OUT){const [x,y]=k.split(',').map(Number),c=S.map[y]&&S.map[y][x];if(c&&!c.fire){delete FX_OUT[k];FX_PUFF[k]=now}}
+  ctx.save();ctx.fillStyle='#f4f7fb';
+  for(const k in FX_PUFF){const a=(now-FX_PUFF[k])/1.4;if(a>=1||a<0){delete FX_PUFF[k];continue}
+    const [x,y]=k.split(',').map(Number),X=x*T+T/2,Y=y*T+T*0.5;
+    for(let j=0;j<9;j++){const an=j*0.7+x,d=6+a*T*0.45;puffBlob(X+Math.cos(an)*d,Y+Math.sin(an)*d*0.6-a*14,7+a*9+(j%3)*2,0.75*(1-a))}}
+  for(const p of S.players){if(!p.hold||p.hold.kind!=='ext'||!(p.actT>0))continue;
+    const c=tile(p.tx,p.ty);if(!c||!c.fire)continue;
+    const sx=p.x*T+p.dx*T*0.3,sy=p.y*T-T*0.15+p.dy*T*0.2,ex=p.tx*T+T/2,ey=p.ty*T+T*0.5;
+    for(let j=0;j<14;j++){const f=((t*2.6+j*0.0714)%1),w=Math.sin(t*13+j*2.1)*f*T*0.22;
+      const nx=-(ey-sy),ny=ex-sx,L=Math.hypot(nx,ny)||1;
+      puffBlob(sx+(ex-sx)*f+nx/L*w,sy+(ey-sy)*f+ny/L*w-f*6,3+f*11,0.85*(1-f*0.55))}}
+  ctx.restore();
+}
 function drawFires(){
   if(!S.map)return;const t=S.t||0;
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
@@ -3021,6 +3039,7 @@ function drawFires(){
       ctx.strokeStyle=`rgba(127,212,255,${0.4+0.6*k})`;ctx.lineWidth=3;rr(x*T+3,y*T+3,T-6,T-6,8);ctx.stroke();ctx.restore()}
     if(!c.fire){if(c.smoke>0&&c.smoke<FIRE_T){const k=c.smoke/FIRE_T;ctx.fillStyle=`rgba(60,60,60,${0.25+0.35*k})`;for(let j=0;j<3;j++){const a=(t*1.5+j*0.33)%1;ctx.beginPath();ctx.arc(x*T+T/2+Math.sin(t*3+j)*6,y*T+T*0.3-a*22,5+a*7*k+3*k,0,7);ctx.fill()}}continue}
     const X=x*T+T/2,Y=y*T+T*0.62;
+    FX_OUT[x+','+y]=1;
     for(let j=0;j<5;j++){const ph=t*9+j*1.3,h=T*(0.42+0.16*Math.sin(ph)),w=T*0.2,ox=(j-2)*T*0.14;
       const g=ctx.createLinearGradient(0,Y,0,Y-h);g.addColorStop(0,'#ff4a1c');g.addColorStop(0.55,'#ff9a1f');g.addColorStop(1,'rgba(255,230,90,0)');
       ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(X+ox-w/2,Y);ctx.quadraticCurveTo(X+ox-w*0.6,Y-h*0.5,X+ox+Math.sin(ph)*3,Y-h);ctx.quadraticCurveTo(X+ox+w*0.6,Y-h*0.5,X+ox+w/2,Y);ctx.fill()}
@@ -3815,6 +3834,7 @@ function drawWorld(arr){
   drawCab(false);
   drawFires();
   drawPlayers();
+  drawExtFx();
   drawTicketPop();
   drawCab(true);cabSparkle();
   ctx.restore();

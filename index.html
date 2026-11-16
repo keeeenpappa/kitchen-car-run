@@ -390,12 +390,12 @@ const EQUIP={
   board:{n:'まな板',e:'🔪',price:20,pro:{n:'よく切れるまな板',d:'切る時間 -40%'}},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
-  plates:{n:'皿置き場',e:'🍽️',price:15},
+  plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
-  trash:{n:'ゴミ箱',e:'🗑️',price:10},
+  trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
   table:{n:'テーブル',e:'🪑',price:12,outside:true},
-  can:{n:'じょうろ',e:'💧',price:12,tool:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
-  basket:{n:'カゴ',e:'🧺',price:12,tool:true,pro:{n:'大きなカゴ',d:'入る数 +2'}},
+  can:{n:'じょうろ',e:'💧',price:12,tool:true,noShop:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
+  basket:{n:'カゴ',e:'🧺',price:12,tool:true,noShop:true,pro:{n:'大きなカゴ',d:'入る数 +2'}},
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
 };
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,sink:0.4};
@@ -464,9 +464,9 @@ function buildMap(){
   for(let x=1;x<=16;x++)set(x,1,'wall');
   for(let y=1;y<=6;y++){set(1,y,'wall');set(16,y,'wall')}
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++)set(x,y,'floor');
-  const top=['counter','fridge','seedbox','sink','board','board','counter','stove','stove','blender','counter','plates','trash','counter'];
+  const top=['counter','fridge','seedbox','sink','board','counter','counter','stove','counter','blender','counter','plates','trash','counter'];   /* one knife board and one stove to start: more come from the equipment shop */
   top.forEach((t,i)=>set(2+i,2,t));
-  for(let y=3;y<=5;y++){set(2,y,'planter',{plant:null});set(15,y,'counter')}
+  for(let y=3;y<=5;y++){if(y<5)set(2,y,'planter',{plant:null});set(15,y,'counter')}   /* 2 planters to start */
   set(15,4,'floor');set(16,4,'lever');
   for(let x=7;x<=10;x++)set(x,4,'counter');
   const bot=['counter','window','counter','counter','door','counter','counter','counter','counter','counter','counter','window','counter','counter'];
@@ -585,7 +585,7 @@ function finishLayout(){
 function showEquipShop(){
   S.phase='equip';
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
-  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP),3).map(id=>equipOffer(id,1,0.15));
+  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop),3).map(id=>equipOffer(id,1,0.15));
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
     const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">

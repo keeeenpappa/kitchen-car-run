@@ -2897,7 +2897,7 @@ function drawTables(withSeated){
 // the stool behind a table (the customer sits here): blue cushion to match the cloth
 function drawStool(X,Y){
   // the delivered chair (front view, backrest): its back top (y15 of 256) and leg tips (y232) span the same height as the drawn stool
-  {const im=fimg('chair');if(im){const sy=Y-T*0.42,w=35*256/217;ctx.drawImage(im,X-w/2,sy-22-15*w/256,w,w);return}}
+  {const im=fimg('chair');if(im){const sy=Y-T*0.42,w=35*256/217,lg=lightGround();if(lg){ctx.save();ctx.shadowColor='rgba(30,50,75,.85)';ctx.shadowBlur=4}ctx.drawImage(im,X-w/2,sy-22-15*w/256,w,w);if(lg)ctx.restore();return}}
   const sy=Y-T*0.42;
   // the backrest (behind the customer): two posts and a rounded wooden back with a blue pad
   ctx.fillStyle='#6b4428';for(const s2 of [-1,1])rr(X+s2*8-1.6,sy-18,3.2,18,1.5),ctx.fill();
@@ -2910,10 +2910,11 @@ function drawStool(X,Y){
 }
 // the plate a customer left, dirty, on the table
 function drawTableDirty(c,X,Y){if(c&&c.item&&c.item.kind==='dirty')drawItem(c.item,X,Y-3,T*0.44)}
+const lightGround=()=>!!(S&&S.town&&S.town.id==='snow');   /* white snow: tables and chairs get a dark outline to stand out */
 function drawTableShape(X,Y,noStool){
-  softShadow(X+3,Y+T*0.46,T*0.52,9,.38);
+  const lg=lightGround();softShadow(X+3,Y+T*0.46,T*0.52,9,lg?.6:.38);
   if(!noStool)drawStool(X,Y);
-  {const im=ST_ART&&fimg('table');if(im){const w=T*1.02;ctx.drawImage(im,X-w/2,Y+2-w*100/256,w,w);return}}   // the cloth's middle at the tile centre, low enough to show the customer's chest
+  {const im=ST_ART&&fimg('table');if(im){const w=T*1.02;if(lg){ctx.save();ctx.shadowColor='rgba(30,50,75,.85)';ctx.shadowBlur=4}ctx.drawImage(im,X-w/2,Y+2-w*100/256,w,w);if(lg)ctx.restore();return}}   // the cloth's middle at the tile centre, low enough to show the customer's chest
   // thick wooden top with a dark rim so it reads on any ground
   const R=T*0.46,ry=T*0.26,cy=Y+1;
   // four legs: the back two (further away) are shorter and darker, the front two splay a little
@@ -2952,10 +2953,12 @@ const CUST={img:{},cache:new Map()};
 const cimg=k=>{const im=CUST.img[k];return im&&im.complete&&im.naturalWidth?im:null};
 const CACC={slow:['glasses','cane'],hasty:['hachimaki'],big:['napkin'],vip:['crown']};
 const CICON={slow:'icon_slow',hasty:'icon_hasty',big:'icon_big',family:'icon_family',takeout:'icon_takeout',vip:'icon_vip',regular:'icon_regular'};
+const CUST_ZOOM={reindeer:1.12,ermine:1.18};   /* antlers / a slim small body make these two look smaller than the rest: drawn a bit bigger (from the feet) */
 function custFig(an,dir,type,hue){
   const hq=Math.round(hue/20)*20%360,ck=an+'|'+dir+'|'+type+'|'+hq;let c=CUST.cache.get(ck);if(c)return c;
   const b=cimg(an+'_'+dir+'_base');if(!b)return null;
   c=document.createElement('canvas');c.width=c.height=CUSZ;const g=c.getContext('2d');
+  {const z=CUST_ZOOM[an]||1,fx=CUSZ/2,fy=CUSZ*240/256;if(z!==1){g.translate(fx,fy);g.scale(z,z);g.translate(-fx,-fy)}}
   const t=cimg(an+'_'+dir+'_tint');
   if(t){const tc=document.createElement('canvas');tc.width=tc.height=CUSZ;const tg=tc.getContext('2d');
     tg.drawImage(t,0,0,CUSZ,CUSZ);tg.globalCompositeOperation='multiply';tg.fillStyle=`hsl(${hq} 55% 62%)`;tg.fillRect(0,0,CUSZ,CUSZ);

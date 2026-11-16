@@ -315,13 +315,13 @@ const RECIPES={
   bakedapple:{n:'焼きりんご',e:'🥧',ings:['apple'],price:14},
   curry:{n:'カレーライス',e:'🍛',ings:['rice','meat','carrot'],price:34},
   yakiguri:{n:'焼きぐり',e:'🌰',ings:['chestnut'],price:14},
-  // each town's third dish: on the menu from the 3rd town of the trip on
-  kaisendon:{n:'海鮮丼',e:'🍣',ings:['rice','fish','shrimp'],price:36},
+  // each town's third dish (the town's most work): on the menu from the 3rd town of the trip on
+  kaisendon:{n:'海鮮丼',e:'🍣',ings:['rice','fish:1','shrimp'],price:36}   /* fish:1 = only cut (raw), not cooked */,
   kinokocheese:{n:'キノコのチーズ焼き',e:'🫕',ings:['mushroom','cheese'],price:22},
   cheeseburger:{n:'チーズバーガー',e:'🍔',ings:['bread','meat','cheese'],price:28},
-  omurice:{n:'オムライス',e:'🍙',ings:['rice','egg','tomato'],price:30},
-  salad:{n:'サラダ',e:'🥗',ings:['lettuce','tomato'],price:14},
-  applepie:{n:'アップルパイ',e:'🥮',ings:['batter','apple'],price:30},
+  omurice:{n:'オムライス',e:'🍙',ings:['rice','egg','meat'],price:32},
+  salad:{n:'サラダ',e:'🥗',ings:['lettuce','tomato','potato'],price:24},
+  applepie:{n:'アップルパイ',e:'🥮',ings:['batter','apple'],price:34},
   kinokogohan:{n:'キノコご飯',e:'🍚',ings:['rice','mushroom'],price:22},
 };
 // sell price (pay) and crowd (rate) are rolled each time a town is offered: see showChoose
@@ -329,12 +329,12 @@ const EXTRA_FROM=2;   // from the 3rd town of the trip, each town's menu has its
 const townMenuOn=(k,withExtra)=>withExtra&&TOWNS[k].extra?TOWNS[k].menu.concat([TOWNS[k].extra]):TOWNS[k].menu.slice();
 const TOWNS={
   port:{n:'港町',e:'⚓',menu:['fishset','soup'],extra:'kaisendon',ground:'#cdb886',deco:'#4f97b8'},
-  forest:{n:'森の町',e:'🌲',menu:['risotto','applejuice'],extra:'kinokocheese',ground:'#6e9450',deco:'#3f6b35'},
+  forest:{n:'森の町',e:'🌲',menu:['kinokocheese','applejuice'],extra:'risotto',ground:'#6e9450',deco:'#3f6b35'},
   ranch:{n:'牧場の町',e:'🐄',menu:['omelet','smilk'],extra:'cheeseburger',ground:'#9db866',deco:'#d9e6b0'},
   busy:{n:'駅前の町',e:'🚉',menu:['burger','fries'],extra:'omurice',lively:true,ground:'#aaa59a',deco:'#6d6a63'},
   farm:{n:'畑の町',e:'🌾',menu:['sandwich','fries'],extra:'salad',ground:'#c39f68',deco:'#8a6a3c'},
   sweets:{n:'スイーツの町',e:'🍰',menu:['shortcake','bakedapple'],extra:'applepie',ground:'#e3c3b8',deco:'#c77f9a'},
-  mountain:{n:'山の町',e:'⛰️',menu:['curry','yakiguri'],extra:'kinokogohan',ground:'#8fa36a',deco:'#5e6f45'},
+  mountain:{n:'山の町',e:'⛰️',menu:['kinokogohan','yakiguri'],extra:'curry',ground:'#8fa36a',deco:'#5e6f45'},
 };
 const pack=id=>({type:'pack',id,qty:3,price:Math.max(3,ING[id].price+rnd(4)-2)});
 const seedItem=id=>({type:'seed',id,qty:2,price:ING[id].seed+rnd(2)});
@@ -409,9 +409,15 @@ const newIng=id=>({kind:'ing',id,step:0,burnt:false});
 const badW=it=>it&&it.id&&ING[it.id]&&ING[it.id].steps.at(-1)==='blend'?'ダメになっている':'焦げている';
 const nextStep=it=>it.kind==='ing'&&!it.burnt?ING[it.id].steps[it.step]:undefined;
 const isDone=it=>it.kind==='ing'&&it.step>=ING[it.id].steps.length;
+// a recipe ingredient is "id" (fully prepared) or "id:step" (prepared only that far, e.g. fish:1 = cut, raw)
+const rid=x=>x.split(':')[0], rstep=x=>x.includes(':')?+x.split(':')[1]:ING[rid(x)].steps.length;
+let PART=null;   // id:step pairs some recipe takes before the last step
+const plateOk=it=>{if(isDone(it))return true;if(it.kind!=='ing')return false;
+  if(!PART){PART=new Set();for(const k in RECIPES)for(const x of RECIPES[k].ings)if(x.includes(':'))PART.add(rid(x)+':'+rstep(x))}
+  return PART.has(it.id+':'+it.step)};
 const fmtT=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
 const regDish=()=>S&&S.reg&&S.reg.st==='on'?S.reg.order:null;   // the regular's usual, once they are a regular
-function townNeeds(town){const s=new Set();for(const r of town.menu.concat(regDish()&&!town.menu.includes(regDish())?[regDish()]:[]))for(const i of RECIPES[r].ings){if(ING[i].mix)mixOf(i).in.forEach(x=>s.add(x));else s.add(i)}return [...s]}
+function townNeeds(town){const s=new Set();for(const r of town.menu.concat(regDish()&&!town.menu.includes(regDish())?[regDish()]:[]))for(const i0 of RECIPES[r].ings){const i=rid(i0);if(ING[i].mix)mixOf(i).in.forEach(x=>s.add(x));else s.add(i)}return [...s]}
 
 // ---------- canvas ----------
 const cv=document.getElementById('cv');let ctx=cv.getContext('2d');
@@ -923,7 +929,7 @@ function accepts(c,h){
 const isDish=x=>!!x&&x.kind==='plate'&&!x.bare&&x.items.length>0;
 const canTray=p=>(p.skT||0)>0&&p.skill==='tray';
 const emptyPlate=x=>!!x&&x.kind==='plate'&&!x.bare&&!x.items.length;
-const canAdd=(pl,it)=>it.kind==='ing'&&isDone(it)&&!it.burnt&&pl.items.length<3;
+const canAdd=(pl,it)=>it.kind==='ing'&&plateOk(it)&&!it.burnt&&pl.items.length<3;
 function placeOrTake(p,c){
   const h=p.hold,it=c.item;
   // a mixer still being filled: empty hand takes the last one back out, a fitting raw ingredient goes in
@@ -950,10 +956,10 @@ function placeOrTake(p,c){
     // Combining always leaves the result on the counter; the hand ends up empty.
     if(['can','seed','basket'].includes(h.kind)||['can','seed','basket'].includes(it.kind)){say(p,'ここには置けない');return}
     const items=x=>x.kind==='plate'?x.items:[x];
-    const ok=x=>x.kind==='plate'||(isDone(x)&&!x.burnt);
+    const ok=x=>x.kind==='plate'||(plateOk(x)&&!x.burnt);
     if(c.t!=='counter'&&c.t!=='board'){
       // a finished item on a board / stove / blender can be scooped up with a plate or a prepared ingredient in hand
-      if(!(it.kind==='ing'&&isDone(it))){say(p,'まだ調理中');return}
+      if(!(it.kind==='ing'&&plateOk(it))){say(p,'まだ調理中');return}
       if(it.burnt){say(p,badW(it));return}
       if(!ok(h)){say(p,'先に'+STEPN[nextStep(h)]);return}
       const all=items(h).concat([it]);
@@ -1002,12 +1008,12 @@ function doPick(p,c,tx,ty){
       // the stand holds the truck's clean plates (S.cleanPlates, 5 in all): one comes off at a time
       if(emptyPlate(p.hold)){S.cleanPlates+=p.hold.cnt||1;p.hold=null;sfx('plate');return}
       if(p.hold&&p.hold.kind==='dirty'){say(p,'汚れた皿はシンクで洗う');return}
-      if((!p.hold||(p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt))&&S.cleanPlates<=0){say(p,'きれいな皿がない（シンクで洗う）');return}
-      if(!p.hold||(p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)){sfx('plate');S.cleanPlates--}
+      if((!p.hold||(p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt))&&S.cleanPlates<=0){say(p,'きれいな皿がない（シンクで洗う）');return}
+      if(!p.hold||(p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)){sfx('plate');S.cleanPlates--}
       if(!p.hold)p.hold={kind:'plate',items:[]};
       // holding a finished stack or a prepared ingredient: take a plate with it on
       else if(p.hold.kind==='plate'&&p.hold.bare)p.hold.bare=false;
-      else if(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)p.hold={kind:'plate',items:[p.hold]};
+      else if(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)p.hold={kind:'plate',items:[p.hold]};
       else if(p.hold.kind==='ing')say(p,p.hold.burnt?badW(p.hold):'先に'+STEPN[nextStep(p.hold)]);
       else say(p,'皿には乗せられない');
       return;
@@ -1064,7 +1070,7 @@ function doPick(p,c,tx,ty){
       if(f){say(p,'このテーブルはうまっている');return}
       if(p.hold2&&isDish(p.hold)&&!pendingOrders(g).includes(matchRecipe(p.hold.items))&&pendingOrders(g).includes(matchRecipe(p.hold2.items))){const a=p.hold;p.hold=p.hold2;p.hold2=a}
       if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare&&p.hold.items.length)serve(p,tx,ty,g);
-      else if(p.hold&&((p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&isDone(p.hold)&&!p.hold.burnt)))say(p,'お皿にのせて出す');
+      else if(p.hold&&((p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)))say(p,'お皿にのせて出す');
       else say(p,'注文は '+orderText(g));
       return}
     case 'counter':case 'board':case 'stove':case 'blender':
@@ -1231,8 +1237,8 @@ function addToBasket(p,ids){
   if(put.length<ids.length)say(p,'カゴがいっぱい');
 }
 function matchRecipe(items){
-  const a=items.map(i=>i.id).sort().join(',');
-  return Object.keys(RECIPES).find(k=>RECIPES[k].ings.slice().sort().join(',')===a);
+  const a=items.map(i=>i.id+':'+i.step).sort().join(',');
+  return Object.keys(RECIPES).find(k=>RECIPES[k].ings.map(x=>rid(x)+':'+rstep(x)).sort().join(',')===a);
 }
 // reputation sets the tip: ♥5 ×1.5, ♥4 ×1.25, ♥3 ×1.0, ♥2 ×0.75, ♥1 ×0.5
 function tipRate(){return 0.25+1.25*Math.max(0,Math.min(HEART_MAX,S.hearts))/HEART_MAX}
@@ -3772,7 +3778,7 @@ function renderHud(){
   let info='';
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
     const SHORT={chop:'切',cook:'焼',blend:'混'};
-    const stepTxt=i=>ING[i].mix?'('+mixOf(i).in.map(x=>itok(x)).join('+')+')'+ING[i].steps.map(s=>SHORT[s]).join('→'):itok(i)+(ING[i].steps.length?ING[i].steps.map(s=>SHORT[s]).join('→'):'素');
+    const stepTxt=i0=>{const i=rid(i0),st=ING[i].steps.slice(0,rstep(i0));return ING[i].mix?'('+mixOf(i).in.map(x=>itok(x)).join('+')+')'+st.map(s=>SHORT[s]).join('→'):itok(i)+(st.length?st.map(s=>SHORT[s]).join('→'):'素')};
     info+=`<b style="color:#7fd893">${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
     if(regDish())info+=`常連：${dtok(regDish())}${RECIPES[regDish()].n}（${RECIPES[regDish()].ings.map(stepTxt).join(' ＋ ')}）<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${itok(id)}${n}</span>`}).join(' ');

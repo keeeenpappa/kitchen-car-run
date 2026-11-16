@@ -389,9 +389,9 @@ const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 const EQUIP={
   board:{n:'まな板',e:'🔪',price:20,pro:{n:'よく切れるまな板',d:'切る時間 -40%'}},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
-  blender:{n:'ミキサー',e:'🌀',price:25,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
+  blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
   plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
-  sink:{n:'シンク',e:'🚰',price:20,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
+  sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
   table:{n:'テーブル',e:'🪑',price:12,outside:true},
   can:{n:'じょうろ',e:'💧',price:12,tool:true,noShop:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
@@ -585,7 +585,7 @@ function finishLayout(){
 function showEquipShop(){
   S.phase='equip';
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
-  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop),3).map(id=>equipOffer(id,1,0.15));
+  if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&(!EQUIP[k].rareOnly||Math.random()<0.15)),3).map(id=>equipOffer(id,1,EQUIP[id].rareOnly?1:0.15));   /* one of each is enough: the mixer and sink only come as rare ★ versions */
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
     const desc=o.pro?proInfo(o.id,o.pro).d:(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">

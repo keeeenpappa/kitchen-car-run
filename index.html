@@ -79,6 +79,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .gburst{position:absolute;left:50%;top:40%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:radial-gradient(circle,#fff,#ffe27a 40%,rgba(255,226,122,0) 70%);opacity:0;animation:gburst .7s 1.35s ease-out forwards}
 .gprize{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transform:scale(.4);animation:gpop .5s 1.55s cubic-bezier(.3,1.5,.6,1) forwards}
 .gprize img{width:170px;height:170px}.gprize b{font-size:22px;color:#ffe08a}.gprize span{font-size:13px}
+.gleft{align-self:center;font-size:14px;margin-left:6px}.gleft b{color:#ffe08a}
 .gok{opacity:0;animation:gin .3s 1.9s forwards}
 @keyframes gdrop{from{transform:translateY(-260px)}to{transform:none}}
 @keyframes gshake{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-9deg)}80%{transform:rotate(6deg)}}
@@ -3392,14 +3393,14 @@ function gachaPull(){
       <div class="gburst"></div>
       <div class="gprize"><img src="${skinPreview(R.sk,[k],200)}" alt=""><b>${R.e} ${R.n}</b><span>${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span>
         ${dup?`<span class="ng">もう持っている → かけら +1${conv?'<br>かけら4つでチケット1枚になった！':''}</span>`:'<span class="perf">NEW!</span>'}</div></div>
-    <div class="row gok"><button class="ovbtn autofocus" data-act="gacha">OK</button>${SV.t?'<button class="ovbtn" data-act="gpull">もう1回</button>':''}</div></div>`);
+    <div class="row gok"><button class="ovbtn autofocus" data-act="gacha">終わる</button>${SV.t?'<button class="ovbtn" data-act="gpull">もう1回</button>':''}<span class="gleft">チケット <b>${SV.t}</b>枚　かけら <b>${SV.sh}</b>/${SHARDS_PER}</span></div></div>`);
 }
 // dressing room for one chef: try skins on, 確定 keeps them, もどる throws the try-on away
 let DRESS=null;
 function dressHtml(){
   const sk=DRESS.sk,K=SKILLS[sk],ks=SKIN_K.filter(k=>SKINS[k].sk===sk),wear=SLOTS.map(sl=>DRESS.eq[sl]).filter(Boolean);
   const items=ks.map(k=>{const S0=SKINS[k];if(!SV.own.includes(k))return `<span class="dsk no">？<small>まだ持っていない</small></span>`;
-    const on=DRESS.eq[S0.slot]===k;return `<button class="ovbtn dsk${on?' on':''}" data-act="dtog" data-v="${k}">${S0.e} ${S0.n}<small>${SLOTN[S0.slot]}・${on?'つけている':'外している'}</small></button>`}).join('');
+    const on=DRESS.eq[S0.slot]===k;return `<button class="ovbtn dsk${on?' on':''}" data-act="dtog" data-v="${k}">${S0.e} ${S0.n}<small>${SLOTN[S0.slot]}</small></button>`}).join('');
   return `<div class="box big"><h2>${K.e} ${K.n}の着せ替え</h2>
     <div class="dress"><img src="${skinPreview(sk,wear,220)}" alt=""><div class="dlist">${items}</div></div>
     <div class="row"><button class="ovbtn autofocus" data-act="dok">確定</button><button class="ovbtn" data-act="dback">もどる</button></div></div>`;

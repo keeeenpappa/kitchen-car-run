@@ -2915,7 +2915,7 @@ function drawStool(X,Y){
 // the plate a customer left, dirty, on the table
 function drawTableDirty(c,X,Y){if(c&&c.item&&c.item.kind==='dirty')drawItem(c.item,X,Y-3,T*0.44)}
 // each town's colour for the tablecloth / chair check: the light-blue parts of the pictures are re-tinted [hue, saturation x, lightness +]
-const CLOTH={forest:[125,0.9,-0.02],ranch:[0,1.5,-0.06],busy:[225,1.1,-0.22],farm:[46,2.3,-0.04],sweets:[335,1.2,0],mountain:[24,2.1,-0.07],snow:[355,1.7,-0.08]};
+const CLOTH={forest:[48,2.4,-0.06],ranch:[0,1.5,-0.06],busy:[225,1.1,-0.22],farm:[215,1.4,-0.2],sweets:[165,1.3,-0.12],mountain:[24,2.1,-0.07],snow:[355,1.7,-0.08]};
 const CLOTH_CACHE={};
 function clothImg(k){
   const im=fimg(k);if(!im)return null;const id=S&&S.town&&S.town.id,P=CLOTH[id];if(!P)return im;
@@ -2929,7 +2929,7 @@ function clothImg(k){
     const [R1,G1,B1]=[[C,X,0],[X,C,0],[0,C,X],[0,X,C],[X,0,C],[C,0,X]][q];d[i]=(R1+m)*255;d[i+1]=(G1+m)*255;d[i+2]=(B1+m)*255}
   g.putImageData(D,0,0);return CLOTH_CACHE[ck]=c;
 }
-const lightGround=()=>!!(S&&S.town&&S.town.id==='snow');   /* white snow: tables and chairs get a dark outline to stand out */
+const lightGround=()=>!!(S&&S.town&&['snow','forest','sweets','farm'].includes(S.town.id));   /* grounds the tables blend into: outlined */   /* white snow: tables and chairs get a dark outline to stand out */
 function drawTableShape(X,Y,noStool){
   const lg=lightGround();softShadow(X+3,Y+T*0.46,T*0.52,9,lg?.6:.38);
   if(!noStool)drawStool(X,Y);

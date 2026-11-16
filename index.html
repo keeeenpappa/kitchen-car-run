@@ -493,8 +493,9 @@ function buildMap(){
   for(let y=3;y<=5;y++){if(y<5)set(2,y,'planter',{plant:null});set(15,y,'counter')}   /* 2 planters to start */
   set(15,4,'floor');set(16,4,'lever');
   for(let x=7;x<=10;x++)set(x,4,'counter');
-  const bot=['counter','window','counter','counter','door','counter','counter','counter','counter','counter','counter','window','counter','counter'];
+  const bot=['counter','window','counter','counter','counter','counter','counter','counter','counter','counter','counter','window','counter','counter'];
   bot.forEach((t,i)=>set(2+i,6,t));
+  {const dx=DOOR_XS[rnd(DOOR_XS.length)];set(dx,6,'door');DOOR_FRONT=[dx,5]}   /* the door is somewhere new on the outer row every trip (never a window) */
   m[6][3].win='後'; m[6][13].win='前';
   set(MKT[0],MKT[1],'market'); for(const k of GOBJ_K)set(GOBJ[k].x,GROW,'gather',{obj:k});
   for(let x=0;x<QSPAN;x++)set(QX+x,QY,'queue',{slot:Math.round(x/QGAP)});
@@ -538,7 +539,9 @@ const inTruck=(x,y)=>x>=2&&x<=15&&y>=2&&y<=6;
 const FIXED=new Set(['door','window','serve']);
 const FURN=['counter','planter','table','warp',...MOVABLE];
 const PILE=['counter','planter','table'];          // these come stacked in one pile outside
-const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_FRONT=[6,5];
+const COUNTERS_GIVEN=6, PLANTERS_GIVEN=3, DOOR_XS=[2,4,5,6,7,8,9,10,11,12,14];
+let DOOR_FRONT=[6,5];
+const syncDoor=()=>{for(let x=2;x<=15;x++)if(S.map[6][x].t==='door')DOOR_FRONT=[x,5]};   /* guests: the door's spot comes with the map */
 const emptyT=y=>y===6?'gap':'floor';
 const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 // spots outside for things handed over at layout time: first the row just outside the door (the door's own column stays free;
@@ -4583,7 +4586,8 @@ function applySnap(d){
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
     S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10,nbT:e[12]?1:0};
-  }
+  }  syncDoor();
+
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}
   S.cleanPlates=Math.max(0,Math.min(9,n(d.cp)));

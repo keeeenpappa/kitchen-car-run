@@ -3596,6 +3596,7 @@ function dressDone(keep){
   if(keep&&DRESS){SV.eq[DRESS.sk]=DRESS.eq;saveSV();if(NET.room&&NET.role==='guest')NET.room.presence({skn:SV.eq}).catch(()=>{})}
   DRESS=null;paintOv(gachaHtml());play('confirm');
 }
+const SEL_ICON_ZOOM={rabbit:1.22,elephant:1.22};   /* their wide ears fill the icon's width, so the face comes out small: shown bigger in the grid */
 function drawSelect(){
   const W=GW*T,H=VH*T;
   {const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#24414a');g.addColorStop(1,'#132026');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
@@ -3608,7 +3609,7 @@ function drawSelect(){
   SKILL_K.forEach((k,i)=>{const {x,y}=selCell(i),an=SKILL_ANIMAL[k],K=SKILLS[k];
     ctx.fillStyle='rgba(16,26,30,.6)';rr(x+6,y+4,SELG.cw-12,SELG.ch-8,14);ctx.fill();
     const im=CHEF.img[an+'_icon'];
-    if(im&&im.naturalWidth)ctx.drawImage(im,x+SELG.cw/2-SELG.icon/2,y+10,SELG.icon,SELG.icon);else emoji(K.e,x+SELG.cw/2,y+56,48);
+    if(im&&im.naturalWidth){const z=SEL_ICON_ZOOM[SKILL_ANIMAL[k]]||1,sz=SELG.icon*z;ctx.drawImage(im,x+SELG.cw/2-sz/2,y+10+SELG.icon/2-sz/2,sz,sz)}else emoji(K.e,x+SELG.cw/2,y+56,48);
     text(K.n,x+SELG.cw/2,y+SELG.ch-18,14,'#fff',800)});
   // cursors: each player's colour, nudged so several on one animal stay visible
   S.players.forEach((p,i)=>{if(!p.sel)return;const {x,y}=selCell(p.sel.cur),d=i*4;

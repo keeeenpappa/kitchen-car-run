@@ -396,6 +396,7 @@ const EQUIP={
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
   counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.25倍（スキルと重ねがけOK）'},{n:'寝かせカウンター',d:'町が終わったとき上にある食材が、次の町で1段階すすみ、冷蔵庫に同じ食材が1個増える'}]},
   warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
+  lucky:{n:'ラッキーボックス',e:'🎁',price:15,noShop:true},
   plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
@@ -426,7 +427,7 @@ const upN=(o,k)=>(o&&o.ups&&o.ups[k])||0;
 const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
 const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
 const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
-const WARP_P=0.08, FAST_MUL=1.25, WARP_OUT=[20,10], WARP_CD=3, WARP_HOLD=1;   /* WARP_HOLD: seconds standing on the gate before it sends the chef */   /* ★足速カウンター speed; the warp gate's fixed exit (under the 3rd spot of the line) and wait */
+const LUCKY_P=0.08, LUCKY_T=2, WARP_P=0.08, FAST_MUL=1.25, WARP_OUT=[20,10], WARP_CD=3, WARP_HOLD=1;   /* WARP_HOLD: seconds standing on the gate before it sends the chef */   /* ★足速カウンター speed; the warp gate's fixed exit (under the 3rd spot of the line) and wait */
 const nearFast=p=>{const x0=Math.floor(p.x),y0=Math.floor(p.y);for(let y=y0-1;y<=y0+1;y++)for(let x=x0-1;x<=x0+1;x++){const c=tile(x,y);if(c&&c.t==='counter'&&c.pro===4)return true}return false};
 let DT_NOW=0;
 function warpCheck(p){   /* stepping on the gate (only while stopped in a town) sends the chef to the exit; one way */
@@ -434,6 +435,7 @@ function warpCheck(p){   /* stepping on the gate (only while stopped in a town) 
   if(!c||c.t!=='warp'){p.wpT=0;return}
   p.wpT=(p.wpT||0)+DT_NOW;if(p.wpT<WARP_HOLD)return;p.wpT=0;
   float(p.x,p.y-0.5,'🌌','#d6c2ff');p.x=WARP_OUT[0]+0.5;p.y=WARP_OUT[1]+0.5;p.dx=0;p.dy=1;p.wpCD=WARP_CD;sfx('mystery');float(p.x,p.y-0.6,'ワープ！','#d6c2ff')}
+const hasSt=st=>S.map.some(r=>r.some(c=>c.t===st||(c.item&&c.item.st===st)))||S.players.some(p=>p.hold&&p.hold.st===st)||S.pendingEquip.some(o=>o.id===st)||S.stored.some(o=>o.st===st);
 const hasWarp=()=>S.map.some(r=>r.some(c=>c.t==='warp'||(c.item&&c.item.st==='warp')))||S.players.some(p=>p.hold&&p.hold.st==='warp')||S.pendingEquip.some(o=>o.id==='warp')||S.stored.some(o=>o.st==='warp');
 const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 15% faster (one counter's worth, never stacked) */
 const proMul=c=>(c.pro===1?(PRO_MUL[c.t]||1):1)*(c.help?HELP_MUL:1);
@@ -525,10 +527,10 @@ function newRun(np,mode){
 }
 function rebuildStations(){
   S.stations=[];
-  S.map.forEach((r,y)=>r.forEach((c,x)=>{if(['stove','blender','planter'].includes(c.t)){c._x=x;c._y=y;S.stations.push(c)}}));
+  S.map.forEach((r,y)=>r.forEach((c,x)=>{if(['stove','blender','planter','lucky'].includes(c.t)){c._x=x;c._y=y;S.stations.push(c)}}));
 }
 // ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
-const MOVABLE=['fridge','seedbox','sink','board','stove','blender','plates','trash'];
+const MOVABLE=['fridge','seedbox','sink','board','stove','blender','plates','trash','lucky'];
 const LAYOUT_TIME=90;
 const inTruck=(x,y)=>x>=2&&x<=15&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
@@ -608,9 +610,9 @@ function showEquipShop(){
   S.phase='equip';
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
   if(!S.eqOffers)S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&(!EQUIP[k].rareOnly||Math.random()<0.15)),3).map(id=>equipOffer(id,1,EQUIP[id].rareOnly?1:0.15));
-  if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)S.eqOffers.push(equipOffer('warp',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
+  if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)S.eqOffers.push(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)S.eqOffers.push(equipOffer('lucky',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
-    const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
+    const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
@@ -974,6 +976,7 @@ function accepts(c,h){
   if(h.kind!=='ing')return false;
   if(c.t==='stove')return nextStep(h)==='cook';
   if(c.t==='blender')return nextStep(h)==='blend'||(!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan([],h.id));
+  if(c.t==='lucky')return h.step===0&&!h.burnt&&!ING[h.id].mix;   /* a raw ingredient goes into the lucky box */
   return false;
 }
 const isDish=x=>!!x&&x.kind==='plate'&&!x.bare&&x.items.length>0;
@@ -995,7 +998,7 @@ function placeOrTake(p,c){
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
       if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c);c.herd=herdOn(p)}}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');
@@ -1123,7 +1126,7 @@ function doPick(p,c,tx,ty){
       else if(p.hold&&((p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)))say(p,'お皿にのせて出す');
       else say(p,'注文は '+orderText(g));
       return}
-    case 'counter':case 'board':case 'stove':case 'blender':
+    case 'counter':case 'board':case 'stove':case 'blender':case 'lucky':
       placeOrTake(p,c);return;
     case 'lever':
       if(canSeat(p)){takeSeat(p);sfx('lever')}
@@ -1183,6 +1186,17 @@ function buy(list,p,shop,tx,ty){
   if(shop)it.sold=true;
 }
 // ---------- fire ----------
+// ラッキーボックス: a raw ingredient goes in, shakes for LUCKY_T s, and something else pops out
+function luckyRoll(c){
+  const need=S.town?townNeeds(S.town).filter(i=>ING[i]&&!ING[i].mix):[],all=ING_K.filter(i=>!ING[i].mix),pk=a=>a[rnd(a.length)];
+  const town=()=>need.length?pk(need):pk(all),r=Math.random(),X=c._x+0.5,Y=c._y;let id,msg,col='#ffe08a';
+  if(r<0.55){id=town();msg='当たり！'}
+  else if(r<0.80){id=pk(all);msg='ポンッ！'}
+  else if(r<0.90){id=town();const id2=town();S.stock[id2]=(S.stock[id2]||0)+1;msg='大当たり！ '+ING[id2].e+'も冷蔵庫へ';col='#ff9fd0'}
+  else{id=pk(all);msg='はずれ…';col='#b0b8c0'}
+  c.item=newIng(id);c.item.lucked=true;if(r>=0.90)c.item.burnt=true;
+  sfx('mystery');float(X,Y,ING[id].e+' '+msg,col);
+}
 function igniteTile(c){
   if(c.fire||!FLAMMABLE.includes(c.t)||(c.wet||0)>0)return;
   c.fire=0.01;c.smoke=0;c.prog=0;
@@ -1886,6 +1900,7 @@ function update(dt){
   const growBoost=c=>(c.boostT||0)>0?2:1;
   for(const c of S.stations){if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);if(c.nbT>0)c.nbT=Math.max(0,c.nbT-dt)}
   for(const c of S.stations){
+    if(c.t==='lucky'){if(c.item&&c.item.kind==='ing'&&!c.item.lucked){c.prog+=dt;if(c.prog>=LUCKY_T){c.prog=0;luckyRoll(c)}}continue}
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
       if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*(c.help?1/HELP_MUL:1)*Math.pow(1.3,upN(c,'grow'));
@@ -2497,6 +2512,7 @@ function drawTile(c,x,y){
     text('ドア',X+T/2,Y+T*0.5,11,(S.phase==='stop'||S.phase==='layout')?'#8a7550':'#fff3d6');return}
   if(c.t==='lever'){drawLever(X,Y);return}
   if(c.t==='warp'){drawWarpGate(X+T/2,Y+T/2,1);return}
+  if(c.t==='lucky'){drawLuckyBox(c,X,Y);return}
   const col=TCOL[c.t]; if(!col)return;
   const loose=x<1;                        // drawn in someone's hands / as an item: no background
   const onFloor=!loose&&y<=5&&inTruck(x,y);
@@ -3050,6 +3066,19 @@ function playHint(p,c){
 // extinguisher powder: a white cloud blowing from the nozzle while spraying, and a cloud that hangs on a tile just put out
 const FX_OUT={},FX_PUFF={};
 function puffBlob(x,y,r,a){ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
+function drawLuckyBox(c,X,Y){   /* a rainbow box with a ?, shaking while it works; what came out sits on top */
+  const t=S.t||0,sh=c.prog>0?Math.sin(t*40)*2.5:0,loose=X<T;
+  if(!loose){ctx.fillStyle='rgba(30,20,10,.18)';rr(X+5,Y+T-10,T-10,7,4);ctx.fill()}
+  ctx.save();ctx.translate(X+T/2+sh,Y+T*0.55);ctx.rotate(c.prog>0?Math.sin(t*33)*0.06:0);
+  const w=T*0.74,h=T*0.56,cols=['#ff7a8a','#ffb347','#ffe066','#7fd88a','#6ec6ff','#b28cff'];
+  ctx.save();rr(-w/2,-h/2,w,h,7);ctx.clip();cols.forEach((cl,i)=>{ctx.fillStyle=cl;ctx.fillRect(-w/2+i*w/6,-h/2,w/6+1,h)});ctx.restore();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2.5;rr(-w/2,-h/2,w,h,7);ctx.stroke();
+  ctx.fillStyle='#fff8e8';rr(-w/2-3,-h/2-7,w+6,10,4);ctx.fill();ctx.strokeStyle='#e8a33a';ctx.lineWidth=1.5;rr(-w/2-3,-h/2-7,w+6,10,4);ctx.stroke();
+  ctx.font=`900 ${T*0.36}px ${FNT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=4;ctx.strokeStyle='#8a4fd0';ctx.strokeText('?',0,2);ctx.fillStyle='#fff';ctx.fillText('?',0,2);
+  ctx.restore();
+  if(c.item&&!(c.prog>0)&&!loose)drawItem(c.item,X+T/2,Y+T*0.28,T*0.5);
+  if(c.prog>0&&!loose)bar(X+6,Y+T-9,T-12,c.prog/LUCKY_T,'#ff9fd0');
+}
 function drawWarpGate(X,Y,k){   /* a purple swirl: k=1 the gate, k<1 the faint exit mark */
   const t=S.t||0;ctx.save();ctx.globalAlpha=k<1?0.75:1;
   const g=ctx.createRadialGradient(X,Y,2,X,Y,T*0.42);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(0.35,k<1?'rgba(190,160,255,.35)':'rgba(170,120,255,.9)');g.addColorStop(1,'rgba(120,70,220,0)');
@@ -4076,7 +4105,7 @@ const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:
   mySlot:0,seq:0,ovId:0,ovHtml:'',ovSentAt:0,snapT:0,mirror:false,hostPeer:null,wantOv:0,ovParts:{},shownOv:-1,
   pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
 const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
-const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp'];
+const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp','lucky'];
 const OFFER_K=['pack','seed','mystery','equip','fuel'];
 const r2=v=>Math.round(v*100)/100;
 (async function initNet(){

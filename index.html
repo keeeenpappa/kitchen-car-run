@@ -3179,7 +3179,8 @@ function drawSignBoard(X,Y){   /* an A-frame board: OPEN in red on cream, little
 }
 function drawSmileFx(){   /* まねきネコ's slow-down: pink sparkles twinkle along the waiting line while it lasts */
   if(!S||S.phase!=='stop'||!skillOn('smile'))return;const t=S.t||0;
-  ctx.save();for(let k=0;k<QMAX;k++)for(let j=0;j<2;j++){const ph=(t*1.3+k*0.37+j*0.5)%1,x=qCX(k)*T+(j?10:-12),y=QY*T+T*0.2-ph*20,z=2+2.2*Math.sin(ph*Math.PI);
+  ctx.save();ctx.fillStyle='rgba(255,140,190,.14)';rr(QX*T+2,(QY-0.15)*T,QSPAN*T-4,T*1.3,10);ctx.fill();   /* a soft pink tint over the line, like the meerkat's area */
+  for(let k=0;k<QMAX;k++)for(let j=0;j<2;j++){const ph=(t*1.3+k*0.37+j*0.5)%1,x=qCX(k)*T+(j?10:-12),y=QY*T+T*0.2-ph*20,z=2+2.2*Math.sin(ph*Math.PI);
     ctx.globalAlpha=0.85*Math.sin(ph*Math.PI);ctx.fillStyle=j?'#ffd23a':'#ff9fc4';ctx.beginPath();for(let q=0;q<8;q++){const r=q%2?z*0.4:z*1.4,an=q*Math.PI/4;ctx.lineTo(x+Math.cos(an)*r,y+Math.sin(an)*r)}ctx.closePath();ctx.fill()}
   ctx.restore();
 }

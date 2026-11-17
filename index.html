@@ -2597,7 +2597,7 @@ function drawTile(c,x,y){
   if(c.t==='warp'){drawWarpGate(X+T/2,Y+T/2,1);return}
   if(c.t==='lucky'){drawLuckyBox(c,X,Y);return}
   if(c.t==='sign'){drawSignBoard(X+T/2,Y+T/2);return}
-  if(c.t==='extst'){softShadow(X+T/2,Y+T*0.8,T*0.26,5,.3);if(!toolImg('tool_extinguisher',X+T/2,Y+T*0.45,T*0.8,1.3))emoji('🧯',X+T/2,Y+T/2,T*0.6);return}
+  if(c.t==='extst'){drawExtStand(X+T/2,Y+T*0.68);return}   /* feet a little up: the counter row in front would hide them */
   const col=TCOL[c.t]; if(!col)return;
   const loose=x<1;                        // drawn in someone's hands / as an item: no background
   const onFloor=!loose&&y<=5&&inTruck(x,y);
@@ -3183,6 +3183,21 @@ function drawLuckyBox(c,X,Y){   /* a rainbow box with a ?, shaking while it work
   if(c.prog>0&&!loose)bar(X+6,Y+T-9,T-12,c.prog/LUCKY_T,'#ff9fd0');
 }
 const proMark=(st,pro)=>st==='counter'&&pro?['','🤝','📦','🔀','💨','🌙'][pro]:st==='board'&&pro===2?'⚙️':'';   /* the mark of a ★ unit with an effect */
+function drawExtStand(cx,by){   /* a tall red extinguisher standing on the floor (feet at by), drawn in the game's own soft style */
+  const w=T*0.36,h=T*0.74,x0=cx-w/2,top=by-h;
+  softShadow(cx,by,T*0.3,5,.32);
+  const g=ctx.createLinearGradient(x0,0,x0+w,0);g.addColorStop(0,'#c7372f');g.addColorStop(0.45,'#f05a4a');g.addColorStop(1,'#a82a24');
+  ctx.fillStyle=g;rr(x0,top,w,h,w*0.42);ctx.fill();ctx.strokeStyle='#7d1f1a';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.35)';rr(x0+w*0.18,top+h*0.12,w*0.16,h*0.62,3);ctx.fill();          // shine
+  ctx.fillStyle='#fff3e0';rr(x0+w*0.12,top+h*0.42,w*0.76,h*0.22,3);ctx.fill();                         // label
+  ctx.fillStyle='#d04a3a';ctx.font=`900 ${Math.round(T*0.14)}px ${FNT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('消火',cx,top+h*0.53);
+  ctx.fillStyle='#3b3f45';rr(cx-w*0.22,top-T*0.07,w*0.44,T*0.09,3);ctx.fill();                       // valve
+  ctx.strokeStyle='#3b3f45';ctx.lineWidth=3;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(cx-w*0.1,top-T*0.06);ctx.lineTo(cx-w*0.55,top-T*0.13);ctx.stroke();       // handle
+  ctx.beginPath();ctx.moveTo(cx+w*0.2,top-T*0.03);ctx.quadraticCurveTo(cx+w*0.95,top+h*0.1,cx+w*0.62,top+h*0.55);ctx.stroke();   // hose
+  ctx.fillStyle='#3b3f45';rr(cx+w*0.5,top+h*0.52,w*0.24,T*0.1,2);ctx.fill();                            // nozzle
+  ctx.lineCap='butt';
+}
 function drawSignBoard(X,Y){   /* an A-frame board: OPEN in red on cream, little hearts float up while it works */
   softShadow(X,Y+T*0.38,T*0.36,6,.35);ctx.strokeStyle='#7a5434';ctx.lineWidth=3;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(X-T*0.26,Y+T*0.38);ctx.lineTo(X-T*0.12,Y-T*0.3);ctx.moveTo(X+T*0.26,Y+T*0.38);ctx.lineTo(X+T*0.12,Y-T*0.3);ctx.stroke();

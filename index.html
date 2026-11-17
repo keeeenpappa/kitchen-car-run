@@ -247,7 +247,7 @@ const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const HEART_MAX=3;
 const PLATES_TOTAL=5, WASH=2.0;   // the truck owns 5 plates; washing one at the sink takes 2 s (作業 hold)
-const WAIT_PAT=1.2;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
+const WAIT_PAT=1.2, SMILE_MUL=0.8, SIGN_MUL=0.85, SIGN_P=0.08;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
 const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=0.6;
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
@@ -432,6 +432,7 @@ const EQUIP={
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
   counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'寝かせカウンター',d:'町が終わったとき上にある食材が、次の町で1段階すすみ、冷蔵庫に同じ食材が1個増える'}]},
   warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
+  sign:{n:'呼び込み看板',e:'🪧',price:20,noShop:true},
   lucky:{n:'ラッキーボックス',e:'🎰',price:15,noShop:true},
   plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
@@ -458,7 +459,7 @@ function makeEquip(id,pro){
   return {kind:'station',st:id,pro:pro||0};
 }
 // power-ups picked after a town are applied to ONE unit (a stove, a planter, a watering can...), stored as ups:{key:n}
-const UPK=['cook','chop','blend','burn','grow','yield','can','basket'];
+const UPK=['cook','chop','blend','burn','grow','yield','can','basket','ret'];
 const upN=(o,k)=>(o&&o.ups&&o.ups[k])||0;
 const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
 const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
@@ -476,7 +477,7 @@ const hasWarp=()=>S.map.some(r=>r.some(c=>c.t==='warp'||(c.item&&c.item.st==='wa
 const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 15% faster (one counter's worth, never stacked) */
 const proMul=c=>(c.pro===1?(PRO_MUL[c.t]||1):1)*(c.help?HELP_MUL:1);
 function helpRefresh(){   /* marks the units standing next to a ★お手伝いカウンター (run on host and guests alike) */
-  if(!S||!S.map)return;
+  if(!S||!S.map)return;S._sign=S.map.some(r=>r.some(c=>c.t==='sign'));
   for(let y=2;y<=6;y++)for(let x=2;x<=15;x++){const c=S.map[y][x];
     c.help=HELP_T.has(c.t)&&DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='counter'&&t.pro===1})}
 }
@@ -558,7 +559,7 @@ function newRun(np,mode){
    let done=false;for(const y of [6,2,3,4,5])for(let x=2;x<=15&&!done;x++){const t=S.map[y][x];if(t.t==='counter'&&!t.item&&reach(x,y)){t.item={kind:'ext'};done=true}}}
   planTicket();
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
-  if(TESTGEAR)putOutside([{kind:'station',st:'warp',pro:0},{kind:'station',st:'lucky',pro:0},{kind:'station',st:'board',pro:2},
+  if(TESTGEAR)putOutside([{kind:'station',st:'warp',pro:0},{kind:'station',st:'lucky',pro:0},{kind:'station',st:'sign',pro:0},{kind:'station',st:'board',pro:2},
     ...[1,2,3,4,5].map(pro=>({kind:'station',st:'counter',pro}))]);
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
@@ -618,6 +619,7 @@ function setupLayout(){
   let tb=0;
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table'){tb++;S.map[y][x]={t:'ground',item:null,prog:0,burn:0}}
   if(tb)objs.push({kind:'station',st:'table',n:tb});
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='sign'){objs.push({kind:'station',st:'sign'});S.map[y][x]={t:'ground',item:null,prog:0,burn:0}}
   putOutside(objs);
   rebuildStations();
   S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;
@@ -659,9 +661,9 @@ function showEquipShop(){
     if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((_,i)=>R.push([id,i+1]));
       const [id,pro]=R[rnd(R.length)];S.eqOffers[rnd(3)]={type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*1.8)}}
   }
-  if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)S.eqOffers.push(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)S.eqOffers.push(equipOffer('lucky',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
+  if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)S.eqOffers.push(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)S.eqOffers.push(equipOffer('lucky',1,0));if(!hasSt('sign')&&Math.random()<SIGN_P)S.eqOffers.push(equipOffer('sign',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
-    const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
+    const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
@@ -718,6 +720,12 @@ function furnPick(p,c,tx,ty){
     if(!(c.t==='ground'&&!c.item)){say(p,(TGTN[tg]||'器具')+'に重ねる');return true}
   }
   // tables: set down / pick up on the plaza (layout time)
+  // the signboard: set down / picked up on the plaza in layout time (it works from wherever it stands)
+  if(lay&&h&&h.kind==='station'&&h.st==='sign'){
+    if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){S.map[ty][tx]={t:'sign',item:null,prog:0,burn:0};p.hold=null;return true}
+    if(inTruck(tx,ty)){say(p,'看板は外の広場に置く');return true}
+  }
+  if(lay&&!h&&c.t==='sign'){p.hold={kind:'station',st:'sign'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
   if(lay&&h&&h.kind==='station'&&h.st==='table'){
     if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){if(!tableOK(tx,ty)){say(p,'となりにテーブルがある（お客さんが座る場所）');return true}S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
     if(inTruck(tx,ty)){say(p,'テーブルは外の広場に置く');return true}
@@ -882,7 +890,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   grow:{n:'ミツバチ',e:'🐝',d:'使ったときにまわり2マスにある菜園の苗が、15秒間2倍の速さで育つ',dur:15,cd:45,now:true},
   dash:{n:'ウサギ',e:'🐇',d:'自分の走る速さ1.5倍',dur:10,cd:35},
   wash:{n:'カワウソ',e:'🦦',d:'自分の皿洗いが2倍速',dur:12,cd:40},
-  smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンに',dur:0.6,cd:45,now:true},
+  smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンにして、そのあと10秒間ゆっくり減る（×0.8）',dur:10,cd:45,now:true},
   forage:{n:'リス',e:'🐿️',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
   haggle:{n:'キツネ',e:'🦊',d:'自分が買うと、道のお店も町の市場も3割引き',dur:17,cd:45},
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
@@ -1275,7 +1283,7 @@ function doAct(p,c,tx,ty,dt){
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'🍽 きれいに','#cdeeff')}
+    p.actT+=dt*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;if(upN(c,'ret'))S.cleanPlates++;else c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,upN(c,'ret')?'🍽 皿置き場へ':'🍽 きれいに','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
@@ -1568,6 +1576,7 @@ const UPS=[
   {id:'pay',e:'📈',n:'看板メニュー',d:'料理の値段 +10%',max:3,apply:u=>u.pay*=1.1},
   {id:'plot',e:'🪴',n:'菜園を広げる',d:'菜園 +1マス（次の配置で置く）',max:3,apply:()=>addPlanter()},
   {id:'grow',e:'🌿',n:'肥料',d:'菜園1つの育つ速さ 1.3倍',max:3,tgt:'planter'},
+  {id:'ret',e:'🍽️',n:'食器の返却口',d:'シンク1台で洗ったお皿が、自動で皿置き場に戻る',max:1,tgt:'sink'},
   {id:'can',e:'💧',n:'じょうろの改造',d:'じょうろ1つの水 +2回分',max:2,tgt:'can'},
   {id:'yield',e:'🌾',n:'豊作',d:'菜園1つの収穫 +1個',max:3,tgt:'planter'},
   {id:'shopx',e:'🛒',n:'顔なじみの店',d:'窓口の品数 +1',max:2,apply:u=>u.shopExtra++},
@@ -1580,7 +1589,7 @@ const UPS=[
 ];
 // the new planter is handed over outside and placed in the next layout time
 function addPlanter(){S.pendingEquip.push({id:'planter',pro:0})}
-const TGTN={stove:'コンロ',board:'まな板',blender:'ミキサー',planter:'菜園',can:'じょうろ',basket:'カゴ'};
+const TGTN={sink:'シンク',stove:'コンロ',board:'まな板',blender:'ミキサー',planter:'菜園',can:'じょうろ',basket:'カゴ'};
 const upById=id=>UPS.find(u=>u.id===id);
 // the money, big, on the screens between towns
 /* the same gold coin picture as the money on the game screen (the 🪙 emoji is silver on some devices) */
@@ -2065,7 +2074,7 @@ function update(dt){
           // 大食い: one more dish (the empty plate stays on the table)
           if(ctypeOf(c).second&&!c.secondDone){c.secondDone=true;c.order=pickMenu();c.st='seat';c.pat=c.max;float(c.tx+.5,c.ty-0.3,'おかわり！','#ffe08a','status_refill');sfx('seat');continue}
           startLeave(c,false)}continue}
-        c.pat-=c.st==='wait'?dt/WAIT_PAT:dt;   // waiting in line to be led to a table lasts a little longer
+        c.pat-=c.st==='wait'?dt/WAIT_PAT*(skillOn('smile')?SMILE_MUL:1)*(S._sign?SIGN_MUL:1):dt;   /* まねきネコ after the refill / 呼び込み看板 */   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
       if(S.timer<=0){S.sub='closing';S.closeT=2;sfx('close');S.toast={text:'営業終了！',t:0,life:2};if(S.served>0)ticketCheck(null)}   /* not a single dish served in that town: no ticket */
@@ -2574,6 +2583,7 @@ function drawTile(c,x,y){
   if(c.t==='lever'){drawLever(X,Y);return}
   if(c.t==='warp'){drawWarpGate(X+T/2,Y+T/2,1);return}
   if(c.t==='lucky'){drawLuckyBox(c,X,Y);return}
+  if(c.t==='sign'){drawSignBoard(X+T/2,Y+T/2);return}
   const col=TCOL[c.t]; if(!col)return;
   const loose=x<1;                        // drawn in someone's hands / as an item: no background
   const onFloor=!loose&&y<=5&&inTruck(x,y);
@@ -3159,6 +3169,20 @@ function drawLuckyBox(c,X,Y){   /* a rainbow box with a ?, shaking while it work
   if(c.prog>0&&!loose)bar(X+6,Y+T-9,T-12,c.prog/LUCKY_T,'#ff9fd0');
 }
 const proMark=(st,pro)=>st==='counter'&&pro?['','🤝','📦','🔀','💨','🌙'][pro]:st==='board'&&pro===2?'⚙️':'';   /* the mark of a ★ unit with an effect */
+function drawSignBoard(X,Y){   /* an A-frame board: OPEN in red on cream, little hearts float up while it works */
+  softShadow(X,Y+T*0.38,T*0.36,6,.35);ctx.strokeStyle='#7a5434';ctx.lineWidth=3;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(X-T*0.26,Y+T*0.38);ctx.lineTo(X-T*0.12,Y-T*0.3);ctx.moveTo(X+T*0.26,Y+T*0.38);ctx.lineTo(X+T*0.12,Y-T*0.3);ctx.stroke();
+  ctx.fillStyle='#fff6e0';rr(X-T*0.3,Y-T*0.36,T*0.6,T*0.46,6);ctx.fill();ctx.strokeStyle='#b8834f';ctx.lineWidth=2;ctx.stroke();
+  text('OPEN',X,Y-T*0.2,11,'#d04a3a',900);text('いらっしゃい',X,Y-T*0.02,7,'#7a5434',800);
+  const t=S.t||0;for(let k=0;k<2;k++){const a=(t*0.6+k*0.5)%1;ctx.globalAlpha=0.8*(1-a);ctx.fillStyle='#ff8fb0';ctx.beginPath();const hx=X+(k?8:-8),hy=Y-T*0.42-a*16;
+    ctx.moveTo(hx,hy+3);ctx.bezierCurveTo(hx-5,hy-1,hx-3,hy-5,hx,hy-2);ctx.bezierCurveTo(hx+3,hy-5,hx+5,hy-1,hx,hy+3);ctx.fill()}ctx.globalAlpha=1;
+}
+function drawSmileFx(){   /* まねきネコ's slow-down: pink sparkles twinkle along the waiting line while it lasts */
+  if(!S||S.phase!=='stop'||!skillOn('smile'))return;const t=S.t||0;
+  ctx.save();for(let k=0;k<QMAX;k++)for(let j=0;j<2;j++){const ph=(t*1.3+k*0.37+j*0.5)%1,x=qCX(k)*T+(j?10:-12),y=QY*T+T*0.2-ph*20,z=2+2.2*Math.sin(ph*Math.PI);
+    ctx.globalAlpha=0.85*Math.sin(ph*Math.PI);ctx.fillStyle=j?'#ffd23a':'#ff9fc4';ctx.beginPath();for(let q=0;q<8;q++){const r=q%2?z*0.4:z*1.4,an=q*Math.PI/4;ctx.lineTo(x+Math.cos(an)*r,y+Math.sin(an)*r)}ctx.closePath();ctx.fill()}
+  ctx.restore();
+}
 function drawWarpGate(X,Y,k){   /* a purple swirl: k=1 the gate, k<1 the faint exit mark */
   const t=S.t||0;ctx.save();ctx.globalAlpha=k<1?0.75:1;
   const g=ctx.createRadialGradient(X,Y,2,X,Y,T*0.42);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(0.35,k<1?'rgba(190,160,255,.35)':'rgba(170,120,255,.9)');g.addColorStop(1,'rgba(120,70,220,0)');
@@ -4016,7 +4040,7 @@ function drawWorld(arr){
   if(S.view==='road')drawShops();
   ctx.save();ctx.translate(0,-bounce);
   drawCab(false);
-  drawFires();drawWarpExit();
+  drawFires();drawWarpExit();drawSmileFx();
   drawPlayers();
   drawExtFx();
   drawTicketPop();
@@ -4211,7 +4235,7 @@ const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:
   mySlot:0,seq:0,ovId:0,ovHtml:'',ovSentAt:0,snapT:0,mirror:false,hostPeer:null,wantOv:0,ovParts:{},shownOv:-1,
   pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
 const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
-const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp','lucky'];
+const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp','lucky','sign'];
 const OFFER_K=['pack','seed','mystery','equip','fuel'];
 const r2=v=>Math.round(v*100)/100;
 (async function initNet(){
@@ -4540,7 +4564,7 @@ function sendSnap(){
     tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
     sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,
-    mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),cp:S.cleanPlates,
+    mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100)]),
@@ -4691,7 +4715,8 @@ function applySnap(d){
     S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10,nbT:e[12]?1:0};
   }  syncDoor();
 
-  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table'||c.t==='sign')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
+  for(const a of Array.isArray(d.sg)?d.sg:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'sign',item:null}}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}
   S.cleanPlates=Math.max(0,Math.min(9,n(d.cp)));
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}

@@ -48,6 +48,8 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
 #ov{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;background:var(--scrim);padding:16px;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #ov>.box{margin:auto}  /* centred when it fits; when it is taller than the screen it starts at the top and scrolls */
 #ov[hidden]{display:none}
+#ov:has(.tbox){background:linear-gradient(to bottom,transparent 45%,rgba(6,10,14,.55))}
+#ov>.tbox{margin:auto auto 0;max-width:640px;background:rgba(22,34,40,.9);padding:14px 16px;gap:8px}
 #readyBtn{position:absolute;bottom:4%;right:12px;z-index:5;background-color:var(--truck);color:#1b1206;border-color:#1b1206;
   background-image:linear-gradient(90deg,rgba(255,255,255,.65) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none}
 .stars{font-size:1.9em;line-height:1;margin:.15em 0 .3em;letter-spacing:.05em}.stars.big{font-size:2.8em}.stars.sm{font-size:1em;letter-spacing:0}
@@ -1839,6 +1841,7 @@ function ovAction(a,v){
   }
   else if(a==='end')showEnd();
   else if(a==='title')showTitle();
+  else if(a==='ghelp')showTitleHelp();
   else if(a==='again')playAgain();
   else if(a==='resume')resumeGame();
   else if(a==='ready')finishLayout();
@@ -1888,7 +1891,16 @@ function showTitle(){
   scanStop();
   if(NET.role!=='off')leaveOnline();
   S=null;
-  showOv(`<div class="box"><h2>ドコドコ・キッチンカー</h2>
+  // the title truck is drawn behind: keep this box low and short so it stays in view
+  showOv(`<div class="box tbox">
+    <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
+    <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
+    <div class="row"><button class="ovbtn" data-act="ghelp">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button></div>
+    ${bestLine()}
+    <div id="netTitle">${netTitleHtml()}</div></div>`);
+}
+function showTitleHelp(){
+  showOv(`<div class="box"><h2>遊び方・設定</h2>
     <p>キッチンカーで町から町へ。走っている間は窓口で通りすがりのお店から仕入れ、町に着いたら料理を出して稼ぎます。4つの町を回りきれば完走です。</p>
     <table class="ctl pconly"><tr><th></th><th>移動</th><th>持つ・置く</th><th>作業（長押し）</th><th>選択を切り替え</th><th>スキル</th></tr>
     <tr><td>P1</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><kbd>Space</kbd></td><td><kbd>F</kbd></td><td><kbd>Q</kbd></td><td><kbd>R</kbd></td></tr>
@@ -1899,12 +1911,7 @@ function showTitle(){
     ${sndRow()}
     ${viewRow()}
     <p class="sub" style="color:var(--muted)">スマホ：左下のスティックで移動、右下の「持つ」「作業（長押し）」「切替」で操作（P1）。横向きがおすすめです。</p>
-    <p style="color:var(--muted)">テスト用に、2つの始め方を選べます。</p>
-    <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
-    <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
-    <div class="row"><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button></div>
-    ${bestLine()}
-    <div id="netTitle">${netTitleHtml()}</div></div>`);
+    <div class="row"><button class="ovbtn autofocus" data-act="title">もどる</button></div></div>`);
 }
 const MOOD={'-10':'静か','0':'落ち着いた','10':'ほどよい人通り','20':'にぎやか','30':'活気あり'};
 // the town's mood sets both the sell price and how many customers come
@@ -2030,7 +2037,7 @@ function update(dt){
     if(c.t==='lucky'){if(c.item&&c.item.kind==='ing'&&!c.item.lucked){c.prog+=dt;if(c.prog>=LUCKY_T){c.prog=0;luckyRoll(c)}}continue}
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered)c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*(c.help?1/HELP_MUL:1)*Math.pow(1.3,upN(c,'grow'));
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered&&S.phase!=='layout')c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*(c.help?1/HELP_MUL:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
     const it=c.item; if(!it){c.fast=false;c.herd=false;c.smoke=0;continue}
@@ -2614,17 +2621,16 @@ function drawCab(front){
   ctx.restore();
 }
 let LEVA=-0.5;
-// the tile under the cab window is the way into the driver's seat: a cab door with a step
+// the tile under the cab window is the way into the driver's seat: a tall, narrow cab door standing right of the teal mat
 function drawLever(X,Y){
-  const x=X+6,y=Y+3,w=T-10,h=T-8;
-  softShadow(x+w/2,Y+T-2,w*0.55,4,.3);
-  const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,'#e3a12a');g.addColorStop(1,'#c4861a');
-  ctx.fillStyle=g;rr(x,y,w,h,[6,10,4,4]);ctx.fill();
-  ctx.strokeStyle='rgba(110,60,0,.45)';ctx.lineWidth=1.5;ctx.stroke();
-  ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x+4,y+2);ctx.lineTo(x+w-6,y+2);ctx.stroke();
-  ctx.fillStyle='#fff3d6';rr(x+w-11,y+h*0.45,8,3.5,1.7);ctx.fill();                 // handle
-  ctx.fillStyle='#8c5a12';rr(x-2,Y+T-8,w+4,5,2);ctx.fill();                          // step
-  ctx.fillStyle='rgba(255,255,255,.35)';rr(x-1,Y+T-8,w+2,1.5,1);ctx.fill();
+  const x=X+2,y=Y+3,w=11,h=T-8;
+  softShadow(x+w/2+2,Y+T-3,w*0.9,3,.28);
+  const g=ctx.createLinearGradient(x,0,x+w,0);g.addColorStop(0,'#f0b33c');g.addColorStop(1,'#c4861a');
+  ctx.fillStyle=g;rr(x,y,w,h,[5,5,3,3]);ctx.fill();
+  ctx.strokeStyle='rgba(110,60,0,.55)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='rgba(190,235,245,.85)';rr(x+2.5,y+4,w-5,h*0.28,2.5);ctx.fill();   // a slim window
+  ctx.fillStyle='rgba(255,255,255,.4)';ctx.fillRect(x+2,y+3,1.5,h-6);                // edge highlight
+  ctx.fillStyle='#fff3d6';rr(x+w-4.5,y+h*0.55,3,7,1.5);ctx.fill();                   // handle
 }
 function frontLabel(b,t,col){text(t,b.cx,b.fy+b.fh/2-0.5,8,col||'rgba(255,255,255,.9)',800)}
 function drawTile(c,x,y){
@@ -4181,9 +4187,10 @@ function drawSidePanel(px,py,pw,phh){
   ctx.fillStyle='rgba(16,26,30,.86)';rr(x0,y0,w,h,10);ctx.fill();
   ctx.beginPath();ctx.rect(x0,y0,w,h);ctx.clip();
   const BASE='#e8f0ee',runs=[],st=[{c:BASE,b:false}];
-  const re=/<br\s*\/?>|<(\/?)(b|span)([^>]*)>|([^<]+)/g;let m;
+  const re=/<br\s*\/?>|<(\/?)(b|span)([^>]*)>|<[^>]*>|([^<]+)/g;let m;
   while((m=re.exec(html))){
     if(m[0].startsWith('<br')){runs.push(null);continue}
+    if(!m[2]&&m[4]==null)continue;   // any other tag is skipped, never drawn as text
     if(m[2]){
       if(m[1]){if(st.length>1)st.pop();continue}
       const top=st[st.length-1],a=m[3]||'';let c=top.c;
@@ -4269,11 +4276,12 @@ const localP=()=>S.players[NET.role==='off'?0:NET.mySlot]||S.players[0];
 const pct=m=>Math.round((1-m)*100);
 const UP_EFF={cook:n=>'焼く時間 -'+pct(Math.pow(0.75,n))+'%',chop:n=>'切る時間 -'+pct(Math.pow(0.7,n))+'%',blend:n=>'混ぜる時間 -'+pct(Math.pow(0.6,n))+'%',
   burn:n=>'焦げるまで +'+6*n+'秒',grow:n=>'育つ速さ '+Math.pow(1.3,n).toFixed(2).replace(/0$/,'')+'倍',yield:n=>'収穫 +'+n+'個',can:n=>'水 +'+2*n+'回分',basket:n=>'入る数 +'+2*n};
-const upsText=o=>Object.entries(o.ups||{}).filter(([,n])=>n>0).map(([k,n])=>{const U=upById(k);return U?upIcHtml(U)+U.n+(n>1?'×'+n:'')+'（'+(UP_EFF[k]?UP_EFF[k](n):U.d)+'）':''}).join('　');
+const upTok=U=>FOOD.img['up_'+U.id]?ITOK+'up_'+U.id+ITOK:U.e;   /* side-panel text is drawn on the canvas: a token, never an <img> */
+const upsText=o=>Object.entries(o.ups||{}).filter(([,n])=>n>0).map(([k,n])=>{const U=upById(k);return U?upTok(U)+U.n+(n>1?'×'+n:'')+'（'+(UP_EFF[k]?UP_EFF[k](n):U.d)+'）':''}).join('　');
 function upInfo(){
   const ps=[localP(),...S.players].filter(Boolean);
   const hp=ps.find(q=>q.hold&&q.hold.kind==='power');
-  if(hp){const U=upById(hp.hold.up);if(U)return `<br><b style="color:#ffd84a">↑ ${upIcHtml(U)} ${U.n}</b>：${U.d}。<b>${TGTN[U.tgt]}</b>に重ねると、その1台だけ強くなります`}
+  if(hp){const U=upById(hp.hold.up);if(U)return `<br><b style="color:#ffd84a">↑ ${upTok(U)} ${U.n}</b>：${U.d}。<b>${TGTN[U.tgt]}</b>に重ねると、その1台だけ強くなります`}
   const p=localP();if(!p)return '';
   // the unit in hand first, otherwise the one being faced
   const h=p.hold, held=h&&(h.kind==='station'||h.kind==='can'||h.kind==='basket');

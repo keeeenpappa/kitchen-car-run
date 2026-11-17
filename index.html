@@ -1395,7 +1395,7 @@ function serve(p,tx,ty,c){
   if(!rid){say(p,'料理になっていない');return}
   const CT=ctypeOf(c);
   // which order this dish fills (a family has two; either can come first)
-  let k=-1;if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
+  let k=-1;if(c.orders)k=c.orders.findIndex((o,i)=>o===rid&&!c.got[i]);else if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
   if(k<0){say(p,'注文は '+orderText(c));return}
   const [pay,tip]=payTip(c,rid);
   S.combo=comboNext();S.comboMax=COMBO_T[S.np]||17;S.comboT=S.comboMax;S.comboPop=0;
@@ -1405,7 +1405,8 @@ function serve(p,tx,ty,c){
   if(CT.takeout){ticketCheck(tx+.5,ty);startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
   // they start eating once everything they ordered is on the table
   ticketCheck(tx+.5,ty);
-  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1);if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5)}
+  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1);if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5);
+    if(c.orders){S.grpN=(S.grpN||0)+1;float(tx+.5,ty-0.6,'団体ボーナス スコア+'+GRP_PT,'#ffd0f0');sfx('mystery')}}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');
 }
 
@@ -1466,7 +1467,7 @@ function custPos(c){
 }
 function startLeave(c,mad){const [x,y]=custPos(c);c.from=c.st;c.st='leave';c.mad=mad;c.lx=x;c.ly=y;c.by=-1}
 // the empty plate stays on the table, dirty
-function leavePlate(c){const nPl=c.order2?2:1,tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'){if(tb.item&&tb.item.kind==='dirty')tb.item.cnt=(tb.item.cnt||1)+nPl;else tb.item={kind:'dirty',cnt:nPl}}}
+function leavePlate(c){const nPl=c.orders?c.orders.length:c.order2?2:1,tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'){if(tb.item&&tb.item.kind==='dirty')tb.item.cnt=(tb.item.cnt||1)+nPl;else tb.item={kind:'dirty',cnt:nPl}}}
 // 子連れ: the child gets bored and wanders around the plaza; 持つ next to it sends it back to the table
 const KID_SPD=1.5, KID_BACK=3.2;
 const KID_RANGE=3;   // tiles from its table (across, down and diagonally)
@@ -1496,7 +1497,12 @@ const CTYPE={
   takeout:{n:'お持ち帰り',e:'🥡',w:1.1,takeout:true},  // stays in the line: bring the dish there; the plate comes back dirty at once
   vip:{n:'VIP',e:'👑',w:0.45,pat:0.7,pay:2},          // rare, short fuse, pays double
   regular:{n:'常連',e:'🎫',w:0,reg:true},              // never random: see S.reg
+  group:{n:'団体',e:'👥',w:0,grp:true},                // never random: once per town (2+ players), announced first: see S.grp
 };
+// 団体客: announced GRP_LEAD seconds ahead with their orders (time to get cooking), then 3-4 arrive together and share one table
+const GRP_LEAD=20, GRP_PT=60;
+const GRP_N=[0,0,3,4,4];            // people in the group, by player count (no group when playing alone)
+const GRP_PAT=[0,0,150,140,130];    // how long they wait at the table (seconds), by player count
 const CTYPE_K=Object.keys(CTYPE);
 const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
 const pickMenu=()=>S.town.menu[rnd(S.town.menu.length)];
@@ -1505,7 +1511,7 @@ const CUST_ALL=Object.values(CUST_AN).flat().concat(['tanuki']);
 const REG_NAME='常連さん', REG_HUE=30;   // no personal name: just 常連
 const pickAnimal=()=>{const k=S.town&&(S.town.id||Object.keys(TOWNS).find(k=>TOWNS[k]===S.town)),l=CUST_AN[k]||CUST_ALL;return l[rnd(l.length)]};
 // the orders still to bring (a family has two)
-const pendingOrders=c=>c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
+const pendingOrders=c=>c.orders?c.orders.filter((o,k)=>!c.got[k]):c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
 const orderText=c=>pendingOrders(c).map(o=>RECIPES[o].e+RECIPES[o].n).join('・');
 function spawnCust(){
   if(waiting().length>=QMAX)return;
@@ -1517,6 +1523,12 @@ function spawnCust(){
   if(CT.two){c.order2=pickMenu();c.got=[false,false]}
   if(type==='regular'){if(!S.reg)S.reg={order:c.order,st:'cand'};else{S.regCame=true;S.toast={text:'🎫 '+REG_NAME+'が来た！ いつもの：'+RECIPES[c.order].n,t:0,life:3.5}}}
   S.cust.push(c);sfx('bell');
+}
+function spawnGroup(){
+  const G=S.grp,n=G.orders.length,max=GRP_PAT[S.np]||140;
+  const c={type:'group',orders:G.orders.slice(),got:G.orders.map(()=>false),order:G.orders[0],pat:max,max,hue:rnd(360),an:pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0,ans:[],hues:[]};
+  for(let k=1;k<n;k++){c.ans.push(pickAnimal());c.hues.push(rnd(360))}
+  S.cust.push(c);sfx('bell');S.toast={text:'👥 団体さんが来た！ テーブルに案内しよう',t:0,life:3};
 }
 function clearKitchen(){
   const rested=[];
@@ -1560,8 +1572,8 @@ function clearKitchen(){
 function endStop(){
   if(S.reg&&S.reg.st==='cand')S.reg.st='off';   // never served in the first town: not a regular
   // customers still eating leave their plate behind, dirty
-  for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.order2?2:1}}
-  S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
+  for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.orders?c.orders.length:c.order2?2:1}}
+  S.grp=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);S.townIds.push(S.town&&S.town.id);
   const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0);
@@ -1642,6 +1654,7 @@ function townStars(served,missed){
 function runScore(clear){
   const earned=S.totalEarned+(S.phase==='over'?S.earned:0), served=S.totalServed+(S.phase==='over'?S.served:0);
   const rows=[['売上 '+earned+'G',earned],['提供 '+served+'皿 ×'+SERVE_PT,served*SERVE_PT],['ノーミスの町 '+S.perfect+' ×'+PERFECT_PT,S.perfect*PERFECT_PT]];
+  if(S.grpN)rows.push(['団体さん '+S.grpN+'組 ×'+GRP_PT,S.grpN*GRP_PT]);
   if(clear){rows.push(['完走ボーナス',CLEAR_PT]);rows.push(['残った評判 '+S.hearts+' ×'+HEART_PT,S.hearts*HEART_PT])}
   return {rows,total:rows.reduce((a,r)=>a+r[1],0)};
 }
@@ -1810,6 +1823,7 @@ const pauseHtml=()=>`<div class="box"><h2>一時停止</h2><p class="mut">${isTo
 const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べる',slow:'気が長いけど、食べるのがゆっくり（テーブルを長く使う）',hasty:'気が短いけど、早く出すとチップが多い',
   big:'食べ終わると、おかわりを頼む',family:'食事中に子どもが歩き回る。子どもの近くで「持つ」で連れ戻すまで帰れない',
   takeout:'席に座らず列で待つ。料理を列まで持っていって渡す（皿はその場で汚れた皿になる）',vip:'たまに来る。王冠をかぶっている。待てる時間は短いけど、料金が2倍',
+  group:'2人以上のときだけ、町ごとに1回。先に「団体さんが来るよ！」と注文が出て、少しあとに3〜4人で来て1つのテーブルに座る。人数分の料理をそろえると団体ボーナス（スコア）',
   regular:'ポイントカードを持ったタヌキ。最初の町のどこかで来て、そのとき頼んだ料理を「いつもの」として、ほかの町でも毎回頼む（その町のメニューになくても）。町を進むほどチップが増える。怒らせると来なくなる'};
 const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
   return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:k==='normal'&&CUST.img.dog_front_base?'<span class="fi fk-dog_front_base"></span>':(C.e||'')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
@@ -2065,11 +2079,15 @@ function update(dt){
     if(S.sub==='prep'){if(S.timer<=0){
       const b=S.bonus||0;
       S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;S.combo=0;S.comboT=0;S.regCame=false;S.regAt=S.timer*(0.4+Math.random()*0.45);sfx('service');
+      S.grp=GRP_N[S.np]?{st:0,ann:S.timer*(0.5+Math.random()*0.25),orders:Array.from({length:GRP_N[S.np]},pickMenu)}:null;
       if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
     else if(S.sub==='closing'){S.timer=0;S.closeT-=dt;if(S.closeT<=0)endStop()}
     else{
       if(S.comboT>0&&!skillOn('combo')){S.comboT-=dt;if(S.comboT<=0){S.comboT=0;S.combo=0;S.comboBreak=0}}
       S.spawnT-=dt;
+      if(S.grp){const G=S.grp;
+        if(G.st===0&&S.timer<=G.ann){G.st=1;sfx('bell');S.toast={text:'👥 団体さんが来るよ！ 先に料理を作っておこう',t:0,life:3.5}}
+        if(G.st===1&&S.timer<=G.ann-GRP_LEAD&&waiting().length<QMAX){G.st=2;spawnGroup()}}
       if(S.spawnT<=0){spawnCust();S.spawnT=spawnInterval()*(0.75+Math.random()*0.5)}
       for(let k=S.cust.length-1;k>=0;k--){
         const c=S.cust[k];
@@ -2915,6 +2933,14 @@ function drawQueueMat(){
     ctx.font=`800 12px ${FNT}`;const w=ctx.measureText(m).width+34;
     ctx.globalAlpha=0.75+0.25*k;ctx.fillStyle='#fff';rr(X-w,Y-12,w,24,12);ctx.fill();ctx.strokeStyle='#e2504a';ctx.lineWidth=2;ctx.stroke();
     emoji(stIc('status_coming','👣'),X-w+14,Y,15);text(m,X-w+26,Y,12,'#e2504a',800,'left');ctx.globalAlpha=1}
+  // 団体さん: the countdown and their orders, so the kitchen can start before they arrive
+  if(S.phase==='stop'&&S.sub==='service'&&S.grp&&S.grp.st===1){
+    const G=S.grp,left=Math.max(0,Math.ceil(S.timer-(G.ann-GRP_LEAD))),m=left>0?'団体さん あと'+left+'秒':'団体さん もうすぐ';
+    const k=0.5+0.5*Math.sin(S.t*6),X=QX*T-8,Y=QY*T+T*0.5;ctx.font=`800 13px ${FNT}`;
+    const tw=ctx.measureText(m).width,w=tw+24+G.orders.length*26;
+    ctx.fillStyle='#fff6e0';rr(X-w,Y-15,w,30,13);ctx.fill();ctx.strokeStyle=`rgba(226,80,74,${0.6+0.4*k})`;ctx.lineWidth=2.5;ctx.stroke();
+    text(m,X-w+12,Y,13,'#c23a34',800,'left');
+    G.orders.forEach((o,i)=>emoji(dishIc(o),X-w+tw+26+i*26,Y,21))}
 }
 function drawTables(withSeated){
   const tbs=[];for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table')tbs.push([x,y]);
@@ -3047,7 +3073,17 @@ function drawCustBody(X,Y,c){
     const FY=seat?Y+17:Y+16-(walk?Math.abs(Math.sin(S.t*10))*2:0);
     if(CT.kid&&!c.kidAway)drawCustFig(X+(seat?15:14),seat?Y+12:Y+18,c.an,KID_HUE(c.hue),'front',false,0.6,'normal');
     if(!seat)softShadow(X,Y+15,12,4,.3);
-    const HY=drawCustFig(X,FY,c.an,c.hue,dir,flip,1,c.type);
+    // 団体: the others trail behind (line / led / leaving), or sit around the same table
+    const mem=[];if(c.ans)c.ans.forEach((an,k)=>{let ox=0,oy=0,front=false;
+      if(seat){const P=c.ans.length>=3?[[-0.62,0.16],[0.62,0.16],[-0.26,-0.04]]:[[-0.62,0.16],[0.62,0.16]];[ox,oy]=P[k]||[0,0];ox*=T;oy*=T;front=oy>0}
+      else{const p=c.st==='follow'&&S.players[c.by],ddx=c.st==='leave'?1:c.st==='wait'?-1:p?(p.dx||0):0,ddy=p?(p.dy||0):0;
+        ox=-(ddx||(!ddy?-1:0))*T*0.4*(k+1);oy=-ddy*T*0.4*(k+1)}
+      mem.push({an,hue:c.hues[k]||0,ox,oy,front})});
+    const X0=seat&&c.ans&&c.ans.length>=3?X+T*0.26:X;
+    const drawMem=f=>{for(const m of mem)if(m.front===f){if(!seat)softShadow(X+m.ox,Y+15+m.oy,11,4,.3);drawCustFig(X+m.ox,FY+m.oy,m.an,m.hue,dir,flip,0.92,'normal')}};
+    drawMem(false);
+    const HY=drawCustFig(X0,FY,c.an,c.hue,dir,flip,1,c.type);
+    drawMem(true);
     if(c.type==='vip'&&HY!=null)drawVip(X,HY,FY);
     if(c.type==='regular'&&HY!=null){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('常連').width+10;ctx.fillStyle='rgba(124,74,180,.9)';rr(X-w/2,FY+2,w,14,7);ctx.fill();text('常連',X,FY+9,10,'#fff',800)}
     if(CT.e&&!custIcon(X,HY,c.type)){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,7.5,0,7);ctx.fill();emoji(CT.e,X-16,HY-11.5,10)}
@@ -3092,7 +3128,7 @@ function drawCustomers(){
     if(c.st==='seat'||c.st==='eat'){
       const Y=py*T-T*0.42;
       // order bubble above the table (a happy face while eating)
-      const top=Y-58,bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?[stIc('status_kid_missing','👶')]:[stIc('status_eating','😋')]):pendingOrders(c).map(o=>dishIc(o)),bw=ord.length>1?66:40;
+      const top=Y-58,bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?[stIc('status_kid_missing','👶')]:[stIc('status_eating','😋')]):pendingOrders(c).map(o=>dishIc(o)),bw=ord.length>1?28*ord.length+10:40;
       ctx.fillStyle='#fff';rr(X-bw/2,top,bw,bh,9);ctx.fill();
       ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
       ord.forEach((e,k)=>emoji(e,X+(k-(ord.length-1)/2)*28,top+bh/2,ord.length>1?21:24));
@@ -4598,7 +4634,7 @@ function sendSnap(){
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100)]),
-    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an)]),
+    cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an),c.orders?[c.orders.map(o=>REC_K.indexOf(o)),c.got.reduce((a,g,i)=>a+(g?1<<i:0),0),c.ans.map(a=>CUST_ALL.indexOf(a)),c.hues]:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100),f.ic||'']),
@@ -4606,6 +4642,7 @@ function sendSnap(){
     to:S.toast?[S.toast.text,Math.round(S.toast.t*10),Math.round(S.toast.life*10)]:0,
     sc:S.phase==='select'?Math.round((S.selT||0)*10):-1,sh2:S.phase==='select'?Math.round((S.selHold||0)*100):0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
+  d.gp=S.grp?[S.grp.st,Math.round(S.grp.ann*10),S.grp.orders.map(o=>REC_K.indexOf(o))]:0;
   d.wt=S.waitN||0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
@@ -4731,6 +4768,7 @@ function applySnap(d){
   if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
   S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;
+  S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
   S.waitN=Math.max(0,Math.min(3,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>2)}):null;
@@ -4757,7 +4795,7 @@ function applySnap(d){
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null,skn:Array.isArray(a[19])?a[19].slice(0,3).map(x=>SKIN_K[n(x)]).filter(Boolean):[],wpT:n(a[20])/100});
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
-  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])]}));
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])],...(Array.isArray(a[18])&&Array.isArray(a[18][0])?(()=>{const o=a[18][0].slice(0,4).map(x=>REC_K[n(x)]||'burger'),gm=n(a[18][1]);return {orders:o,got:o.map((_,i)=>!!(gm&(1<<i))),ans:(a[18][2]||[]).slice(0,3).map(x=>CUST_ALL[n(x)]),hues:(a[18][3]||[]).slice(0,3).map(n)}})():{})}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100,ic:/^status_[a-z_]{1,20}$/.test(a[5])?a[5]:''}));

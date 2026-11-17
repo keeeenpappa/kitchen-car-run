@@ -735,11 +735,10 @@ function furnPick(p,c,tx,ty){
   }
   if(lay&&!h&&c.t==='sign'){p.hold={kind:'station',st:'sign'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
   if(lay&&h&&h.kind==='station'&&h.st==='table'){
-    if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){if(!tableOK(tx,ty)){say(p,'となりにテーブルがある（お客さんが座る場所）');return true}S.map[ty][tx]={t:'table',item:null,prog:0,burn:0};p.hold=null;return true}
+    if(c.t==='ground'&&!c.item&&inTblZone(tx,ty)){if(!tableOK(tx,ty)){say(p,'となりにテーブルがある（お客さんが座る場所）');return true}S.map[ty][tx]={t:'table',item:h.top||null,prog:0,burn:0};p.hold=null;return true}
     if(inTruck(tx,ty)){say(p,'テーブルは外の広場に置く');return true}
   }
-  if(lay&&c.t==='table'&&c.item&&c.item.kind==='dirty'){if(!h){p.hold=c.item;c.item=null;sfx('pick')}else if(h.kind==='dirty'){c.item.cnt=(c.item.cnt||1)+(h.cnt||1);p.hold=null;sfx('put')}else say(p,'手を空けて汚れた皿を持つ');return true}
-  if(lay&&!h&&c.t==='table'){p.hold={kind:'station',st:'table'};S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
+  if(lay&&!h&&c.t==='table'){p.hold={kind:'station',st:'table',top:c.item||null};   /* dirty plates ride along with the table */S.map[ty][tx]={t:'ground',item:null,prog:0,burn:0};return true}
   // put a counter / planter / piece of equipment down on an empty floor spot in the truck (equipment: any time)
   if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}

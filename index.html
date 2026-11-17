@@ -1051,7 +1051,7 @@ function placeOrTake(p,c){
   // a mixer still being filled: empty hand takes the last one back out, a fitting raw ingredient goes in
   if(c.t==='blender'&&it&&it.kind==='mix'){
     if(!h){p.hold=newIng(it.items.pop());if(!it.items.length)c.item=null;return}
-    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);c.herd=herdOn(p);return}
+    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);act(p,'blend');c.herd=herdOn(p);return}
     say(p,'この組み合わせは混ぜられない');return}
   // a counter holds one plate: empty plates only stack on the plate stand
   if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
@@ -1061,7 +1061,7 @@ function placeOrTake(p,c){
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;if(c.t==='stove')act(p,'cook');else if(c.t==='blender')act(p,'blend');if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
       if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c);c.herd=herdOn(p)}}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');
@@ -1156,10 +1156,10 @@ function doPick(p,c,tx,ty){
     case 'planter':
       if(c.plant){
         if(p.hold&&p.hold.kind==='can'){waterPlant(p,c,tx,ty);return}
-        if(c.plant.t>=ING[c.plant.id].grow)harvest(c,tx,ty);
+        if(c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest')}
         else say(p,c.plant.watered?'まだ育っていない':'水が必要（じょうろ）');
       }
-      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false};p.hold=null;say(p,'じょうろで水をあげる');sfx('plant')}
+      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false};p.hold=null;act(p,'plant');say(p,'じょうろで水をあげる');sfx('plant')}
       else if(p.hold&&p.hold.kind==='can')say(p,'先に種を植える');
       else say(p,'種を持ってくる');
       return;
@@ -1170,7 +1170,7 @@ function doPick(p,c,tx,ty){
         if(p.hold&&p.hold.kind==='plate'&&!p.hold.bare&&p.hold.items.length){serve(p,tx,ty,w);return}
         say(p,'お持ち帰り：'+orderText(w)+'を持ってくる');return}
       if(follower(p)){say(p,'もう1人案内している');return}
-      w.st='follow';w.by=p.i;say(p,'空いているテーブルへ案内');sfx('follow');return}
+      w.st='follow';w.by=p.i;act(p,'guide');say(p,'空いているテーブルへ案内');sfx('follow');return}
     case 'table':{
       if(S.phase!=='stop')return;
       const g=guestAt(tx,ty),f=follower(p);
@@ -1292,10 +1292,10 @@ function doAct(p,c,tx,ty,dt){
     if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;c.wet=WET_T;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
     else say(p,'燃えている！ 消火器で消す');
     return}
-  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0}return}
-  if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);p.lock=true;return}
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
+  if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest');p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;if(upN(c,'ret'))S.cleanPlates++;else c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,upN(c,'ret')?'🍽 皿置き場へ':'🍽 きれいに','#cdeeff')}
+    p.actT+=dt*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;act(p,'wash');if(upN(c,'ret'))S.cleanPlates++;else c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,upN(c,'ret')?'🍽 皿置き場へ':'🍽 きれいに','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
@@ -1357,7 +1357,7 @@ function gatherInput(p,inp,dt){
 const forageMul=p=>(p.skT||0)>0&&p.skill==='forage'?2:1;   // 採りじょうず's skill
 function gatherDone(p,n){
   const g=p.g,O=GOBJ[g.obj];
-  sfx('catch');
+  sfx('catch');act(p,'g_'+g.obj);
   if(O.items.length>1){g.item=O.items[rnd(O.items.length)];g.st=2;return}
   addToBasket(p,Array((n||1)*forageMul(p)).fill(O.items[0]));p.g=null;
 }
@@ -1400,7 +1400,7 @@ function serve(p,tx,ty,c){
   const [pay,tip]=payTip(c,rid);
   S.combo=comboNext();S.comboMax=COMBO_T[S.np]||17;S.comboT=S.comboMax;S.comboPop=0;
   if(CT.reg&&S.reg&&S.reg.st==='cand')S.reg.st='on';
-  S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;
+  S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;act(p,'serve');
   if(c.got)c.got[k]=true;
   if(CT.takeout){ticketCheck(tx+.5,ty);startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
   // they start eating once everything they ordered is on the table
@@ -1444,6 +1444,36 @@ function genMarket(town){
   for(const id of seeds)out.push({type:'seed',id,qty:2,price:Math.round(ING[id].seed*1.5)});
   return out;
 }
+// 全員ミッション: one per town, "everyone does X once" (alone: X three times). It nudges people out of fixed roles.
+// When every circle is filled: score +MSN_PT, and some ingredients of the next town go into the fridge on arrival.
+const MSN={
+  serve:'料理を出す',chop:'材料を切る',cook:'コンロで焼く・煮る',wash:'皿を洗う',plant:'種を植える',harvest:'菜園で収穫する',guide:'お客さんを席に案内する',blend:'ミキサーで混ぜる',
+  g_pond:'釣りをする',g_log:'原木でキノコを採る',g_barn:'畜舎で牛乳か卵をとる',g_tree:'木の実（くり・りんご）を採る',g_field:'畑でいもかにんじんを採る'};
+const MSN_K=Object.keys(MSN);
+const MSN_COMMON=['serve','chop','cook','wash','plant'];
+const MSN_TOWN={port:'g_pond',forest:'g_log',ranch:'g_barn',busy:'guide',farm:'harvest',sweets:'blend',mountain:'g_tree',snow:'g_field'};
+const MSN_PT=60, MSN_SOLO=3, MSN_GIFT=2;
+const msnNeed=()=>S.np===1?MSN_SOLO:1;
+function pickMission(){
+  const tk=S.town&&MSN_TOWN[S.town.id],last=S.msnLast;
+  let k;
+  if(tk&&tk!==last&&Math.random()<0.5)k=tk;
+  else{   // the common job that someone has done least so far this trip
+    const A=S.acts||{},lo=j=>Math.min(...S.players.map(q=>((A[q.i]||{})[j])||0));
+    const l=MSN_COMMON.filter(j=>j!==last);let m=Infinity;for(const j of l)m=Math.min(m,lo(j));
+    const c=l.filter(j=>lo(j)===m);k=c[rnd(c.length)]}
+  S.msnLast=k;S.msn={k,d:S.players.map(()=>0),ok:false};
+}
+// a player did something: remember it (for picking later missions) and count it for this town's mission
+function act(p,k){
+  if(!S||!p||NET.role==='guest')return;
+  const A=S.acts||(S.acts={}),a=A[p.i]||(A[p.i]={});a[k]=(a[k]||0)+1;
+  const M=S.msn;if(!M||M.ok||M.k!==k||S.phase!=='stop')return;
+  const need=msnNeed();if((M.d[p.i]||0)>=need)return;M.d[p.i]=(M.d[p.i]||0)+1;
+  if(S.players.every(q=>(M.d[q.i]||0)>=need)){M.ok=true;S.msnN=(S.msnN||0)+1;S.msnGift=true;sfx('mystery');
+    S.toast={text:'🎯 ミッション達成！ スコア+'+MSN_PT+'・次の町で材料のおまけ',t:0,life:3.5}}
+  else float(p.x,p.y-0.9,'🎯','#ffe08a');
+}
 function arrive(){
   // earlier / later than running at ふつう the whole way → more / less service time
   const delta=Math.round((S.refT||0)-(S.actT||0));
@@ -1453,6 +1483,10 @@ function arrive(){
   S.boostN=0;for(const q of S.players)if(skillOf(q).perTown)q.skT=0;
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];S.arrT=0;
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
+  if(S.msnGift){S.msnGift=false;const l=townNeeds(S.town).filter(i=>!ING[i].mix),got=[];
+    for(let k=0;k<MSN_GIFT&&l.length;k++){const i=l[rnd(l.length)];S.stock[i]=(S.stock[i]||0)+1;got.push(ING[i].e)}
+    if(got.length)S.toast={text:'🎯 ミッションのおまけ：冷蔵庫に '+got.join('')+' が入った',t:0,life:3.5}}
+  pickMission();
 }
 function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
 // st: wait (in line) -> follow (led by player `by`) -> seat (at table tx,ty, order shown) -> eat (paid, leaves after EAT_T)
@@ -1573,7 +1607,7 @@ function endStop(){
   if(S.reg&&S.reg.st==='cand')S.reg.st='off';   // never served in the first town: not a regular
   // customers still eating leave their plate behind, dirty
   for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.orders?c.orders.length:c.order2?2:1}}
-  S.grp=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
+  S.grp=null;S.msn=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);S.townIds.push(S.town&&S.town.id);
   const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0);
@@ -1654,6 +1688,7 @@ function townStars(served,missed){
 function runScore(clear){
   const earned=S.totalEarned+(S.phase==='over'?S.earned:0), served=S.totalServed+(S.phase==='over'?S.served:0);
   const rows=[['売上 '+earned+'G',earned],['提供 '+served+'皿 ×'+SERVE_PT,served*SERVE_PT],['ノーミスの町 '+S.perfect+' ×'+PERFECT_PT,S.perfect*PERFECT_PT]];
+  if(S.msnN)rows.push(['ミッション達成 '+S.msnN+'回 ×'+MSN_PT,S.msnN*MSN_PT]);
   if(S.grpN)rows.push(['団体さん '+S.grpN+'組 ×'+GRP_PT,S.grpN*GRP_PT]);
   if(clear){rows.push(['完走ボーナス',CLEAR_PT]);rows.push(['残った評判 '+S.hearts+' ×'+HEART_PT,S.hearts*HEART_PT])}
   return {rows,total:rows.reduce((a,r)=>a+r[1],0)};
@@ -3944,6 +3979,7 @@ function drawTopBarPhone(){
   if(tw){const nm=(S.phase==='stop'?'':'→ ')+tw.e+' '+tw.n;ctx.font=`800 15px ${FNT}`;const nw=ctx.measureText(nm).width+20;
     ctx.fillStyle='#2f6f6a';rr(170,9,nw,26,13);ctx.fill();text(nm,180,y,15,'#fff',800,'left')}
   drawCombo(tw?170+ctx.measureText((S.phase==='stop'?'':'→ ')+tw.e+' '+tw.n).width+30:170,10,1,true);
+  drawMission(6,46,1);
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'配置 '+fmtT(S.timer):'時間切れ';
   else if(S.phase==='drive')ph=kmTxt(Math.min(S.dist,S.route))+'/'+kmTxt(S.route)+'km';
@@ -3962,6 +3998,18 @@ function drawTopBarPhone(){
   if(NET.role!=='off'&&NET.code)text('部屋 '+NET.code,14,y2,12,'#ffe08a',800,'left');
 }
 // money / reputation / timer drawn on the canvas itself so it is visible on phones too
+// the mission line: 🎯 what to do, then one circle per player, filled in that player's colour once they have done it
+function drawMission(x,y,zm){
+  const M=S&&S.msn;if(!M||S.phase!=='stop')return 0;
+  const need=msnNeed(),lab='🎯 '+(S.np===1?MSN[M.k]+'（'+Math.min(need,M.d[0]||0)+'/'+need+'）':'全員が1回ずつ'+MSN[M.k]);
+  ctx.save();ctx.translate(x,y);ctx.scale(zm,zm);
+  ctx.font=`800 12px ${FNT}`;const lw=ctx.measureText(lab).width,w=lw+24+S.players.length*20;
+  ctx.fillStyle=M.ok?'rgba(40,90,50,.92)':'rgba(16,26,30,.9)';rr(0,0,w,24,12);ctx.fill();ctx.strokeStyle=M.ok?'#7fe0a0':'#9fd8ff';ctx.lineWidth=1.5;ctx.stroke();
+  text(lab,10,12,12,'#fff',800,'left');
+  S.players.forEach((q,i)=>{const cx=lw+22+i*20,on=(M.d[q.i]||0)>=need;ctx.beginPath();ctx.arc(cx,12,7,0,7);
+    if(on){ctx.fillStyle=PCOL[q.i];ctx.fill()}ctx.strokeStyle=on?'#fff':PCOL[q.i];ctx.lineWidth=2;ctx.stroke()});
+  ctx.restore();return w*zm;
+}
 function drawCombo(x,y,zm,compact){zm=zm||1;
   if(S.comboPop!=null)S.comboPop+=1/60;if(S.comboBreak!=null)S.comboBreak+=1/60;
   if(S.phase!=='stop'||!S.combo){
@@ -3985,7 +4033,7 @@ function drawTopBar(){
   let hx=150;for(let k=0;k<HEART_MAX;k++)text('♥',hx+k*20,y,18,k<S.hearts?'#ff6d6d':'#3b5059',800);
   text('チップ×'+tipRate().toFixed(2).replace(/0$/,''),hx+HEART_MAX*20+2,y,12,'#ffcfcf',800,'left');
   text('町 '+Math.min(S.stop+1,STOPS)+'/'+STOPS,345,y,15,'#f4eedf',800,'left');
-  drawCombo(150,6+T*0.8+4,1.5);
+  {const mw=drawMission(12,6+T*0.8+6,1.2);drawCombo(mw?Math.max(150,12+mw+12):150,6+T*0.8+4,1.5)}
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'レイアウト '+fmtT(S.timer):'時間切れ';
   else if(S.phase==='drive')ph='🛣 '+kmTxt(Math.min(S.dist,S.route))+' / '+kmTxt(S.route)+' km';
@@ -4643,6 +4691,7 @@ function sendSnap(){
     sc:S.phase==='select'?Math.round((S.selT||0)*10):-1,sh2:S.phase==='select'?Math.round((S.selHold||0)*100):0,
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
   d.gp=S.grp?[S.grp.st,Math.round(S.grp.ann*10),S.grp.orders.map(o=>REC_K.indexOf(o))]:0;
+  d.ms=S.msn?[S.msn.k,S.msn.d,S.msn.ok?1:0]:0;
   d.wt=S.waitN||0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
@@ -4769,6 +4818,7 @@ function applySnap(d){
   S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;
   S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
+  S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;
   S.waitN=Math.max(0,Math.min(3,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>2)}):null;

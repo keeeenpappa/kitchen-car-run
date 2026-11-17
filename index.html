@@ -2192,26 +2192,28 @@ function drawItem(it,cx,cy,s,inHand){
     ctx.fillStyle='rgba(255,255,255,.35)';rr(cx-s*0.12,cy-s*0.18,3,s*0.4,1.5);ctx.fill();
     return}
   if(it.kind==='can'){
-    {// a classic watering can seen from the side: a tapered body, a big arched handle on top, a long straight spout with a rose
-     const L=Math.max(1.2,s*0.03),ol='#2d6a86';
-     ctx.fillStyle='rgba(0,0,0,.14)';ctx.beginPath();ctx.ellipse(cx-s*0.06,cy+s*0.25,s*0.3,s*0.07,0,0,7);ctx.fill();
-     // spout (behind the body): from the lower front up to the rose
-     ctx.lineCap='round';ctx.strokeStyle=ol;ctx.lineWidth=Math.max(4,s*0.11);ctx.beginPath();ctx.moveTo(cx+s*0.06,cy+s*0.14);ctx.lineTo(cx+s*0.4,cy-s*0.24);ctx.stroke();
-     ctx.strokeStyle='#7cc4e0';ctx.lineWidth=Math.max(2.4,s*0.075);ctx.beginPath();ctx.moveTo(cx+s*0.06,cy+s*0.14);ctx.lineTo(cx+s*0.4,cy-s*0.24);ctx.stroke();
-     ctx.save();ctx.translate(cx+s*0.43,cy-s*0.28);ctx.rotate(-0.85);   // the rose: a little funnel with holes
-     ctx.fillStyle='#5aa6c8';ctx.strokeStyle=ol;ctx.lineWidth=L;ctx.beginPath();ctx.moveTo(-s*0.05,s*0.03);ctx.lineTo(-s*0.1,-s*0.06);ctx.lineTo(s*0.1,-s*0.06);ctx.lineTo(s*0.05,s*0.03);ctx.closePath();ctx.fill();ctx.stroke();
-     ctx.fillStyle='#bfe6f4';ctx.beginPath();ctx.ellipse(0,-s*0.06,s*0.1,s*0.03,0,0,7);ctx.fill();ctx.stroke();
-     ctx.fillStyle=ol;for(const d of [-0.05,0,0.05])ctx.fillRect(d*s-0.7,-s*0.06-0.7,1.4,1.4);ctx.restore();
-     // handle: one big arch over the top, from the back to the middle
-     ctx.strokeStyle=ol;ctx.lineWidth=Math.max(4,s*0.1);ctx.beginPath();ctx.moveTo(cx-s*0.27,cy-s*0.02);ctx.bezierCurveTo(cx-s*0.36,cy-s*0.42,cx+s*0.06,cy-s*0.44,cx+s*0.02,cy-s*0.16);ctx.stroke();
-     ctx.strokeStyle='#6bb4d4';ctx.lineWidth=Math.max(2.4,s*0.065);ctx.stroke();ctx.lineCap='butt';
-     // body: wider at the bottom
-     const g=ctx.createLinearGradient(cx-s*0.3,0,cx+s*0.14,0);g.addColorStop(0,'#3f8fb2');g.addColorStop(0.35,'#8fd0e8');g.addColorStop(1,'#4a95b6');
-     ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(cx-s*0.25,cy-s*0.16);ctx.lineTo(cx+s*0.07,cy-s*0.16);ctx.lineTo(cx+s*0.13,cy+s*0.2);ctx.quadraticCurveTo(cx+s*0.13,cy+s*0.24,cx+s*0.08,cy+s*0.24);
-     ctx.lineTo(cx-s*0.26,cy+s*0.24);ctx.quadraticCurveTo(cx-s*0.31,cy+s*0.24,cx-s*0.31,cy+s*0.2);ctx.closePath();ctx.fill();ctx.strokeStyle=ol;ctx.lineWidth=L;ctx.stroke();
-     ctx.fillStyle='#a9dcef';ctx.beginPath();ctx.ellipse(cx-s*0.09,cy-s*0.16,s*0.16,s*0.04,0,0,7);ctx.fill();ctx.stroke();   // the top opening
-     ctx.strokeStyle='rgba(45,106,134,.6)';ctx.beginPath();ctx.moveTo(cx-s*0.29,cy+s*0.12);ctx.lineTo(cx+s*0.12,cy+s*0.12);ctx.stroke();   // a band
-     ctx.fillStyle='rgba(255,255,255,.6)';rr(cx-s*0.21,cy-s*0.1,s*0.05,s*0.2,s*0.025);ctx.fill()}
+    {// a garden watering can: a tapered tin body (wide at the bottom) with a flat top and filler hole, a D handle at the back,
+     // a long straight spout from low in front ending in a flat rose; soft blue with a warm brown outline
+     const L=Math.max(1.4,s*0.035),ol='#6b4a2f',bx=cx-s*0.08;
+     ctx.lineJoin='round';ctx.lineCap='round';
+     ctx.fillStyle='rgba(0,0,0,.13)';ctx.beginPath();ctx.ellipse(bx+s*0.04,cy+s*0.27,s*0.34,s*0.06,0,0,7);ctx.fill();
+     // spout (behind the body)
+     ctx.fillStyle='#a8dcf2';ctx.strokeStyle=ol;ctx.lineWidth=L;
+     ctx.beginPath();ctx.moveTo(bx+s*0.12,cy+s*0.06);ctx.lineTo(bx+s*0.43,cy-s*0.2);ctx.lineTo(bx+s*0.47,cy-s*0.15);ctx.lineTo(bx+s*0.14,cy+s*0.17);ctx.closePath();ctx.fill();ctx.stroke();
+     ctx.save();ctx.translate(bx+s*0.46,cy-s*0.19);ctx.rotate(-0.72);   // the rose: a flat round head with holes
+     ctx.fillStyle='#e9f6fb';ctx.beginPath();ctx.ellipse(0,0,s*0.035,s*0.085,0,0,7);ctx.fill();ctx.stroke();
+     ctx.fillStyle=ol;for(const d of [-0.045,0,0.045])ctx.fillRect(-0.7,d*s-0.7,1.4,1.4);ctx.restore();
+     // D handle at the back
+     ctx.strokeStyle=ol;ctx.lineWidth=Math.max(4.5,s*0.1);ctx.beginPath();ctx.moveTo(bx-s*0.2,cy-s*0.13);ctx.bezierCurveTo(bx-s*0.42,cy-s*0.14,bx-s*0.44,cy+s*0.1,bx-s*0.24,cy+s*0.12);ctx.stroke();
+     ctx.strokeStyle='#a8dcf2';ctx.lineWidth=Math.max(2.5,s*0.06);ctx.stroke();
+     // body: narrower top, wider bottom, and a base rim
+     const g=ctx.createLinearGradient(bx-s*0.26,0,bx+s*0.2,0);g.addColorStop(0,'#8ccbe8');g.addColorStop(0.55,'#b6e2f5');g.addColorStop(1,'#93cfe9');
+     ctx.fillStyle=g;ctx.strokeStyle=ol;ctx.lineWidth=L;
+     ctx.beginPath();ctx.moveTo(bx-s*0.2,cy-s*0.17);ctx.lineTo(bx+s*0.13,cy-s*0.17);ctx.lineTo(bx+s*0.2,cy+s*0.2);ctx.lineTo(bx-s*0.27,cy+s*0.2);ctx.closePath();ctx.fill();ctx.stroke();
+     ctx.fillStyle='#9fd5ee';rr(bx-s*0.29,cy+s*0.19,s*0.51,s*0.06,s*0.03);ctx.fill();ctx.stroke();
+     ctx.fillStyle='#c3e8f7';ctx.beginPath();ctx.ellipse(bx-s*0.035,cy-s*0.17,s*0.165,s*0.045,0,0,7);ctx.fill();ctx.stroke();   // flat top
+     ctx.fillStyle='#6fb3d4';ctx.beginPath();ctx.ellipse(bx-s*0.09,cy-s*0.172,s*0.06,s*0.02,0,0,7);ctx.fill();               // filler hole
+     ctx.fillStyle='rgba(255,255,255,.6)';rr(bx+s*0.06,cy-s*0.1,s*0.04,s*0.24,s*0.02);ctx.fill();ctx.lineCap='butt'}
     const cap=canCap(it);
     if(it.bonus)text('★',cx+s*0.36,cy-s*0.34,12,'#ff4fa3',800);
     if(upTotal(it))text('↑'+upTotal(it),cx-s*0.34,cy-s*0.34,11,'#ffd84a',800);

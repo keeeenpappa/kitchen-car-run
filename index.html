@@ -1448,7 +1448,7 @@ function genMarket(town){
 // When every circle is filled: score +MSN_PT, and some ingredients of the next town go into the fridge on arrival.
 const MSN={
   serve:'料理を出す',chop:'材料を切る',cook:'コンロで焼く・煮る',wash:'皿を洗う',plant:'種を植える',harvest:'菜園で収穫する',guide:'お客さんを席に案内する',blend:'ミキサーで混ぜる',
-  g_pond:'釣りをする',g_log:'原木でキノコを採る',g_barn:'畜舎で牛乳か卵をとる',g_tree:'木の実（くり・りんご）を採る',g_field:'畑でいもかにんじんを採る'};
+  g_pond:'釣り堀で採取する',g_log:'原木で採取する',g_barn:'畜舎で採取する',g_tree:'木で採取する',g_field:'畑で採取する'};
 const MSN_K=Object.keys(MSN);
 const MSN_COMMON=['serve','chop','cook','wash','plant'];
 const MSN_TOWN={port:'g_pond',forest:'g_log',ranch:'g_barn',busy:'guide',farm:'harvest',sweets:'blend',mountain:'g_tree',snow:'g_field'};
@@ -1484,9 +1484,10 @@ function arrive(){
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];S.arrT=0;
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
   if(S.msnGift){S.msnGift=false;const l=townNeeds(S.town).filter(i=>!ING[i].mix),got=[];
-    for(let k=0;k<MSN_GIFT&&l.length;k++){const i=l[rnd(l.length)];S.stock[i]=(S.stock[i]||0)+1;got.push(ING[i].e)}
-    if(got.length)S.toast={text:'🎯 ミッションのおまけ：冷蔵庫に '+got.join('')+' が入った',t:0,life:3.5}}
-  pickMission();
+    for(let k=0;k<MSN_GIFT&&l.length;k++){const i=l[rnd(l.length)];S.stock[i]=(S.stock[i]||0)+1;got.push(i)}
+    if(got.length){const cnt={};for(const i of got)cnt[i]=(cnt[i]||0)+1;const m='🎯 ミッションのおまけ：'+Object.keys(cnt).map(i=>ING[i].e+ING[i].n+'×'+cnt[i]).join('　');
+      S.toast={text:S.toast&&S.toast.t<0.5?S.toast.text+'　／　'+m:m,t:0,life:5}}}
+  S.grpN0=S.grpN||0;pickMission();
 }
 function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
 // st: wait (in line) -> follow (led by player `by`) -> seat (at table tx,ty, order shown) -> eat (paid, leaves after EAT_T)
@@ -1607,19 +1608,23 @@ function endStop(){
   if(S.reg&&S.reg.st==='cand')S.reg.st='off';   // never served in the first town: not a regular
   // customers still eating leave their plate behind, dirty
   for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.orders?c.orders.length:c.order2?2:1}}
+  const msnRes=S.msn?{ok:S.msn.ok,k:S.msn.k}:null,grpDone=(S.grpN||0)-(S.grpN0||0);
   S.grp=null;S.msn=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);S.townIds.push(S.town&&S.town.id);
-  const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0);
+  const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0)+(msnRes&&msnRes.ok?MSN_PT:0)+grpDone*GRP_PT;
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
   const lost=clearKitchen();
   const last=S.stop>=STOPS;
+  if(last)S.msnGift=false;
   showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
     <div class="stars big" style="text-align:center">${starsHtml(tst)}</div>
     <div class="bigscore">${tpts}<span>点</span></div>
     <p style="text-align:center" class="mut">合計 <b>${runScore(false).total}点</b></p>
     <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b>${perf?' <span class="perf">ノーミス ＋'+PERFECT_PT+'点</span>':''}</p>
+    ${msnRes?`<p>🎯 ${msnRes.ok?`ミッション達成 <span class="perf">＋${MSN_PT}点</span>${last?'':`　次の町の材料 <b>＋${MSN_GIFT}</b>`}`:`<span class="mut">ミッション未達成（全員が1回ずつ${MSN[msnRes.k]}）</span>`}</p>`:''}
+    ${grpDone?`<p>👥 団体さん <span class="perf">＋${grpDone*GRP_PT}点</span></p>`:''}
     ${moneyBig('評判 '+'♥'.repeat(S.hearts))}
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
     <div class="row"><button class="ovbtn hold autofocus" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}（${OVK()}）</button></div></div>`);

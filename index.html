@@ -3637,7 +3637,7 @@ function drawChefSprite(p,X,Y){
   img(L.over,0,-bob);
 }
 // ---------- character select: every player picks an animal (= skill) at the same time ----------
-const SEL_COLS=7, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
+const SEL_COLS=8, SEL_T=1.4, SEL_HOLD=1.0;   // countdown once everyone is OK; how long the host holds 作業 to start at once
 function startSelect(){
   S.phase='select';S.selT=0;S.selHold=0;hideOv();
   for(const p of S.players){const k=SKILL_K.indexOf(p.skill);p.sel={cur:Math.max(0,k),ok:false,last:'0,0',rep:0};p.skill=SKILL_K[p.sel.cur]}
@@ -3670,7 +3670,7 @@ function finishSelect(){
   if(S.startMode==='layout')setupLayout();else showChoose();
 }
 // layout of the screen (canvas units)
-const SELG={x0:GW*T/2-SEL_COLS*148/2,y0:62,cw:148,ch:126,icon:88};   // the grid is centred on the screen
+const SELG={x0:GW*T/2-SEL_COLS*136/2,y0:62,cw:136,ch:126,icon:88};   // 16 chefs: 8 x 2   // the grid is centred on the screen
 const selCell=k=>({x:SELG.x0+(k%SEL_COLS)*SELG.cw,y:SELG.y0+Math.floor(k/SEL_COLS)*SELG.ch});
 function selSkillLine(K){return K.perTown?'1つの町へ1回':(K.dur<1?'すぐ効く':'効果 '+K.dur+'秒')+'・待ち '+K.cd+'秒'}
 function wrapText(t,x,y,w,lh,size,col,weight,maxLines){

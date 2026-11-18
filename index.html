@@ -105,7 +105,9 @@ body.touch #pauseBtn{display:none}
 .box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
 .box p{margin:0;line-height:1.7;color:var(--ink)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
-.ovbtn{font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
+.pdots{position:absolute;top:5px;right:6px;display:flex;gap:3px;pointer-events:none}
+.pdots i{width:11px;height:11px;border-radius:50%;border:2px solid #fff;display:block;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.ovbtn{position:relative;font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
 .ovbtn.sel,.ovbtn:focus-visible{border-color:var(--truck);outline:none;background:#36545f}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .town{text-align:left;display:flex;flex-direction:column;gap:6px;line-height:1.5}
@@ -1824,7 +1826,16 @@ function fitOv(){
 function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
 function ovButtons(){return [...ov.querySelectorAll('.ovbtn')]}
 function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel))}
-ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
+// online: on the host's screens a guest moves its own cursor; everyone's pick shows as a coloured dot under the button
+let GSEL=0;
+function ovDots(arr){
+  const bs=ovButtons();
+  bs.forEach((b,i)=>{const who=(arr||[]).map((k,j)=>k===i?j:-1).filter(j=>j>=0),key=who.join(',');if(b._pd===key)return;b._pd=key;
+    let el=b.querySelector('.pdots');if(!who.length){if(el)el.remove();return}
+    if(!el){el=document.createElement('span');el.className='pdots';b.appendChild(el)}
+    el.innerHTML=who.map(j=>`<i style="background:${PCOL[j]}"></i>`).join('')});
+}
+ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&guestLocked()){GSEL=Math.max(0,ovButtons().indexOf(b));return}if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
 const HOLD=0.6, READY_HOLD=0.8;
 let ovHold={btn:null,t:0,src:null},ovHoldLock=false;
 const setP=(b,f)=>{if(b)b.style.setProperty('--p',Math.round(Math.min(1,f)*100)+'%')};
@@ -1957,6 +1968,7 @@ function showTitle(){
     <div class="row"><span style="align-self:center;min-width:9em">キッチンを自分で並べる</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|layout">${n}人</button>`).join('')}</div>
     <div class="row"><span style="align-self:center;min-width:9em">初期配置済み</span>${[1,2,3,4].map(n=>`<button class="ovbtn" data-act="np" data-v="${n}|preset">${n}人</button>`).join('')}</div>
     <div class="row"><button class="ovbtn" data-act="ghelp">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button></div>
+    ${GIFT_MSG?`<p class="good">${GIFT_MSG}</p>`:''}
     ${bestLine()}
     <div id="netTitle">${netTitleHtml()}</div></div>`);
 }
@@ -2016,7 +2028,12 @@ function showChoose(){
 }
 let OVSTICK=0;
 function overlayInput(){
-  const b=ovButtons(); if(!b.length||guestLocked())return;
+  const b=ovButtons(); if(!b.length)return;
+  if(guestLocked()){   // the host decides; a guest only shows which one it would pick
+    const p0=pads[0],sx=p0?p0.ax:0,sd=sx>0.6?1:sx<-0.6?-1:0,st=sd&&sd!==OVSTICK?sd:0;if(Math.abs(sx)<0.3)OVSTICK=0;else if(sd)OVSTICK=sd;
+    let mv=0;if(pressed.has('ArrowRight')||pressed.has('KeyD')||(p0&&p0.edge('r'))||st===1)mv=1;if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l'))||st===-1)mv=-1;
+    if(mv){GSEL=wrap(GSEL+mv,b.length);play('tick')}
+    return}
   if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
   const p0=pads[0];
   let mv=0,ok=false;
@@ -3716,12 +3733,19 @@ const TICKET_P=0.5, PITY=3, SHARDS_PER=4;
 let SV={t:0,sh:0,own:[],eq:{},dry:0};
 try{const v=JSON.parse(localStorage.getItem('kcr-save')||'null');if(v&&typeof v==='object'){
   SV.t=Math.max(0,+v.t||0);SV.sh=Math.max(0,+v.sh||0);SV.dry=Math.max(0,+v.dry||0);
-  SV.own=Array.isArray(v.own)?v.own.filter(k=>SKINS[k]):[];
+  SV.own=Array.isArray(v.own)?v.own.filter(k=>SKINS[k]):[];SV.gifts=Array.isArray(v.gifts)?v.gifts.slice(0,50).map(String):[];
   if(v.eq&&typeof v.eq==='object')for(const sk in v.eq)if(SKILLS[sk]){SV.eq[sk]={};for(const sl of SLOTS){const k=v.eq[sk]&&v.eq[sk][sl];if(SKINS[k]&&SKINS[k].sk===sk&&SKINS[k].slot===sl&&SV.own.includes(k))SV.eq[sk][sl]=k}}}}catch(_){}
 const saveSV=()=>{try{localStorage.setItem('kcr-save',JSON.stringify(SV))}catch(_){}};
+// friend gift codes (stored as hashes): one use per device
+const GIFTS={'s3cz8q':10};   /* friends test round, 2026-11 */let GIFT_MSG='';
 // test links: ?tickets=20 adds tickets once (the address is cleaned so a reload does not add more), ?resetsave=1 clears tickets / shards / skins
 try{const q=new URLSearchParams(location.search);let ch=false;
   if(q.has('tickets')){SV.t+=Math.max(0,Math.min(50,parseInt(q.get('tickets'),10)||0));q.delete('tickets');ch=true}
+  // a friend's link: ?gift=CODE gives its tickets once on this device
+  if(q.has('gift')){const c=String(q.get('gift')||'').trim().toUpperCase();let h=7;for(const ch of c)h=(h*131+ch.charCodeAt(0))>>>0;
+    const n=GIFTS[h.toString(36)];SV.gifts=Array.isArray(SV.gifts)?SV.gifts:[];
+    if(n&&!SV.gifts.includes(h.toString(36))){SV.t+=n;SV.gifts.push(h.toString(36));GIFT_MSG='🎫 ガチャチケット '+n+'枚をもらいました！'}
+    else GIFT_MSG=n?'このプレゼントはもう受け取っています':'';q.delete('gift');ch=true}
   if(q.has('resetsave')){SV={t:0,sh:0,own:[],eq:{},dry:0};q.delete('resetsave');ch=true}
   if(ch){saveSV();const r=q.toString();history.replaceState(null,'',location.pathname+(r?'?'+r:'')+location.hash)}}catch(_){}
 // skins worn by a chef with skill sk, from an equip map (only real, matching ids)
@@ -4787,6 +4811,7 @@ function sendSnap(){
   d.ms=S.msn?[S.msn.k,S.msn.d,S.msn.ok?1:0]:0;
   d.wt=S.waitN||0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
+  d.oc=ov.hidden||S.players.length<2?0:S.players.map((p,i)=>i===0?ovSel:(NET.inputs[i]&&NET.inputs[i][7]!=null?+NET.inputs[i][7]:-1));ovDots(d.oc||[]);
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
   let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
   if(bytes>3800){d.fl=[];bytes=new TextEncoder().encode(JSON.stringify(d)).length}
@@ -4840,7 +4865,7 @@ function guestFrame(dt){
   }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0];
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,guestLocked()?GSEL:-1];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state
@@ -4858,6 +4883,7 @@ function guestFrame(dt){
       // follow the host's cursor (and its long-press bar) on the host's screens
       if(guestLocked()&&Array.isArray(d.os)){const bs=ovButtons(),k=Math.max(0,Math.min(bs.length-1,+d.os[0]||0));
         if(k!==ovSel){ovSel=k;markSel()}bs.forEach((b,i)=>setP(b,i===k?(+d.os[1]||0)/100:0))}
+      if(guestLocked()){GSEL=Math.max(0,Math.min(ovButtons().length-1,GSEL));const oc=Array.isArray(d.oc)?d.oc.slice():[];if(NET.mySlot>=0)oc[NET.mySlot]=GSEL;ovDots(oc)}
     }
   }
   if(!host&&S&&peers.some(p=>!p.sameTab&&p.presence&&p.presence.lb>0)){S=null;NET.seenSnap=-1;guestLocalOv('wait')}

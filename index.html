@@ -831,7 +831,7 @@ if(isTouch)document.body.classList.add('touch');
     b.addEventListener('contextmenu',e=>e.preventDefault())};
   btn('bPick',()=>touch.pick=true);
   btn('bAct',()=>touch.act=true,()=>touch.act=false);
-  btn('bSw',()=>touch.sw=true);
+  btn('bSw',()=>{touch.sw=true;touch.swH=true},()=>touch.swH=false);
   btn('bSkill',()=>touch.sk=true);
   btn('bPause',()=>touch.pause=true);
 })();
@@ -842,26 +842,26 @@ function readInput(i){
 }
 function deviceInput(){
   const a=baseInput(0),b=baseInput(1,true);
-  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw,sk:a.sk||b.sk};
+  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw,sk:a.sk||b.sk,swH:a.swH||b.swH};
 }
 function baseInput(i,keysOnly){
-  let mx=0,my=0,pick=false,act=false,sw=false,sk=false;
-  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw;sk=touch.sk}
+  let mx=0,my=0,pick=false,act=false,sw=false,sk=false,swH=false;
+  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw;sk=touch.sk;swH=touch.swH}
   const k=KB[i];
   if(k){
     const h=a=>a.some(c=>held.has(c)), p=a=>a.some(c=>pressed.has(c));
     if(h(k.up))my-=1; if(h(k.down))my+=1; if(h(k.left))mx-=1; if(h(k.right))mx+=1;
-    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw); sk=sk||p(k.sk);
+    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw); sk=sk||p(k.sk); swH=swH||h(k.sw);
     if(mx||my||pick||act||sw)LASTIN[i]='kb';
   }
   const ps=keysOnly?null:pads[i];
   if(ps){
     if(Math.abs(ps.ax)>0.3)mx+=ps.ax; if(Math.abs(ps.ay)>0.3)my+=ps.ay;
     if(ps.now.l)mx-=1; if(ps.now.r)mx+=1; if(ps.now.u)my-=1; if(ps.now.d)my+=1;
-    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw'); sk=sk||ps.edge('sk');
+    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw'); sk=sk||ps.edge('sk'); swH=swH||ps.now.sw;
     if(Math.abs(ps.ax)>0.3||Math.abs(ps.ay)>0.3||ps.now.a||ps.now.x||ps.now.sw||ps.now.l||ps.now.r||ps.now.u||ps.now.d)LASTIN[i]='pad';
   }
-  return {mx,my,pick,act,sw,sk};
+  return {mx,my,pick,act,sw,sk,swH};
 }
 
 // ---------- collision ----------
@@ -906,6 +906,8 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
   tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
+  pouch:{n:'ハムスター',e:'🐹',d:'発動中、持っている食材をスキルボタンでほお袋に入れる（2個まで。冷蔵庫を開いたままでも入れられる）。切替ボタン長押しで取り出す',dur:12,cd:40},
+  cheer:{n:'カナリア',e:'🐤',d:'使うと、仲間全員のスキルの待ち時間が10秒短くなる（自分には効かない。1人のときは何も起きない）',dur:1.2,cd:40,now:true},
   herd:{n:'ミーアキャット',e:'🐾',d:'まわり2マスの仲間と自分の、切る・洗う・水汲み・走る・焼く・ミキサーが1.3倍速（焼く・ミキサーは入れたときに範囲内なら）',dur:10,cd:45}};
 // ミーアキャット: a 5x5-tile area round a meerkat whose skill is working; it does not add up with a chef's own speed skill (the faster one counts)
 const HERD=1.3, HERD_R=2.5;
@@ -940,6 +942,10 @@ function skillNow(p,K){
     if(S.phase!=='drive'){say(p,'走行中に使う');return false}
     S.toast={text:'🐎 ひとっ走り！ 燃料なしで速く走る',t:0,life:2};
     return true}
+  if(K===SKILLS.cheer){   // カナリア: every other chef's wait gets shorter (nothing happens when playing alone)
+    float(p.x,p.y-0.9,'♪ 応援歌 ♪','#fff1a0');
+    for(const q of S.players)if(q!==p&&!((q.skT||0)>0)&&!skillOf(q).perTown&&(q.skCD||0)>0){q.skCD=Math.max(0,q.skCD-CHEER_CUT);float(q.x,q.y-0.9,'♪ −'+CHEER_CUT+'秒','#fff1a0')}
+    return true}
   if(K===SKILLS.tidy){   // タコ: every dirty plate on the tables comes into this chef's hands
     if(S.phase!=='stop'){say(p,'町の営業中に使う');return false}
     if(p.hold&&p.hold.kind!=='dirty'){say(p,'手を空けて使う');return false}
@@ -958,8 +964,36 @@ function skillNow(p,K){
     for(const c of w){c.pat=c.max;const [x,y]=custPos(c);float(x,y-0.7,'','#ffb3c8','status_love')}
     return true}
   return true;
-}function useSkill(p){
+}
+// ハムスター: the cheek pouch holds up to 2 ingredients; in they go with the skill button while the skill works,
+// out they come with a long press of 切替 (empty hands); whatever is left at the end of a town does not come along
+const POUCH_MAX=2, POUCH_HOLD=0.35, CHEER_CUT=10;
+function pouchPut(p){
+  p.pouch=p.pouch||[];
+  if(p.pouch.length>=POUCH_MAX){say(p,'ほお袋がいっぱい');sfx('nope');return}
+  if(p.menu&&p.menu.kind==='fridge'){   // the fridge stays open
+    const id=MENU.fridge.list()[p.menu.sel];
+    if(!id||MENU.fridge.count(id)<=0){say(p,(id?ING[id].n:'食材')+'がない');sfx('nope');return}
+    S.stock[id]--;p.pouch.push(newIng(id));sfx('pick');float(p.x,p.y-0.9,'ほお袋へ '+ING[id].e,'#ffe08a');return}
+  if(!p.hold||p.hold.kind!=='ing'){say(p,'食材を持って使う');sfx('nope');return}
+  p.pouch.push(p.hold);p.hold=null;sfx('pick');float(p.x,p.y-0.9,'ほお袋へ','#ffe08a');
+}
+function pouchInput(p,inp,dt){   // returns true while the pouch picker is open (the chef stands still)
+  if(!p.pouch||!p.pouch.length||p.hold||p.menu||p.mk||p.g||p.seat){p.swT=0;p.pouchSel=null;return false}
+  if(inp.swH){
+    p.swT=(p.swT||0)+dt;
+    if(p.swT>=POUCH_HOLD&&!p.pouchSel)p.pouchSel={k:0,last:0};
+    if(p.pouchSel){const d=inp.mx>0.5?1:inp.mx<-0.5?-1:0;if(d&&d!==p.pouchSel.last&&p.pouch.length>1){p.pouchSel.k=wrap(p.pouchSel.k+d,p.pouch.length);sfx('tick')}p.pouchSel.last=d;return true}
+    return false}
+  if(p.pouchSel){const k=Math.min(p.pouchSel.k,p.pouch.length-1);p.hold=p.pouch.splice(k,1)[0];sfx('pick')}
+  p.swT=0;p.pouchSel=null;return false;
+}
+function pouchEnd(){   // leaving a town: raw ingredients go back to the fridge, anything worked on is lost
+  for(const p of S.players){for(const it of p.pouch||[])if(it&&it.kind==='ing'&&!it.step&&!it.burnt)S.stock[it.id]=(S.stock[it.id]||0)+1;p.pouch=[];p.pouchSel=null}
+}
+function useSkill(p){
   const K=skillOf(p);if(!K)return;
+  if(p.skill==='pouch'&&(p.skT||0)>0){pouchPut(p);return}
   if((p.skT||0)>0)return;
   if((p.skCD||0)>0){say(p,K.perTown?'次の町への走行でまた使える':'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
   // an instant skill: works at once (and is not used up when there is nothing to do)
@@ -1377,6 +1411,7 @@ function addToBasket(p,ids){
   const b=p.hold;if(!b||b.kind!=='basket')return;
   const put=ids.slice(0,Math.max(0,basketCap(b)-b.items.length));
   b.items.push(...put);
+  if(put.length<ids.length&&p.skill==='pouch'&&(p.skT||0)>0){p.pouch=p.pouch||[];for(const id of ids.slice(put.length)){if(p.pouch.length>=POUCH_MAX)break;p.pouch.push(newIng(id));put.push(id)}}   // ハムスター: what the basket cannot take goes in the cheeks
   const g=p.g;float(g?g.x+.5:p.x,g?g.y:p.y,'+'+put.length+' '+put.map(id=>ING[id].e).join(''),'#bff2c6');
   if(put.length<ids.length)say(p,'カゴがいっぱい');
 }
@@ -1620,6 +1655,7 @@ function endStop(){
   if(S.reg&&S.reg.st==='cand')S.reg.st='off';   // never served in the first town: not a regular
   // customers still eating leave their plate behind, dirty
   for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.orders?c.orders.length:c.order2?2:1}}
+  pouchEnd();
   const msnRes=S.msn?{ok:S.msn.ok,k:S.msn.k}:null,grpDone=(S.grpN||0)-(S.grpN0||0);
   S.grp=null;S.msn=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
@@ -2063,7 +2099,8 @@ function update(dt){
   }
   // players
   S.players.forEach((p,i)=>{
-    const inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
+    let inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
+    if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);
     if(!horseWait)p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt);p.wpCD=Math.max(0,(p.wpCD||0)-dt);
@@ -3420,6 +3457,7 @@ function drawPlayers(){
     if(p.dy===-1)holdAt();
     drawChef(p,X,Y);
     if(p.dy!==-1)holdAt();
+    drawPouch(p,X,Y);
     skillPop(p,X,Y);
     const me=NET.role!=='off'&&NET.mySlot===p.i;
     const lab='P'+(p.i+1)+(me?' あなた':'');
@@ -3523,7 +3561,7 @@ function shade(hex,k){
 const CHEF_DY=8;
 // ----- animal chefs (delivered art): parts on a shared 256x256 grid, feet anchored at (128,240).
 // The player colour is multiplied into the *_tint layers; the animal follows the chef's skill.
-const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion',herd:'meerkat',tidy:'octopus'};
+const SKILL_ANIMAL={knife:'beaver',grow:'bee',dash:'rabbit',wash:'otter',smile:'cat',forage:'squirrel',haggle:'fox',tray:'gorilla',fire:'dragon',boost:'horse',nofire:'elephant',combo:'lion',herd:'meerkat',tidy:'octopus',pouch:'hamster',cheer:'canary'};
 // an animal whose pictures have not been delivered yet is drawn with the beaver's until they arrive
 const artAn=an=>typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[an+'_head_front']?an:'beaver';
 const CHEF_K=0.22;            // world units per sprite pixel (the chef is about 48 world units tall)
@@ -3541,9 +3579,9 @@ function chefTint(key,col){   // a *_tint layer multiplied by the player colour,
   CHEF.cache.set(ck,c);return c;
 }
 // what goes under the shoes (bee wings, a tail seen from the side) and over them (clothes, paws, head, hat), per animal / colour / direction
-function chefLayers(an,col,dir,sk){
-  an=artAn(an);sk=(sk||[]).filter(k=>SKINS[k]);
-  const ck='l|'+an+'|'+col+'|'+dir+'|'+sk.join(',');let L=CHEF.cache.get(ck);if(L)return L;
+function chefLayers(an,col,dir,sk,puff){
+  an=artAn(an);sk=(sk||[]).filter(k=>SKINS[k]);puff=!!puff&&!!CHEF.img[an+'_head_'+dir+'_puff'];
+  const ck='l|'+an+'|'+col+'|'+dir+'|'+sk.join(',')+(puff?'|p':'');let L=CHEF.cache.get(ck);if(L)return L;
   const mk=()=>{const c=document.createElement('canvas');c.width=c.height=CSZ;const g=c.getContext('2d');g.scale(CSZ/256,CSZ/256);return [c,g]};
   const [uc,ug]=mk(),[oc,og]=mk(),I=k=>CHEF.img[k],put=(g,k,dx,dy,flip)=>{const im=I(k);if(!im||!im.naturalWidth)return;
     if(flip){g.save();g.translate(256,0);g.scale(-1,1);g.drawImage(im,-(dx||0),dy||0,256,256);g.restore()}else g.drawImage(im,dx||0,dy||0,256,256)};
@@ -3561,7 +3599,7 @@ function chefLayers(an,col,dir,sk){
       if(oct){const k=CSZ/256,sl=[88*k,180*k,32*k,25*k];   // the sleeve cuff goes back over the arm
         og.drawImage(chefTint('body_side_tint',col),...sl,88,180,32,25);const bi=I('body_side_base');if(bi&&bi.naturalWidth)og.drawImage(bi,...sl,88,180,32,25)}}
     else paws()}
-  put(og,an+'_head_'+dir);
+  put(og,an+'_head_'+dir+(puff?'_puff':''));
   const hat=sk.find(k=>SKINS[k].slot==='hat');
   if(hat)drawSkinPart(og,hat,dir);else{og.drawImage(chefTint('hat_'+dir+'_tint',col),0,hy,256,256);put(og,'hat_'+dir+'_base',0,hy)}
   for(const k of sk)if(SKINS[k].slot!=='hat')drawSkinPart(og,k,dir);
@@ -3574,7 +3612,7 @@ function drawChefSprite(p,X,Y){
   const ph=S.t*14+p.i,bob=mv?Math.abs(Math.sin(ph))*2.6:Math.sin(S.t*3+p.i)*0.7,st=mv?Math.sin(ph)*2.2:0;
   {const sg=ctx.createRadialGradient(X,Y+15,1,X,Y+15,16);sg.addColorStop(0,'rgba(30,20,10,.38)');sg.addColorStop(1,'rgba(30,20,10,0)');
    ctx.fillStyle=sg;ctx.beginPath();ctx.ellipse(X,Y+15,17,6,0,0,7);ctx.fill()}
-  const L=chefLayers(an,col,dir,skinsOf(p)),W=256*CHEF_K,ox=X-128*CHEF_K,oy=Y+16-240*CHEF_K;
+  const L=chefLayers(an,col,dir,skinsOf(p),p.pouch&&p.pouch.length),W=256*CHEF_K,ox=X-128*CHEF_K,oy=Y+16-240*CHEF_K;
   const img=(c,dx,dy)=>{if(flip){ctx.save();ctx.translate(X,0);ctx.scale(-1,1);ctx.drawImage(c,-W/2+(dx||0),oy+(dy||0),W,W);ctx.restore()}else ctx.drawImage(c,ox+(dx||0),oy+(dy||0),W,W)};
   img(L.under,0,-bob);
   // the two shoes step while walking (the only part drawn every frame on its own)
@@ -3814,6 +3852,15 @@ cv.addEventListener('pointerdown',e=>{
   for(let k=0;k<SKILL_K.length;k++){const c=selCell(k);if(x>=c.x&&x<c.x+SELG.cw&&y>=c.y&&y<c.y+SELG.ch){
     if(NET.role==='guest'){if(NET.mySlot>=0)guestSend('selpick',k)}else selectTap(0,k);e.preventDefault();return}}
 });
+// ハムスター: what is in the cheeks floats by the head; the picker (long 切替) rings the one that comes out
+function drawPouch(p,X,Y){
+  const L=p.pouch;if(!L||!L.length)return;
+  L.forEach((it,k)=>{const x=X+(L.length>1?(k?19:-19):19),y=Y-12,on=p.pouchSel&&Math.min(p.pouchSel.k,L.length-1)===k;
+    ctx.fillStyle=on?'rgba(255,216,74,.95)':'rgba(255,248,230,.85)';ctx.beginPath();ctx.arc(x,y,9.5,0,7);ctx.fill();
+    ctx.strokeStyle=on?'#c4861a':'rgba(140,100,40,.6)';ctx.lineWidth=on?2.2:1.2;ctx.stroke();
+    drawItem(it,x,y,15,true)});
+  if(p.pouchSel&&L.length>1)text('◀ 選ぶ ▶',X,Y+24,9,'#fff',800);
+}
 function drawChef(p,X,Y){
   if(CHEF.ready){drawChefSprite(p,X,Y);return}
   const col=PCOL[p.i],dark=shade(col,-0.3),light=shade(col,0.25);
@@ -4630,7 +4677,7 @@ function remoteInput(i){
   const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i], sk=(+r[5]||0)!==(NET.lastSk[i]||0);
   NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];NET.lastSk[i]=+r[5]||0;
   const cl=v=>Math.max(-1,Math.min(1,+v||0));
-  return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk};
+  return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk,swH:!!r[6]};
 }
 const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
 function guestAction(a,v,slot){
@@ -4705,7 +4752,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100)]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100),(p.pouch||[]).map(encItem),p.pouchSel?p.pouchSel.k:-1]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an),c.orders?[c.orders.map(o=>REC_K.indexOf(o)),c.got.reduce((a,g,i)=>a+(g?1<<i:0),0),c.ans.map(a=>CUST_ALL.indexOf(a)),c.hues]:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer),s.fox?1:0]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -4771,7 +4818,7 @@ function guestFrame(dt){
   }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0]:[0,0,0,NET.pk,NET.sw,NET.sk||0];
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state
@@ -4867,6 +4914,7 @@ function applySnap(d){
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null,skn:Array.isArray(a[19])?a[19].slice(0,3).map(x=>SKIN_K[n(x)]).filter(Boolean):[],wpT:n(a[20])/100});
+    p.pouch=Array.isArray(a[21])?a[21].map(decItem).filter(Boolean):[];p.pouchSel=a[22]!=null&&n(a[22])>=0?{k:n(a[22])}:null;
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])],...(Array.isArray(a[18])&&Array.isArray(a[18][0])?(()=>{const o=a[18][0].slice(0,4).map(x=>REC_K[n(x)]||'burger'),gm=n(a[18][1]);return {orders:o,got:o.map((_,i)=>!!(gm&(1<<i))),ans:(a[18][2]||[]).slice(0,3).map(x=>CUST_ALL[n(x)]),hues:(a[18][3]||[]).slice(0,3).map(n)}})():{})}));

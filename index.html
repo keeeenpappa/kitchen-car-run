@@ -899,7 +899,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   wash:{n:'カワウソ',e:'🦦',d:'自分の皿洗いが2倍速',dur:12,cd:40},
   smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンにして、そのあと10秒間ゆっくり減る（×0.8）',dur:10,cd:45,now:true},
   forage:{n:'リス',e:'🐿️',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
-  haggle:{n:'キツネ',e:'🦊',d:'自分が買うと、道のお店も町の市場も3割引き',dur:17,cd:45},
+  haggle:{n:'キツネ',e:'🦊',d:'走行中：窓口のお店（いなければ次に来るお店）の品ぞろえ＋1、そのお店は誰が買っても3割引き。町：17秒間、誰が市場で買っても3割引き',dur:17,cd:45},
   tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
   boost:{n:'ウマ',e:'🐎',d:'走行中に使うと、10秒間、燃料なしで「急ぐ」より少し速く走る（窓口でお店と並んでいる間はいつもの速さで、残り時間も減らない）',dur:10,cd:40,now:true},
@@ -964,7 +964,9 @@ function skillNow(p,K){
   if((p.skCD||0)>0){say(p,K.perTown?'次の町への走行でまた使える':'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
   // an instant skill: works at once (and is not used up when there is nothing to do)
   if(K.now&&!skillNow(p,K))return;
+  let fs=null;if(p.skill==='haggle'&&S.phase==='drive'){fs=foxTarget();if(!fs){say(p,'この先にお店がない');sfx('nope');return}}
   p.skT=K.dur;p.skCD=K.cd;sfx('skill');
+  if(fs)foxShop(p,fs);
   // elephant: stoves / mixers within 2 tiles when it is used stay safe for the whole skill
   if(p.skill==='nofire')for(const c of S.stations)if((c.t==='stove'||c.t==='blender')&&Math.max(Math.abs(c._x-p.tx),Math.abs(c._y-p.ty))<=2)c.nbT=K.dur;
 }
@@ -1233,8 +1235,17 @@ function waterPlant(p,c,tx,ty){
 function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6');sfx('harvest')}
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
 // 値切り上手: road-shop prices 30% off for the one who has the skill working
+// キツネ: on the road it marks one shop (+1 item, 30% off for everyone there); in town everyone buys 30% off while it works
 const haggling=p=>!!p&&(p.skT||0)>0&&p.skill==='haggle';
-const priceFor=(p,it,shop)=>haggling(p)?Math.max(1,Math.round(it.price*0.7)):it.price;
+const priceFor=(p,it,shop)=>(shop?shop.fox:S.phase==='stop'&&skillOn('haggle'))?Math.max(1,Math.round(it.price*0.7)):it.price;
+// the shop at a window, or else the next one still to come (never the gas station, never one already marked)
+const foxTarget=()=>S.shops.filter(s=>!s.type.gas&&!s.fox&&!s.fade&&s.x+2+WMARGIN>3.5).sort((a,b)=>a.x-b.x)[0]||null;
+function foxShop(p,s){
+  let add=null;for(let k=0;k<12&&!add;k++)add=s.type.gen().find(m=>m.type==='mystery'||!s.items.some(i=>i.type===m.type&&i.id===m.id));
+  if(!add&&s.items.length){const b=s.items[rnd(s.items.length)];add=Object.assign({},b,{sold:false})}   // nothing new in this shop: one more of what it sells
+  if(add){add.price=Math.max(2,Math.round(add.price*S.up.shopDisc));s.items.push(add)}
+  s.fox=true;float(p.x,p.y-0.9,'🦊 '+s.type.n+'：品ぞろえ＋1・3割引き','#ffe08a');
+}
 function buy(list,p,shop,tx,ty){
   if(!list||!list.length)return;
   const it=list[wrap(p.cur,list.length)],pr=priceFor(p,it,shop);
@@ -4696,7 +4707,7 @@ function sendSnap(){
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100)]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an),c.orders?[c.orders.map(o=>REC_K.indexOf(o)),c.got.reduce((a,g,i)=>a+(g?1<<i:0),0),c.ans.map(a=>CUST_ALL.indexOf(a)),c.hues]:0]),
-    sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer)]),
+    sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer),s.fox?1:0]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
     fl:S.floats.map(f=>[Math.round(f.x*100),Math.round(f.y*100),f.text,f.col,Math.round(f.t*100),f.ic||'']),
     tk:S.tkSeq||0,tp:S.tkPop?[Math.round(S.tkPop.x*100),Math.round(S.tkPop.y*100)]:0,
@@ -4859,7 +4870,7 @@ function applySnap(d){
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])],...(Array.isArray(a[18])&&Array.isArray(a[18][0])?(()=>{const o=a[18][0].slice(0,4).map(x=>REC_K[n(x)]||'burger'),gm=n(a[18][1]);return {orders:o,got:o.map((_,i)=>!!(gm&(1<<i))),ans:(a[18][2]||[]).slice(0,3).map(x=>CUST_ALL[n(x)]),hues:(a[18][3]||[]).slice(0,3).map(n)}})():{})}));
-  S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer)}));
+  S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer),fox:!!a[4]}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100,ic:/^status_[a-z_]{1,20}$/.test(a[5])?a[5]:''}));
   // a ticket dropped on the host: everyone in the room gets one

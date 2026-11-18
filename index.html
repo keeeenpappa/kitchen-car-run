@@ -3854,7 +3854,7 @@ function drawSelect(){
     text(ok?'OK!':'えらび中…',x+pw-14,py+14,13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
     drawChefBig(an,PCOL[i],x+70,py+176,150,S.t+i,skinsOf(p));
     text(K.n,x+136,py+52,17,'#fff',800,'left');
-    wrapText(K.d,x+136,py+80,pw-148,19,12.5,'#d8e6e7',600,5);
+    wrapText(K.d,x+136,py+80,pw-148,19,12.5,'#d8e6e7',600,Math.max(5,Math.floor((ph-26-16-80)/19)+1));   // down to just above the effect / wait line
     text(selSkillLine(K),x+136,py+ph-26,11.5,'#ffe08a',700,'left');
     if(ok){ctx.save();ctx.translate(x+pw-48,py+ph-60);ctx.rotate(-0.18);ctx.strokeStyle='#ffd84a';ctx.lineWidth=3;rr(-34,-16,68,32,8);ctx.stroke();text('OK!',0,1,20,'#ffd84a',900);ctx.restore()}
   });

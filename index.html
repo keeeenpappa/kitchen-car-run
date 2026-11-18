@@ -920,7 +920,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
   combo:{n:'ライオン',e:'🦁',d:'12秒間、コンボのゲージが減らない',dur:12,cd:45},
   tidy:{n:'タコ',e:'🐙',d:'テーブルに残っている汚れた皿を全部、一気に手元に集める（手が空いているか、汚れた皿を持っているとき）',dur:0.6,cd:40,now:true},
-  pouch:{n:'ハムスター',e:'🐹',d:'発動中、持っている食材をスキルボタンでほお袋に入れる（2個まで。冷蔵庫を開いたままでも入れられる）。切替ボタン長押しで取り出す',dur:12,cd:40},
+  pouch:{n:'ハムスター',e:'🐹',d:'発動中、食材をスキルボタンでほお袋へ（2個まで）。切替長押しで取り出す',dur:12,cd:40},
   cheer:{n:'カナリア',e:'🐤',d:'使うと、仲間全員のスキルの待ち時間が10秒短くなる（自分には効かない。1人のときは何も起きない）',dur:1.2,cd:40,now:true},
   herd:{n:'ミーアキャット',e:'🐾',d:'まわり2マスの仲間と自分の、切る・洗う・水汲み・走る・焼く・ミキサーが1.3倍速（焼く・ミキサーは入れたときに範囲内なら）',dur:10,cd:45}};
 // ミーアキャット: a 5x5-tile area round a meerkat whose skill is working; it does not add up with a chef's own speed skill (the faster one counts)
@@ -1352,6 +1352,7 @@ function doAct(p,c,tx,ty,dt){
     if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;c.wet=WET_T;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
     else say(p,'燃えている！ 消火器で消す');
     return}
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'&&p.hold){say(p,'手を空けて切る');return}
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest');p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
@@ -3307,7 +3308,7 @@ function playHint(p,c){
   if(c.t==='table'&&!h&&c.item&&c.item.kind==='dirty')return AL(p,'pick','汚れた皿を持つ');
   if(c.t==='sink'&&h&&h.kind==='can')return h.water>=canCap(h)||p.actT>0?'':AL(p,'act','水を汲む',1);   // while filling, the meter shows instead
   if(c.t==='planter'&&c.plant&&h&&h.kind==='can'&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow)return h.water>0?AL(p,'pick','水をあげる'):'じょうろが空';
-  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop')return AL(p,'act','切る',1);
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop')return h?'手を空けて切る':AL(p,'act','切る',1);
   return '';
 }
 // extinguisher powder: a white cloud blowing from the nozzle while spraying, and a cloud that hangs on a tile just put out
@@ -3674,6 +3675,9 @@ const SELG={x0:GW*T/2-SEL_COLS*136/2,y0:62,cw:136,ch:126,icon:88};   // 16 chefs
 const selCell=k=>({x:SELG.x0+(k%SEL_COLS)*SELG.cw,y:SELG.y0+Math.floor(k/SEL_COLS)*SELG.ch});
 function selSkillLine(K){return K.perTown?'1つの町へ1回':(K.dur<1?'すぐ効く':'効果 '+K.dur+'秒')+'・待ち '+K.cd+'秒'}
 function wrapText(t,x,y,w,lh,size,col,weight,maxLines){
+  // a long text gets smaller letters (down to 9px) rather than being cut off
+  const gs=graphemes(t),lines=sz=>{ctx.font=`${weight||600} ${sz}px ${FNT}`;let l='',n=1;for(const ch of gs){if(ctx.measureText(l+ch).width>w&&l){n++;l=''}l+=ch}return n};
+  if(maxLines)while(size>9&&lines(size)>maxLines){lh*=(size-0.5)/size;size-=0.5}
   ctx.font=`${weight||600} ${size}px ${FNT}`;ctx.fillStyle=col;ctx.textAlign='left';ctx.textBaseline='middle';
   let line='',n=0;for(const ch of graphemes(t)){if(ctx.measureText(line+ch).width>w&&line){ctx.fillText(line,x,y+n*lh);line='';if(++n>=(maxLines||9))return}line+=ch}
   if(line)ctx.fillText(line,x,y+n*lh);

@@ -3611,13 +3611,14 @@ function chefTint(key,col){   // a *_tint layer multiplied by the player colour,
   CHEF.cache.set(ck,c);return c;
 }
 // what goes under the shoes (bee wings, a tail seen from the side) and over them (clothes, paws, head, hat), per animal / colour / direction
+const HAT_POS={"beaver":{"front":[0,10],"side":[-7,10],"back":[0,10]},"bee":{"front":[0,0],"side":[0,0],"back":[0,0]},"rabbit":{"front":[0,0],"side":[0,0],"back":[0,0]},"otter":{"front":[0,0],"side":[0,0],"back":[0,0]},"cat":{"front":[0,8],"side":[-5,8],"back":[0,8]},"squirrel":{"front":[0,0],"side":[4,0],"back":[0,0]},"fox":{"front":[0,16],"side":[-6,16],"back":[0,16]},"gorilla":{"front":[0,0],"side":[0,0],"back":[0,0]},"dragon":{"front":[0,0],"side":[0,0],"back":[0,0]},"horse":{"front":[0,14],"side":[-6,14],"back":[0,14]},"elephant":{"front":[0,12],"side":[-5,12],"back":[0,12]},"lion":{"front":[0,0],"side":[4,0],"back":[0,0]},"meerkat":{"front":[0,6],"side":[0,6],"back":[0,6]},"octopus":{"front":[0,0],"side":[0,0],"back":[0,0]},"hamster":{"front":[0,14],"side":[-5,14],"back":[0,14]},"canary":{"front":[0,12],"side":[-4,12],"back":[0,12]}};
 function chefLayers(an,col,dir,sk,puff){
   an=artAn(an);sk=(sk||[]).filter(k=>SKINS[k]);puff=!!puff&&!!CHEF.img[an+'_head_'+dir+'_puff'];
   const ck='l|'+an+'|'+col+'|'+dir+'|'+sk.join(',')+(puff?'|p':'');let L=CHEF.cache.get(ck);if(L)return L;
   const mk=()=>{const c=document.createElement('canvas');c.width=c.height=CSZ;const g=c.getContext('2d');g.scale(CSZ/256,CSZ/256);return [c,g]};
   const [uc,ug]=mk(),[oc,og]=mk(),I=k=>CHEF.img[k],put=(g,k,dx,dy,flip)=>{const im=I(k);if(!im||!im.naturalWidth)return;
     if(flip){g.save();g.translate(256,0);g.scale(-1,1);g.drawImage(im,-(dx||0),dy||0,256,256);g.restore()}else g.drawImage(im,dx||0,dy||0,256,256)};
-  const oct=an==='octopus',hy=an==='meerkat'?6:(an==='hamster'||an==='canary')?12:0;   // hamster / canary: the chef hat sits 12px lower (their delivery)   // per-animal rules from the corrections-v6 delivery
+  const oct=an==='octopus',hp=(HAT_POS[an]&&HAT_POS[an][dir])||[0,0];   // the default chef hat's fit per chef / direction (chef-default-hat-fit-v2)   // per-animal rules from the corrections-v6 delivery
   if(an==='bee')put(ug,'bee_wings_'+dir);
   if(dir==='side'||oct)put(ug,an+'_tail_'+dir);   // octopus: its legs peek out from behind in every direction
   // a 'front' skin is worn over the coat without its apron
@@ -3635,7 +3636,7 @@ function chefLayers(an,col,dir,sk,puff){
   for(const k of sk)if(early(k))drawSkinPart(og,k,dir);
   put(og,an+'_head_'+dir+(puff?'_puff':''));
   const hat=sk.find(k=>SKINS[k].slot==='hat');
-  if(hat)drawSkinPart(og,hat,dir);else{og.drawImage(chefTint('hat_'+dir+'_tint',col),0,hy,256,256);put(og,'hat_'+dir+'_base',0,hy)}
+  if(hat)drawSkinPart(og,hat,dir);else{og.drawImage(chefTint('hat_'+dir+'_tint',col),hp[0],hp[1],256,256);put(og,'hat_'+dir+'_base',hp[0],hp[1])}
   for(const k of sk)if(SKINS[k].slot!=='hat'&&!early(k))drawSkinPart(og,k,dir);
   L={under:uc,over:oc};CHEF.cache.set(ck,L);return L;
 }

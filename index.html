@@ -3254,23 +3254,27 @@ function drawCustomers(){
   drawKidsAway();
   for(const c of S.cust){
     const [px,py]=custPos(c),X=px*T,f=c.pat/c.max,col=f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d';
-    if(c.st==='seat'||c.st==='eat'){
-      const Y=py*T-T*0.42;
-      // order bubble above the table (a happy face while eating)
-      const top=Y-58,bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?[stIc('status_kid_missing','👶')]:[stIc('status_eating','😋')]):pendingOrders(c).map(o=>dishIc(o)),bw=ord.length>1?28*ord.length+10:40;
-      ctx.fillStyle='#fff';rr(X-bw/2,top,bw,bh,9);ctx.fill();
-      ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
-      ord.forEach((e,k)=>emoji(e,X+(k-(ord.length-1)/2)*28,top+bh/2,ord.length>1?21:24));
-      if(c.st==='seat')goldTag(X+bw/2+3,top+bh/2,c);
-      if(c.type==='regular'&&c.st==='seat'){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('いつもの').width+10;ctx.fillStyle='#7c4ab4';rr(X-w/2,top-9,w,14,7);ctx.fill();text('いつもの',X,top-2,10,'#fff',800)}
-      if(c.st==='seat')bar(X-17,Y+15,34,f,col);
-      continue}
+    if(c.st==='seat'||c.st==='eat')continue;
     const Y=py*T;
     drawCustBody(X,Y,c);
     if(c.st==='wait'&&c.type==='takeout'){const top=Y-58,bs=30;ctx.fillStyle='#fff';rr(X-bs/2,top,bs,bs,8);ctx.fill();
       ctx.beginPath();ctx.moveTo(X-4,top+bs);ctx.lineTo(X+4,top+bs);ctx.lineTo(X,top+bs+5);ctx.fill();emoji(dishIc(c.order),X,top+bs/2,20);goldTag(X+bs/2+3,top+bs/2,c)}
     if(c.st==='leave'){if(c.mad)emoji(stIc('status_angry','😠'),X+12,Y-14,16);continue}
     bar(X-17,Y+15,34,f,col);
+  }
+}
+function drawSeatBubbles(){
+  for(const c of S.cust){
+    if(c.st!=='seat'&&c.st!=='eat')continue;
+    const [px,py]=custPos(c),X=px*T,f=c.pat/c.max,col=f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d';
+    const Y=py*T-T*0.42;
+    const top=Y-58,bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?[stIc('status_kid_missing','👶')]:[stIc('status_eating','😋')]):pendingOrders(c).map(o=>dishIc(o)),bw=ord.length>1?28*ord.length+10:40;
+    ctx.fillStyle='#fff';rr(X-bw/2,top,bw,bh,9);ctx.fill();
+    ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
+    ord.forEach((e,k)=>emoji(e,X+(k-(ord.length-1)/2)*28,top+bh/2,ord.length>1?21:24));
+    if(c.st==='seat')goldTag(X+bw/2+3,top+bh/2,c);
+    if(c.type==='regular'&&c.st==='seat'){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('いつもの').width+10;ctx.fillStyle='#7c4ab4';rr(X-w/2,top-9,w,14,7);ctx.fill();text('いつもの',X,top-2,10,'#fff',800)}
+    if(c.st==='seat')bar(X-17,Y+15,34,f,col);
   }
 }
 function drawLayoutGround(){
@@ -4017,7 +4021,7 @@ function drawArrive(){
 // ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
 // and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
 // does not move the picture -----
-const PZ=1.5, UZ=1.45, PCZ=1.5, BOARD_H=2.6;   // phone 1.5x, PC 1.25x close-up; the customer board takes the bottom rows
+const PZ=1.5, UZ=1.45, PCZ=1.5, BOARD_H=1.3;   // phone 1.5x, PC 1.25x close-up; the customer board takes the bottom rows
 const CAM={x:0,y:0,ok:false};
 let VIEW='auto', PHONE_INFO=false;
 try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}
@@ -4210,18 +4214,18 @@ function drawCustBoard(y0,h){
   const cw=60,gap=6,seats=S.cust.filter(c=>c.st==='seat'||c.st==='eat').slice(0,6),wait=waiting().slice(0,5);
   text('座席',12,y0+11,11,'#e6eef0',800,'left');
   text('待ち・持ち帰り',452,y0+11,11,'#e6eef0',800,'left');
-  const card=(x,c,takeout)=>{
+  const card=(x,c,takeout,seat)=>{
     ctx.fillStyle=takeout?'#34484f':'#4a6269';rr(x,top+14,cw,ch-14,6);ctx.fill();
-    if(takeout)ctx.strokeStyle='#f6d36a',ctx.lineWidth=1.5,ctx.setLineDash([3,2]),rr(x,top+14,cw,ch-14,6),ctx.stroke(),ctx.setLineDash([]);
+    if(takeout){ctx.strokeStyle='#f6d36a';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);rr(x,top+14,cw,ch-14,6);ctx.stroke();ctx.setLineDash([])}
     if(!c)return;
-    emoji(ctypeOf(c).e||'👤',x+14,top+26,13);
+    if(!custIcon(x+30,top+26,c.type))emoji(ctypeOf(c).e||'👤',x+14,top+26,13);
     const r=c.st==='eat'?1:Math.max(0,Math.min(1,c.pat/(c.max||1)));
     ctx.fillStyle='#1a2a30';rr(x+28,top+22,cw-34,6,3);ctx.fill();
     ctx.fillStyle=r>0.35?'#f6d36a':'#d63b3b';rr(x+28,top+22,(cw-34)*r,6,3);ctx.fill();
-    const oid=c.order||(c.orders&&c.orders[0]);if(oid&&RECIPES[oid])emoji(RECIPES[oid].e,x+cw/2,top+ch-8,14);
+    const oid=c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(RECIPES[oid].e,x+cw/2,top+ch-8,14);
   };
-  for(let i=0;i<6;i++)card(12+i*(cw+gap),seats[i]||null,false);
-  for(let i=0;i<5;i++){const c=wait[i]||null;card(452+i*(cw+gap),c,!!(c&&c.type==='takeout'))}
+  for(let i=0;i<6;i++)card(12+i*(cw+gap),seats[i]||null,false,true);
+  for(let i=0;i<5;i++){const c=wait[i]||null;card(452+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}
 }
 function drawMenus(){
   for(const p of S.players)if(p.g&&isMine(p))drawGather(p);
@@ -4292,6 +4296,7 @@ function drawWorld(arr){
   cachedRect('floor',2*T,2*T,12*T,4*T,()=>{for(let y=2;y<=5;y++)for(let x=2;x<=13;x++)drawFloor(x,y);drawFloorAO()});
   for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(FLOORISH.has(c.t))drawTile(c,x,y)}
   for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(!FLOORISH.has(c.t))drawTile(c,x,y)}
+  drawSeatBubbles();
   if(S.phase==='layout'){
     // equipment nobody can reach from the door gets a red frame
     ctx.strokeStyle='#ff4d4d';ctx.lineWidth=3;

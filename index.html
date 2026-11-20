@@ -238,12 +238,12 @@ const CUST_SWEAT={"penguin_front":[176,21,57,57],"penguin_side":[182,21,57,57],"
 const T=48, GW=24, GH=14, VH=13.5; // VH: rows shown (24 x 13.5 = 16:9); the last row is only a border // 16:9-ish field: truck top-left, town below and to the right
 const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
-const QX=18, QY=8, QMAX=5, QGAP=1.2, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
+const QX=18, QY=10, QMAX=5, QGAP=1.2, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
 const QSPAN=Math.ceil((QMAX-1)*QGAP)+1;         // tiles the line covers (each tile belongs to the nearest spot)
 const qCX=k=>QX+k*QGAP+0.5;                      // centre x of spot k
-const TBL_ZONE={x0:1,x1:17,y0:8,y1:9};          // where tables can stand (the plaza under the truck)
+const TBL_ZONE={x0:1,x1:17,y0:10,y1:11};          // where tables can stand (the plaza under the truck)
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
-const PRESET_TABLES=[[4,8],[9,8],[14,8]];
+const PRESET_TABLES=[[4,10],[9,10],[14,10]];
 const tableOK=(x,y)=>inTblZone(x,y)&&!(y===QY&&x>=QX-1)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
 const FIRE_T=3, FIRE_SPREAD=8, EXT_T=0.5, WET_T=6;   /* WET_T: a tile just put out cannot catch fire again for this long */   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
 const FLAMMABLE=['counter','board','stove','blender','plates','serve'];
@@ -2265,7 +2265,7 @@ function update(dt){
         const c=S.cust[k];
         if(c.st==='leave'){
           // step down to the walkway under the tables, then walk out to the right
-          const gy=c.from==='wait'?c.ly:11.5;
+          const gy=c.from==='wait'?c.ly:8.5;
           if(Math.abs(c.ly-gy)>0.05)c.ly+=Math.sign(gy-c.ly)*Math.min(Math.abs(gy-c.ly),3*dt);else c.lx+=3*dt;
           if(c.lx>GW+0.6)S.cust.splice(k,1);
           continue}

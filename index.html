@@ -698,6 +698,7 @@ function showEquipShop(){
 function startDayLayout(){
   unseatAll();
   const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
+  if(S.stop===2)objs.push(makeEquip('board',0),makeEquip('stove',0),makeEquip('planter',0));
   S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqRerolled=false;
   toolsOnCounters(objs);
   putOutside(objs);

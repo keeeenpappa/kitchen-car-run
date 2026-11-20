@@ -915,7 +915,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンにして、そのあと10秒間ゆっくり減る（×0.8）',dur:10,cd:45,now:true},
   forage:{n:'リス',e:'🐿️',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
   haggle:{n:'キツネ',e:'🦊',d:'走行中：窓口のお店（いなければ次に来るお店）の品ぞろえ＋1、そのお店は誰が買っても3割引き。町：17秒間、誰が市場で買っても3割引き',dur:17,cd:45},
-  tray:{n:'ゴリラ',e:'🦍',d:'料理ののったお皿を2つ持てる',dur:15,cd:45},
+  tray:{n:'ゴリラ',e:'🦍',d:'完成した料理の皿を持って使うと、5マス以内で待ち時間が一番短いお客さんに投げて出す（持ち帰りのお客さんの前には汚れた皿が残る）',dur:0,cd:45},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
   boost:{n:'ウマ',e:'🐎',d:'走行中に使うと、10秒間、燃料なしで「急ぐ」より少し速く走る（窓口でお店と並んでいる間はいつもの速さで、残り時間も減らない）',dur:10,cd:40,now:true},
   nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
@@ -1006,11 +1006,50 @@ function pouchInput(p,inp,dt){   // returns true while the pouch picker is open 
 function pouchEnd(){   // leaving a town: raw ingredients go back to the fridge, anything worked on is lost
   for(const p of S.players){for(const it of p.pouch||[])if(it&&it.kind==='ing'&&!it.step&&!it.burnt)S.stock[it.id]=(S.stock[it.id]||0)+1;p.pouch=[];p.pouchSel=null}
 }
+function throwPlate(p){
+  const h=p.hold;
+  if(!(h&&h.kind==='plate'&&!h.bare&&h.items.length&&matchRecipe(h.items))){say(p,'完成した料理の皿を持って使う');sfx('nope');return false}
+  const rid=matchRecipe(h.items);
+  let best=null,bd=Infinity;
+  for(const c of S.cust){
+    const ok=(c.st==='seat'&&pendingOrders(c).includes(rid))||(c.st==='wait'&&c.type==='takeout'&&c.order===rid);
+    if(!ok)continue;
+    const [px,py]=custPos(c);
+    if(Math.hypot(px-p.x,py-p.y)>5)continue;
+    const r=c.pat/(c.max||1);
+    if(r<bd){bd=r;best=c}
+  }
+  if(!best){say(p,'5マス以内に、この料理を待っているお客さんがいない');sfx('nope');return false}
+  const [px,py]=custPos(best);
+  (S.flights||(S.flights=[])).push({x0:p.x,y0:p.y-0.3,x1:px,y1:py-0.3,t0:S.t,dur:0.45,plate:h,c:best,p});
+  p.hold=null;sfx('put');
+  return true;
+}
+function tickFlights(){
+  if(!S.flights||!S.flights.length)return;
+  const left=[];
+  for(const f of S.flights){
+    if(S.t-f.t0<f.dur){left.push(f);continue}
+    const c=f.c,p=f.p;
+    if(!S.cust.includes(c)){if(!p.hold)p.hold=f.plate;continue}
+    p.hold=f.plate;
+    const [px,py]=custPos(c);
+    serve(p,Math.floor(px),Math.floor(py),c);
+    if(c.type==='takeout'&&p.hold&&p.hold.kind==='dirty'){(S.dirtyDrops||(S.dirtyDrops=[])).push({x:px,y:py});p.hold=null}
+    else if(p.hold===f.plate&&!p.hold.bare)p.hold=null;
+  }
+  S.flights=left;
+}
+function drawFlights(){
+  for(const f of S.flights||[]){const a=Math.min(1,(S.t-f.t0)/f.dur),x=f.x0+(f.x1-f.x0)*a,y=f.y0+(f.y1-f.y0)*a-Math.sin(Math.PI*a)*1.2;drawItem(f.plate,x*T+T/2,y*T+T/2,T*0.7,true)}
+  for(const d of S.dirtyDrops||[])drawItem({kind:'dirty',cnt:1},d.x*T+T/2,d.y*T+T*0.5,T*0.5);
+}
 function useSkill(p){
   const K=skillOf(p);if(!K)return;
   if(p.skill==='pouch'&&(p.skT||0)>0){pouchPut(p);return}
   if((p.skT||0)>0)return;
   if((p.skCD||0)>0){say(p,K.perTown?'次の町への走行でまた使える':'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
+  if(p.skill==='tray'){if(throwPlate(p))p.skCD=K.cd;return}
   // an instant skill: works at once (and is not used up when there is nothing to do)
   if(K.now&&!skillNow(p,K))return;
   let fs=null;if(p.skill==='haggle'&&S.phase==='drive'){fs=foxTarget();if(!fs){say(p,'この先にお店がない');sfx('nope');return}}
@@ -1095,7 +1134,6 @@ function accepts(c,h){
   return false;
 }
 const isDish=x=>!!x&&x.kind==='plate'&&!x.bare&&x.items.length>0;
-const canTray=p=>(p.skT||0)>0&&p.skill==='tray';
 const emptyPlate=x=>!!x&&x.kind==='plate'&&!x.bare&&!x.items.length;
 const canAdd=(pl,it)=>it.kind==='ing'&&plateOk(it)&&!it.burnt&&pl.items.length<3;
 function placeOrTake(p,c){
@@ -1111,7 +1149,6 @@ function placeOrTake(p,c){
   if(h&&it&&h.kind==='dirty'&&it.kind==='dirty'){it.cnt=(it.cnt||1)+(h.cnt||1);p.hold=null;return}   // dirty plates stack (and are carried as a pile)
   if(h&&it&&(h.kind==='dirty'||it.kind==='dirty')){say(p,h.kind==='dirty'?'汚れた皿はシンクへ':'汚れた皿がある');return}
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
-  if(h&&it&&canTray(p)&&isDish(h)&&isDish(it)&&!p.hold2){p.hold2=h;p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&!it){
     if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;if(c.t==='stove')act(p,'cook');else if(c.t==='blender')act(p,'blend');if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
       if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c);c.herd=herdOn(p)}}
@@ -1677,7 +1714,7 @@ function endStop(){
   for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.orders?c.orders.length:c.order2?2:1}}
   pouchEnd();
   const msnRes=S.msn?{ok:S.msn.ok,k:S.msn.k}:null,grpDone=(S.grpN||0)-(S.grpN0||0);
-  S.grp=null;S.msn=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
+  S.grp=null;S.msn=null;S.dirtyDrops=[];S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);S.townIds.push(S.town&&S.town.id);
   const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0)+(msnRes&&msnRes.ok?MSN_PT:0)+grpDone*GRP_PT;
@@ -2187,6 +2224,7 @@ function update(dt){
     if(!p.hold&&p.hold2){p.hold=p.hold2;p.hold2=null}   // the second dish moves into the hands
     if(p.msgT>0)p.msgT-=dt;
   });
+  tickFlights();
   // phase
   if(S.phase==='layout'){S.timer=Math.max(0,S.timer-dt)}
   else if(S.phase==='drive'){
@@ -4299,6 +4337,7 @@ function drawWorld(arr){
   for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(FLOORISH.has(c.t))drawTile(c,x,y)}
   for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(!FLOORISH.has(c.t))drawTile(c,x,y)}
   drawSeatBubbles();
+  drawFlights();
   if(S.phase==='layout'){
     // equipment nobody can reach from the door gets a red frame
     ctx.strokeStyle='#ff4d4d';ctx.lineWidth=3;

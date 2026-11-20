@@ -425,7 +425,7 @@ const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう',
 const FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
 const SHOP_GAP=10, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
 const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
-const LEVER=[15,4], LEVER_FRONT=[14,4];
+const LEVER=[15,3], LEVER_FRONT=[14,3];
 const inWindowZone=s=>[3.5,13.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
 const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
@@ -534,7 +534,7 @@ function buildMap(){
   const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','plates','trash'];
   top.forEach((t,i)=>set(2+i,2,t));
   set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
-  set(13,3,'counter');set(14,4,'floor');set(15,4,'lever');
+  set(13,3,'floor');set(14,3,'floor');set(15,3,'lever');
   set(8,4,'counter');set(9,4,'counter');
   const bot=['gap','window','gap','gap','gap','gap','gap','gap','gap','gap','gap','window'];
   bot.forEach((t,i)=>set(2+i,6,t));
@@ -557,7 +557,7 @@ function newRun(np,mode){
     roadOff:0,gatherLeft:[0,0],market:[],paused:false,t:0,
     up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],townIds:[],reg:null};
-  S.map[3][13].item={kind:'can',water:3};
+  S.map[4][8].item={kind:'can',water:3};
   S.map[2][7].item={kind:'basket',items:[]};
   extStand();   // the extinguisher stands on its own on the floor (not on a counter)
   planTicket();
@@ -1266,7 +1266,7 @@ function doPick(p,c,tx,ty){
   }
 }
 // the driver's seat in the cab, next to the lever. Sit down by pressing 持つ while facing the lever from the tile in front of it.
-const SEAT=[15.55,3.05];
+const SEAT=[15.5,3.5];
 const canSeat=p=>(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&p.tx===LEVER[0]&&p.ty===LEVER[1]&&!S.players.some(q=>q.seat);
 function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1];p.dx=1;p.dy=0;p.tx=-9;p.ty=-9;p.actT=0}
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
@@ -3482,7 +3482,7 @@ function drawPlayers(){
     if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me||p.seat){const msg=p.seat?AL(p,'act','スピード切替')+'　'+AL(p,'pick','降りる'):AL(p,'pick','運転席に座る');
-        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?15.55*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
+        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?15.5*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     if(S.phase==='drive'||S.phase==='stop'){const msg=playHint(p,c);
       if(msg){ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
@@ -3491,7 +3491,7 @@ function drawPlayers(){
       if(lb&&lb!=='置く'){const msg=AL(p,'pick',lb);ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     // held item goes behind the chef when facing away, in front otherwise
-    const holdAt=()=>{if(p.hold2)drawItem(p.hold2,X+p.dx*16-(p.dx?0:9),Y+p.dy*14-4+(p.dx?-9:0),T*0.62,true);if(p.hold)drawItem(p.hold,X+p.dx*16+(p.hold2&&!p.dx?9:0),Y+p.dy*14-4+(p.hold2&&p.dx?5:0),T*0.62,true)};
+    const holdAt=()=>{if(p.hold2)drawItem(p.hold2,X+p.dx*16-(p.dx?0:9),Y+p.dy*14-4+(p.dx?-9:0),T*0.62,true);if(p.hold){const hx=X+p.dx*16+(p.hold2&&!p.dx?9:0),hy=Y+p.dy*14-4+(p.hold2&&p.dx?5:0);if(p.hold.kind==='ext'&&p.dx>0){ctx.save();ctx.translate(hx,0);ctx.scale(-1,1);drawItem(p.hold,0,hy,T*0.62,true);ctx.restore()}else drawItem(p.hold,hx,hy,T*0.62,true)}};
     skillArea(p);skillGlow(p,X,Y);
     if(p.dy===-1)holdAt();
     drawChef(p,X,Y);

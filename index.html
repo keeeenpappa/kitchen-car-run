@@ -1353,9 +1353,9 @@ function doAct(p,c,tx,ty,dt){
   if(p.actKey!==key){p.actKey=key;p.actT=0}
   if(p.lock)return;
   if(c.fire){
-    if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;c.wet=WET_T;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
+    if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;c.wet=WET_T;sfx('water');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
     else say(p,'燃えている！ 消火器で消す');
-  }
+  }else if(p.hold&&p.hold.kind==='ext')p.actT+=dt;
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'&&p.hold){say(p,'手を空けて切る');return}
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest');p.lock=true;return}
@@ -3403,7 +3403,7 @@ function drawExtFx(){
     const [x,y]=k.split(',').map(Number),X=x*T+T/2,Y=y*T+T*0.5;
     for(let j=0;j<9;j++){const an=j*0.7+x,d=6+a*T*0.45;puffBlob(X+Math.cos(an)*d,Y+Math.sin(an)*d*0.6-a*14,7+a*9+(j%3)*2,0.75*(1-a))}}
   for(const p of S.players){if(!p.hold||p.hold.kind!=='ext'||!(p.actT>0))continue;
-    const c=tile(p.tx,p.ty);if(!c||!c.fire)continue;
+    const c=tile(p.tx,p.ty);if(!c)continue;
     const sx=p.x*T+p.dx*T*0.3,sy=p.y*T-T*0.15+p.dy*T*0.2,ex=p.tx*T+T/2,ey=p.ty*T+T*0.5;
     for(let j=0;j<14;j++){const f=((t*2.6+j*0.0714)%1),w=Math.sin(t*13+j*2.1)*f*T*0.22;
       const nx=-(ey-sy),ny=ex-sx,L=Math.hypot(nx,ny)||1;

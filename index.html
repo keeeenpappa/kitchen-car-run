@@ -4040,18 +4040,14 @@ const viewRowInner=()=>`<span style="align-self:center;min-width:9em">画面の�
 const viewRow=()=>`<div class="row" id="viewRow">${viewRowInner()}</div>`;
 const camFollow=()=>!!S&&VIEW!=='pc';
 const camZoom=()=>phoneView()?PZ:camFollow()?PCZ:1;
-const boardH=()=>S&&S.phase==='stop'?BOARD_H:0;
+const boardH=()=>S&&S.phase==='stop'&&VIEW!=='pc'?BOARD_H:0;
 function updateCam(dt){
   if(!camFollow()){CAM.ok=false;return}
   const p=localP();if(!p)return;
   const z=camZoom(),vw=GW/z,vh=(VH-boardH())/z;
-  const mx=Math.min(4.6,vw/3),myT=Math.min(2.4,vh/4),myB=Math.min(2.2,vh/4);   // the chef can roam this far inside the screen before it slides
-  let tx=CAM.x,ty=CAM.y;
-  if(p.x<CAM.x+mx)tx=p.x-mx;else if(p.x>CAM.x+vw-mx)tx=p.x-vw+mx;
-  if(p.y<CAM.y+myT)ty=p.y-myT;else if(p.y>CAM.y+vh-myB)ty=p.y-vh+myB;
-  tx=Math.max(0,Math.min(GW-vw,tx));ty=Math.max(0,Math.min(VH-vh,ty));
+  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2+(p.dx||0)*vw*0.2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2+(p.dy||0)*vh*0.2));   // centred on the chef, a little ahead of where it walks
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
-  const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
+  const k=Math.min(1,dt*6);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;
 }
 // phone: the camera doesn't show the road ahead, so the next shops (and what they sell) are listed at the top while driving
 function drawUpcomingPhone(){

@@ -425,7 +425,7 @@ const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう',
 const FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
 const SHOP_GAP=10, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
 const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
-const LEVER=[15,3], LEVER_FRONT=[14,3];
+const LEVER=[15,3], LEVER_FRONT=[13,4];
 const inWindowZone=s=>[3.5,12.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
 const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
@@ -534,7 +534,7 @@ function buildMap(){
   const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','plates','trash'];
   top.forEach((t,i)=>set(2+i,2,t));
   set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
-  set(14,3,'floor');set(15,3,'lever');
+  set(15,3,'lever');
   set(8,4,'counter');set(9,4,'counter');
   const bot=['gap','window','gap','gap','gap','gap','gap','gap','gap','gap','window','gap'];
   bot.forEach((t,i)=>set(2+i,6,t));
@@ -1146,6 +1146,7 @@ function placeOrTake(p,c){
 // the mixer's contents make a mix: it turns into that and starts mixing
 function mixStart(c){const out=mixDone(c.item.items);if(out){c.item=newIng(out);c.prog=0;c.burn=0}}
 function doPick(p,c,tx,ty){
+  if(Math.floor(p.x)===LEVER_FRONT[0]&&Math.floor(p.y)===LEVER_FRONT[1]&&p.dx>0&&!p.hold&&(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&!S.players.some(q=>q.seat)){takeSeat(p);sfx('lever');return}
   if(c&&c.fire&&S.phase!=='layout'){say(p,p.hold&&p.hold.kind==='ext'?AL(p,'act','消火',1):'燃えている！ 消火器で消す');return}
   {const k=kidNear(p);if(k){k.kidAway=2;float(k.kx,k.ky-0.6,'👶 はーい','#8fe39a');sfx('seat');return}}
   if(c.t==='extst'){if(p.hold){say(p,'手を空けて消火器を持つ');return}p.hold={kind:'ext'};S.map[ty][tx]=blankTile(ty);sfx('pick');return}

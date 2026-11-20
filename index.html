@@ -2400,7 +2400,7 @@ function groundPat(col){
 // static layers (ground, roadside) are painted once into an offscreen canvas at the screen's resolution and then just copied
 const LAYER={};
 function cachedRect(key,x,y,w,h,paint){
-  const zz=phoneView()?PZ:1,sc=cv.width/(GW*T)*zz,k=key+'|'+cv.width+'|'+zz;
+  const zz=camZoom(),sc=cv.width/(GW*T)*zz,k=key+'|'+cv.width+'|'+zz;
   let c=LAYER[k];
   if(!c){c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(h*sc));
     const g=c.getContext('2d');g.scale(sc,sc);g.translate(-x,-y);const o=ctx;ctx=g;try{paint(g)}finally{ctx=o}LAYER[k]=c;
@@ -2410,7 +2410,7 @@ function cachedRect(key,x,y,w,h,paint){
 // a small cached picture (house, stall…) drawn at (x,y) with size w×h; paint() draws it with its top-left at 0,0
 const SPR=new Map();
 function sprite(key,x,y,w,h,paint){
-  const zz=phoneView()?PZ:1,sc=cv.width/(GW*T)*zz,k=key+'|'+cv.width+'|'+zz;let c=SPR.get(k);
+  const zz=camZoom(),sc=cv.width/(GW*T)*zz,k=key+'|'+cv.width+'|'+zz;let c=SPR.get(k);
   if(!c){c=document.createElement('canvas');c.width=Math.max(1,Math.ceil(w*sc));c.height=Math.max(1,Math.ceil(h*sc));
     const g=c.getContext('2d');g.scale(sc,sc);const o=ctx;ctx=g;try{paint()}finally{ctx=o}
     SPR.set(k,c);if(SPR.size>160)SPR.delete(SPR.keys().next().value)}
@@ -3031,7 +3031,7 @@ function drawTown(){
   text('市場（種もある）',mx-T*0.4,(VH-0.25)*T,11,'#f4eedf',800,'left');
   drawGroundItems();
   drawOffer(S.market,(MKT[0]+1.2)*T+S.market.length*0.95*T/2,(MKT[1]-0.45)*T,null);
-  const mp=S.players.find(q=>q.mk);
+  const mp=S.players.find(q=>q.mk&&isMine(q));
   if(mp){const hx=(MKT[0]+1.2)*T,hy=(MKT[1]-0.45)*T-14;
     ctx.font=`800 11px ${FNT}`;const msg=AL(mp,'sw','切替')+'　'+AL(mp,'act','購入',1)+'　'+AL(mp,'pick','閉じる'),w=ctx.measureText(msg).width+16;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(hx-4,hy-10,w,20,8);ctx.fill();text(msg,hx+4,hy,11,'#ffe08a',800,'left')}
@@ -4017,7 +4017,7 @@ function drawArrive(){
 // ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
 // and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
 // does not move the picture -----
-const PZ=1.5, UZ=1.45, PVW=GW/PZ, PVH=VH/PZ;      // 16 x 9 tiles on screen
+const PZ=1.5, UZ=1.45, PCZ=1.25, BOARD_H=2.6;   // phone 1.5x, PC 1.25x close-up; the customer board takes the bottom rows
 const CAM={x:0,y:0,ok:false};
 let VIEW='auto', PHONE_INFO=false;
 try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}
@@ -4026,14 +4026,18 @@ const VIEWN={auto:'自動',pc:'PC（全体）',phone:'スマホ（大きく）'}
 function cycleView(){VIEW=VIEW==='auto'?'phone':VIEW==='phone'?'pc':'auto';try{localStorage.setItem('kcr-view',VIEW)}catch(_){}CAM.ok=false}
 const viewRowInner=()=>`<span style="align-self:center;min-width:9em">画面の表示</span><button class="ovbtn" data-act="view">${VIEWN[VIEW]}${VIEW==='auto'?'（今は'+(isTouch?'スマホ':'PC')+'）':''}</button>`;
 const viewRow=()=>`<div class="row" id="viewRow">${viewRowInner()}</div>`;
+const camFollow=()=>!!S&&VIEW!=='pc';
+const camZoom=()=>phoneView()?PZ:camFollow()?PCZ:1;
+const boardH=()=>S&&S.phase==='stop'?BOARD_H:0;
 function updateCam(dt){
-  if(!phoneView()){CAM.ok=false;return}
+  if(!camFollow()){CAM.ok=false;return}
   const p=localP();if(!p)return;
-  const mx=4.6,myT=2.4,myB=2.2;                   // the chef can roam this far inside the screen before it slides
+  const z=camZoom(),vw=GW/z,vh=(VH-boardH())/z;
+  const mx=Math.min(4.6,vw/3),myT=Math.min(2.4,vh/4),myB=Math.min(2.2,vh/4);   // the chef can roam this far inside the screen before it slides
   let tx=CAM.x,ty=CAM.y;
-  if(p.x<CAM.x+mx)tx=p.x-mx;else if(p.x>CAM.x+PVW-mx)tx=p.x-PVW+mx;
-  if(p.y<CAM.y+myT)ty=p.y-myT;else if(p.y>CAM.y+PVH-myB)ty=p.y-PVH+myB;
-  tx=Math.max(0,Math.min(GW-PVW,tx));ty=Math.max(0,Math.min(VH-PVH,ty));
+  if(p.x<CAM.x+mx)tx=p.x-mx;else if(p.x>CAM.x+vw-mx)tx=p.x-vw+mx;
+  if(p.y<CAM.y+myT)ty=p.y-myT;else if(p.y>CAM.y+vh-myB)ty=p.y-vh+myB;
+  tx=Math.max(0,Math.min(GW-vw,tx));ty=Math.max(0,Math.min(VH-vh,ty));
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
   const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
 }
@@ -4198,10 +4202,31 @@ function drawTopBar(){
   text('ふつう'+FUEL_USE_TXT[1],fx+140,fy+37,11,S.speed===1?'#c9f2d2':'#6f8587',S.speed===1?800:600,'right');
   text('急ぐ'+FUEL_USE_TXT[2],fx+214,fy+37,11,S.speed===2?'#ff9c9c':'#6f8587',S.speed===2?800:600,'right');
 }
+const isMine=p=>NET.role==='off'||p.i===NET.mySlot;
+function drawCustBoard(y0,h){
+  const W=GW*T,top=y0+6,ch=h-12;
+  ctx.fillStyle='#2a3a40';ctx.fillRect(0,y0,W,h);
+  ctx.fillStyle='#1a2a30';ctx.fillRect(0,y0,W,2);
+  const cw=60,gap=6,seats=S.cust.filter(c=>c.st==='seat'||c.st==='eat').slice(0,6),wait=waiting().slice(0,5);
+  text('座席',12,y0+11,11,'#e6eef0',800,'left');
+  text('待ち・持ち帰り',452,y0+11,11,'#e6eef0',800,'left');
+  const card=(x,c,takeout)=>{
+    ctx.fillStyle=takeout?'#34484f':'#4a6269';rr(x,top+14,cw,ch-14,6);ctx.fill();
+    if(takeout)ctx.strokeStyle='#f6d36a',ctx.lineWidth=1.5,ctx.setLineDash([3,2]),rr(x,top+14,cw,ch-14,6),ctx.stroke(),ctx.setLineDash([]);
+    if(!c)return;
+    emoji(ctypeOf(c).e||'👤',x+14,top+26,13);
+    const r=c.st==='eat'?1:Math.max(0,Math.min(1,c.pat/(c.max||1)));
+    ctx.fillStyle='#1a2a30';rr(x+28,top+22,cw-34,6,3);ctx.fill();
+    ctx.fillStyle=r>0.35?'#f6d36a':'#d63b3b';rr(x+28,top+22,(cw-34)*r,6,3);ctx.fill();
+    const oid=c.order||(c.orders&&c.orders[0]);if(oid&&RECIPES[oid])emoji(RECIPES[oid].e,x+cw/2,top+ch-8,14);
+  };
+  for(let i=0;i<6;i++)card(12+i*(cw+gap),seats[i]||null,false);
+  for(let i=0;i<5;i++){const c=wait[i]||null;card(452+i*(cw+gap),c,!!(c&&c.type==='takeout'))}
+}
 function drawMenus(){
-  for(const p of S.players)if(p.g)drawGather(p);
+  for(const p of S.players)if(p.g&&isMine(p))drawGather(p);
   for(const p of S.players){
-    if(!p.menu)continue;
+    if(!p.menu||!isMine(p))continue;
     const M=MENU[p.menu.kind],list=M.list(),cols=Math.max(1,Math.min(M.cols,list.length)),rows=Math.ceil(list.length/cols),cw=44;
     if(!list.length)continue;
     const w=cols*cw+16,h=rows*cw+40;
@@ -4231,10 +4256,12 @@ function draw(){
   if(S.phase==='select'){drawSelect();return}
   const arr=S.view==='town'&&S.town&&S.arrT!=null&&S.arrT<ARRIVE_T;
   // phone view: the world is drawn 1.5x around the camera; the bars and panels stay on the screen
-  const ph=phoneView();
-  if(ph){ctx.save();ctx.scale(PZ,PZ);ctx.translate(-CAM.x*T,-CAM.y*T)}
+  const ph=phoneView(),z=camZoom(),bh=boardH();
+  ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();
+  if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}
   drawWorld(arr);
-  if(ph)ctx.restore();
+  ctx.restore();
+  if(bh)drawCustBoard((VH-bh)*T,bh*T);
   if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawUpcomingPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();drawSidePanel()}
   drawWaiting();

@@ -425,8 +425,8 @@ const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう',
 const FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
 const SHOP_GAP=10, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
 const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
-const LEVER=[15,3], LEVER_FRONT=[14,3];
-const inWindowZone=s=>[3.5,13.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
+const LEVER=[14,3], LEVER_FRONT=[13,3];
+const inWindowZone=s=>[3.5,12.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
 const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
 // A rare "pro" version (★) exists for some of them.
@@ -534,12 +534,12 @@ function buildMap(){
   const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','plates','trash'];
   top.forEach((t,i)=>set(2+i,2,t));
   set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
-  set(13,3,'floor');set(14,3,'floor');set(15,3,'lever');
+  set(13,3,'floor');set(14,3,'lever');
   set(8,4,'counter');set(9,4,'counter');
-  const bot=['gap','window','gap','gap','gap','gap','gap','gap','gap','gap','gap','window'];
+  const bot=['gap','window','gap','gap','gap','gap','gap','gap','gap','gap','window','gap'];
   bot.forEach((t,i)=>set(2+i,6,t));
   {const dx=DOOR_XS[rnd(DOOR_XS.length)];set(dx,6,'door');DOOR_FRONT=[dx,5]}   /* the door is somewhere new on the outer row every trip (never a window) */
-  m[6][3].win='後'; m[6][13].win='前';
+  m[6][3].win='後'; m[6][12].win='前';
   set(MKT[0],MKT[1],'market'); for(const k of GOBJ_K)set(GOBJ[k].x,GROW,'gather',{obj:k});
   for(let x=0;x<QSPAN;x++)set(QX+x,QY,'queue',{slot:Math.round(x/QGAP)});
   for(const [x,y] of PRESET_TABLES)set(x,y,'table');
@@ -590,7 +590,7 @@ const inTruck=(x,y)=>x>=2&&x<=13&&y>=2&&y<=6;
 const FIXED=new Set(['door','window','serve']);
 const FURN=['counter','planter','table','warp',...MOVABLE];
 const PILE=['counter','planter','table'];          // these come stacked in one pile outside
-const COUNTERS_GIVEN=6, PLANTERS_GIVEN=2, DOOR_XS=[2,4,5,6,7,8,9,10,11,12];
+const COUNTERS_GIVEN=6, PLANTERS_GIVEN=2, DOOR_XS=[2,4,5,6,7,8,9,10,11];
 let DOOR_FRONT=[6,5];
 const syncDoor=()=>{for(let x=2;x<=13;x++)if(S.map[6][x].t==='door')DOOR_FRONT=[x,5]};   /* guests: the door's spot comes with the map */
 const emptyT=y=>y===6?'gap':'floor';
@@ -1266,7 +1266,7 @@ function doPick(p,c,tx,ty){
   }
 }
 // the driver's seat in the cab, next to the lever. Sit down by pressing 持つ while facing the lever from the tile in front of it.
-const SEAT=[15.5,3.5];
+const SEAT=[14.95,2.6];
 const canSeat=p=>(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&p.tx===LEVER[0]&&p.ty===LEVER[1]&&!S.players.some(q=>q.seat);
 function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1];p.dx=1;p.dy=0;p.tx=-9;p.ty=-9;p.actT=0}
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
@@ -3482,7 +3482,7 @@ function drawPlayers(){
     if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me||p.seat){const msg=p.seat?AL(p,'act','スピード切替')+'　'+AL(p,'pick','降りる'):AL(p,'pick','運転席に座る');
-        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?15.5*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
+        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?14.95*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     if(S.phase==='drive'||S.phase==='stop'){const msg=playHint(p,c);
       if(msg){ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;

@@ -558,7 +558,7 @@ function newRun(np,mode){
     up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],townIds:[],reg:null};
   S.map[3][13].item={kind:'can',water:3};
-  S.map[2][2].item={kind:'basket',items:[]};
+  S.map[2][7].item={kind:'basket',items:[]};
   extStand();   // the extinguisher stands on its own on the floor (not on a counter)
   planTicket();
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
@@ -1355,9 +1355,7 @@ function doAct(p,c,tx,ty,dt){
   if(c.fire){
     if(p.hold&&p.hold.kind==='ext'){p.actT+=dt;if(p.actT>=EXT_T){p.actT=0;c.fire=0;c.smoke=0;c.wet=WET_T;sfx('water');float(tx+.5,ty,'消えた！','#cdeeff');if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}}
     else say(p,'燃えている！ 消火器で消す');
-  }else if(p.hold&&p.hold.kind==='ext'){
-    p.puffT=(p.puffT||0)-dt;if(p.puffT<=0){p.puffT=0.15;(S.puffs||(S.puffs=[])).push({x:tx+.5,y:ty+.35,b:S.t})}
-    return}
+  }
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'&&p.hold){say(p,'手を空けて切る');return}
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest');p.lock=true;return}
@@ -3265,12 +3263,6 @@ function drawCustomers(){
     bar(X-17,Y+15,34,f,col);
   }
 }
-function drawPuffs(){
-  if(!S.puffs)return;
-  S.puffs=S.puffs.filter(q=>S.t-q.b<0.7);
-  for(const q of S.puffs){const a=(S.t-q.b)/0.7,r=5+a*12;
-    ctx.fillStyle=`rgba(255,255,255,${0.9*(1-a)})`;ctx.beginPath();ctx.arc(q.x*T+Math.sin(q.b*9)*5,q.y*T-a*28,r,0,7);ctx.fill()}
-}
 function drawSeatBubbles(){
   for(const c of S.cust){
     if(c.st!=='seat'&&c.st!=='eat')continue;
@@ -4301,7 +4293,6 @@ function drawWorld(arr){
   for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(FLOORISH.has(c.t))drawTile(c,x,y)}
   for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(!FLOORISH.has(c.t))drawTile(c,x,y)}
   drawSeatBubbles();
-  drawPuffs();
   if(S.phase==='layout'){
     // equipment nobody can reach from the door gets a red frame
     ctx.strokeStyle='#ff4d4d';ctx.lineWidth=3;

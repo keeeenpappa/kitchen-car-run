@@ -693,12 +693,12 @@ function showEquipShop(){
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
     <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
     <div class="cards">${cards}</div>
-    <div class="row"><button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
+    <div class="row">${S.eqRerolled||S.eqBought!=null?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
 function startDayLayout(){
   unseatAll();
   const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
-  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;
+  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqRerolled=false;
   toolsOnCounters(objs);
   putOutside(objs);
   S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
@@ -1905,6 +1905,11 @@ function ovAction(a,v){
     const o=S.eqOffers[+v];if(!o)return;
     if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
     S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showChoose();
+  }
+  else if(a==='eqreroll'){
+    if(S.eqRerolled||S.eqBought!=null)return;
+    if(S.money<S.rerollCost){const b=ov.querySelector('[data-act=eqreroll]');if(b)b.textContent='お金が足りない（'+S.rerollCost+'G）';return}
+    const left=S.ovT;S.money-=S.rerollCost;S.eqRerolled=true;S.eqOffers=null;showEquipShop();S.ovT=left;
   }
   else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();

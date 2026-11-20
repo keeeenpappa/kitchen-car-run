@@ -4037,9 +4037,9 @@ function updateCam(dt){
   if(!camFollow()){CAM.ok=false;return}
   const p=localP();if(!p)return;
   const z=camZoom(),vw=GW/z,vh=(VH-boardH())/z;
-  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2+(p.dx||0)*vw*0.2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2+(p.dy||0)*vh*0.2));   // centred on the chef, a little ahead of where it walks
+  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2));   // centred on the chef
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
-  const k=Math.min(1,dt*2.64);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;
+  const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
 }
 // phone: the camera doesn't show the road ahead, so the next shops (and what they sell) are listed at the top while driving
 function drawUpcomingPhone(){

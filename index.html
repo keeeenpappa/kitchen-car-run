@@ -1266,7 +1266,7 @@ function doPick(p,c,tx,ty){
   }
 }
 // the driver's seat in the cab, next to the lever. Sit down by pressing 持つ while facing the lever from the tile in front of it.
-const SEAT=[14.95,2.6];
+const SEAT=[15.5,2.8];
 const canSeat=p=>(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&p.tx===LEVER[0]&&p.ty===LEVER[1]&&!S.players.some(q=>q.seat);
 function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1];p.dx=1;p.dy=0;p.tx=-9;p.ty=-9;p.actT=0}
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
@@ -3482,7 +3482,7 @@ function drawPlayers(){
     if(p.seat||canSeat(p)){
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me||p.seat){const msg=p.seat?AL(p,'act','スピード切替')+'　'+AL(p,'pick','降りる'):AL(p,'pick','運転席に座る');
-        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?14.95*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
+        ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.seat?15.5*T:Math.min(LEVER[0]*T+T/2,GW*T-w/2-4),hy=p.seat?1.55*T:LEVER[1]*T-2;
         ctx.fillStyle=PCOL[p.i];rr(hx-w/2,hy-9,w,18,9);ctx.fill();text(msg,hx,hy,11,'#fff',800)}}
     if(S.phase==='drive'||S.phase==='stop'){const msg=playHint(p,c);
       if(msg){ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(msg).width+12,hx=p.tx*T+T/2,hy=p.ty*T-2;

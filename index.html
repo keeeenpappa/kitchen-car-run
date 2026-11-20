@@ -2678,22 +2678,22 @@ function cabSparkle(){
   ctx.globalAlpha=1;
 }
 function drawCab(front){
-  ctx.save();ctx.beginPath();ctx.roundRect(16.25*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.clip();
+  ctx.save();ctx.beginPath();ctx.roundRect(14.85*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.clip();
   if(!front){
-    ctx.fillStyle='rgba(40,70,80,.18)';ctx.fillRect(16.25*T,3.15*T,T*1.25,T*0.4);       // the dashboard shadow
-    ctx.fillStyle='#24605c';rr(16.33*T,2.55*T,T*0.3,T*1.05,9);ctx.fill();               // seat back
-    ctx.fillStyle='#3fa6a1';rr(16.37*T,2.61*T,T*0.18,T*0.88,7);ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.35)';rr(16.39*T,2.65*T,3,T*0.6,1.5);ctx.fill();
-    ctx.fillStyle='#24605c';rr(16.4*T,3.33*T,T*0.75,T*0.3,7);ctx.fill();                // cushion
+    ctx.fillStyle='rgba(40,70,80,.18)';ctx.fillRect(14.85*T,3.15*T,T*1.25,T*0.4);       // the dashboard shadow
+    ctx.fillStyle='#24605c';rr(14.93*T,2.55*T,T*0.3,T*1.05,9);ctx.fill();               // seat back
+    ctx.fillStyle='#3fa6a1';rr(14.97*T,2.61*T,T*0.18,T*0.88,7);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.35)';rr(14.99*T,2.65*T,3,T*0.6,1.5);ctx.fill();
+    ctx.fillStyle='#24605c';rr(15*T,3.33*T,T*0.75,T*0.3,7);ctx.fill();                // cushion
   } else {
-    const cx=17.3*T,cy=3.0*T;
+    const cx=15.9*T,cy=3.0*T;
     ctx.strokeStyle='#33393e';ctx.lineWidth=4;ctx.lineCap='round';
     ctx.beginPath();ctx.moveTo(cx+2,cy+4);ctx.lineTo(cx+13,cy+22);ctx.stroke();           // column
     ctx.lineWidth=4.5;ctx.beginPath();ctx.ellipse(cx,cy,4.5,13,-0.28,0,7);ctx.stroke();    // the wheel, seen from the side
     ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(cx-1,cy,4.5,12,-0.28,Math.PI*0.9,Math.PI*1.4);ctx.stroke();
     // the speed lever by the seat (green = ふつう, tilted forward and red = 急ぐ)
     const fast=S&&S.speed===2;LEVA+=((fast?0.6:-0.35)-LEVA)*0.25;
-    const px=16.98*T,py=3.5*T,L=13,kx=px+Math.sin(LEVA)*L,ky=py-Math.cos(LEVA)*L;
+    const px=15.58*T,py=3.5*T,L=13,kx=px+Math.sin(LEVA)*L,ky=py-Math.cos(LEVA)*L;
     ctx.fillStyle='#1d4f4c';ctx.beginPath();ctx.ellipse(px,py,6,2.6,0,0,7);ctx.fill();
     ctx.strokeStyle='#9aa4aa';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(kx,ky);ctx.stroke();
     const kg=ctx.createRadialGradient(kx-1.5,ky-1.5,0.5,kx,ky,5);kg.addColorStop(0,fast?'#ffb3a8':'#c9f5d3');kg.addColorStop(0.5,fast?'#ff5d5d':'#52c374');kg.addColorStop(1,fast?'#b52a2a':'#2b8a4a');

@@ -531,7 +531,7 @@ function buildMap(){
   for(let y=1;y<=6;y++){set(1,y,'wall');for(let x=14;x<=16;x++)set(x,y,'wall')}
   for(let y=2;y<=6;y++)for(let x=2;x<=13;x++)set(x,y,'floor');
   /* the ready-made kitchen holds exactly what a self-made layout gets: COUNTERS_GIVEN counters, PLANTERS_GIVEN planters, one of each unit */
-  const top=['fridge','seedbox','sink','board','counter','stove','counter','stove','blender','counter','plates','trash'];
+  const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','plates','trash'];
   top.forEach((t,i)=>set(2+i,2,t));
   set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
   set(13,3,'counter');set(14,4,'floor');set(15,4,'lever');
@@ -558,7 +558,7 @@ function newRun(np,mode){
     up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],townIds:[],reg:null};
   S.map[3][13].item={kind:'can',water:3};
-  S.map[2][6].item={kind:'basket',items:[]};
+  S.map[2][2].item={kind:'basket',items:[]};
   extStand();   // the extinguisher stands on its own on the floor (not on a counter)
   planTicket();
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */

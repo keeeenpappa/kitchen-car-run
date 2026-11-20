@@ -4014,7 +4014,7 @@ function drawArrive(){
 // ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
 // and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
 // does not move the picture -----
-const PZ=1.5, UZ=1.45, PCZ=1.25, BOARD_H=2.6;   // phone 1.5x, PC 1.25x close-up; the customer board takes the bottom rows
+const PZ=1.5, UZ=1.45, PCZ=1.5, BOARD_H=2.6;   // phone 1.5x, PC 1.25x close-up; the customer board takes the bottom rows
 const CAM={x:0,y:0,ok:false};
 let VIEW='auto', PHONE_INFO=false;
 try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}

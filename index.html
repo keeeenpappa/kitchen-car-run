@@ -2812,33 +2812,36 @@ function drawTruckShell(){
   drawWheels();
 }
 function drawTruckBody(){
-  const R=14.6*T,W=R-T;
-  softShadow((T+R)/2,7*T+12,W*0.92,16,.35);
-  // headlight with a glow, at the front corner
-  {const hx=R-0.3*T,hy=5.7*T,g=ctx.createRadialGradient(hx,hy,2,hx,hy,16);g.addColorStop(0,'rgba(255,245,200,.6)');g.addColorStop(1,'rgba(255,245,200,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(hx,hy,16,0,7);ctx.fill();
+  softShadow(9.4*T,7*T+12,9.2*T,16,.35);
+  // cab
+  {const g=ctx.createLinearGradient(0,1.9*T,0,7*T);g.addColorStop(0,'#f6c04c');g.addColorStop(0.6,'#e9a92c');g.addColorStop(1,'#c98918');
+   ctx.fillStyle=g;rr(15.6*T,1.9*T,T*2.2,5.1*T-2,[10,30,22,10]);ctx.fill();
+   ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(15.8*T,1.9*T+2);ctx.lineTo(17.2*T,1.9*T+2);ctx.quadraticCurveTo(17.75*T,1.95*T,17.78*T,2.5*T);ctx.stroke()}
+  ctx.fillStyle='#c98918';rr(15.6*T,5.05*T,T*2.2,10,[0,0,6,0]);ctx.fill();
+  {const g=ctx.createLinearGradient(16.25*T,2.2*T,17.5*T,3.55*T);g.addColorStop(0,'#e3f5fb');g.addColorStop(0.5,'#a9dcef');g.addColorStop(1,'#7fbfd9');
+   ctx.fillStyle='#b77d16';rr(16.2*T,2.15*T,T*1.35,T*1.45,[9,23,9,9]);ctx.fill();
+   ctx.fillStyle=g;rr(16.25*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.fill();
+   ctx.fillStyle='rgba(255,255,255,.6)';ctx.beginPath();ctx.moveTo(16.4*T,3.35*T);ctx.lineTo(16.9*T,2.3*T);ctx.lineTo(17.1*T,2.3*T);ctx.lineTo(16.6*T,3.35*T);ctx.closePath();ctx.fill()}
+  // headlight with a glow
+  {const hx=17.72*T,hy=5.7*T,g=ctx.createRadialGradient(hx,hy,2,hx,hy,16);g.addColorStop(0,'rgba(255,245,200,.6)');g.addColorStop(1,'rgba(255,245,200,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(hx,hy,16,0,7);ctx.fill();
    ctx.fillStyle='#b77d16';ctx.beginPath();ctx.arc(hx,hy,9,0,7);ctx.fill();ctx.fillStyle='#fff8e2';ctx.beginPath();ctx.arc(hx,hy,7,0,7);ctx.fill();ctx.fillStyle='#ffe28a';ctx.beginPath();ctx.arc(hx+1,hy+1,4,0,7);ctx.fill()}
   // body: rounded box, lit from above, darker towards the bottom
   {const g=ctx.createLinearGradient(0,T,0,7*T);g.addColorStop(0,'#f8c652');g.addColorStop(0.15,'#eeae30');g.addColorStop(0.85,'#e3a228');g.addColorStop(1,'#c4861a');
-   ctx.fillStyle=g;rr(T,T,W,6*T-2,24);ctx.fill();
+   ctx.fillStyle=g;rr(T,T,15.4*T,6*T-2,24);ctx.fill();
    ctx.strokeStyle='rgba(120,70,0,.35)';ctx.lineWidth=1.5;ctx.stroke();
-   ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(T+24,T+2.5);ctx.lineTo(R-24,T+2.5);ctx.stroke()}
-  // front window, widened to the left
-  {const wx=12.4*T,wy=2.15*T,ww=R-0.4*T-wx,wh=T*1.35;const g=ctx.createLinearGradient(wx,wy,wx+ww,wy+wh);g.addColorStop(0,'#e3f5fb');g.addColorStop(0.5,'#a9dcef');g.addColorStop(1,'#7fbfd9');
-   ctx.fillStyle='#b77d16';rr(wx-T*0.05,wy-T*0.05,ww+T*0.1,wh+T*0.1,[9,23,9,9]);ctx.fill();
-   ctx.fillStyle=g;rr(wx,wy,ww,wh,[8,22,8,8]);ctx.fill();
-   ctx.fillStyle='rgba(255,255,255,.6)';ctx.beginPath();ctx.moveTo(wx+0.15*T,wy+1.15*T);ctx.lineTo(wx+0.6*T,wy+0.15*T);ctx.lineTo(wx+0.8*T,wy+0.15*T);ctx.lineTo(wx+0.35*T,wy+1.15*T);ctx.closePath();ctx.fill()}
+   ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(T+24,T+2.5);ctx.lineTo(16.4*T-24,T+2.5);ctx.stroke()}
   // the kitchen opening sits a little lower than the body (inner rim)
-  ctx.strokeStyle='rgba(120,70,0,.3)';ctx.lineWidth=3;rr(2*T-2,2*T-2,12*T+4,4*T+4,6);ctx.stroke();
+  ctx.strokeStyle='rgba(120,70,0,.3)';ctx.lineWidth=3;rr(2*T-2,2*T-2,14*T+4,4*T+4,6);ctx.stroke();
   // roof trim
-  ctx.fillStyle='#f6d36a';rr(T+14,T+6,W-28,5,3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.6)';rr(T+14,T+6,W-28,2,1);ctx.fill();
+  ctx.fillStyle='#f6d36a';rr(T+14,T+6,15.4*T-28,5,3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.6)';rr(T+14,T+6,15.4*T-28,2,1);ctx.fill();
   // scalloped skirt
   const sy=7*T-6;
-  ctx.fillStyle='#b8461a';rr(T+10,sy-4,W-20,8,4);ctx.fill();
-  ctx.fillStyle='#d4561c';rr(T+10,sy-6,W-20,7,4);ctx.fill();
-  for(let k=0;k<30;k++){const x=T+22+k*(W-44)/29;ctx.fillStyle=k%2?'#fff3d6':'#d4561c';ctx.beginPath();ctx.arc(x,sy+2,7,0,Math.PI);ctx.fill();
+  ctx.fillStyle='#b8461a';rr(T+10,sy-4,15.4*T-20,8,4);ctx.fill();
+  ctx.fillStyle='#d4561c';rr(T+10,sy-6,15.4*T-20,7,4);ctx.fill();
+  for(let k=0;k<30;k++){const x=T+22+k*(15.4*T-44)/29;ctx.fillStyle=k%2?'#fff3d6':'#d4561c';ctx.beginPath();ctx.arc(x,sy+2,7,0,Math.PI);ctx.fill();
     ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.arc(x,sy+2,7,0.2*Math.PI,0.8*Math.PI);ctx.fill()}
 }
-const WHEELS=[3.35,12.6], WHEEL_R=22;
+const WHEELS=[3.35,16.45], WHEEL_R=22;
 function drawWheels(){
   const ang=S?S.roadOff*T/(WHEEL_R*1.0):0;
   for(const wx of WHEELS){

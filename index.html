@@ -4222,7 +4222,7 @@ function drawCustBoard(y0,h){
     const r=c.st==='eat'?1:Math.max(0,Math.min(1,c.pat/(c.max||1)));
     ctx.fillStyle='#1a2a30';rr(x+6,by+38,cw-12,6,3);ctx.fill();
     ctx.fillStyle=r>0.35?'#f6d36a':'#d63b3b';rr(x+6,by+38,(cw-12)*r,6,3);ctx.fill();
-    const oid=c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(RECIPES[oid].e,cx,by+bh-15,28);
+    const oid=c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(dishIc(oid),cx,by+bh-15,28);
   };
   for(let i=0;i<6;i++)card(12+i*(cw+gap),seats[i]||null,false,true);
   for(let i=0;i<5;i++){const c=wait[i]||null;card(452+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}

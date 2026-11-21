@@ -3617,14 +3617,10 @@ function skillGlyph(k,x,y,u,col){
 function drawWaiting(){
   const n=S.waitN||0,watching=NET.role==='guest'&&NET.mySlot<0;
   if(n>0){
-    const x0=18.2*T,y0=7.0*T,w=5.8*T,h=50;
-    ctx.fillStyle='rgba(16,26,30,.88)';rr(x0,y0,w,h,12);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
-    text('待機中',x0+12,y0+16,13,'#ffe08a',800,'left');
-    text('営業が終わったら参加',x0+12,y0+35,11,'#cfe0e2',700,'left');
-    for(let k=0;k<n;k++){const slot=S.players.length+k,cx=x0+w-26-k*44,cy=y0+30;
-      ctx.save();ctx.translate(cx,cy);ctx.scale(0.62,0.62);ctx.globalAlpha=0.55+0.45*Math.abs(Math.sin(S.t*2+k));
-      drawChef({i:slot,x:0,y:0,dx:0,dy:1},0,0);ctx.restore();
-      text('P'+(slot+1),cx,y0+8,10,PCOL[slot],800)}
+    const msg='待機中 '+n+'人（営業が終わったら参加）',yb=(VH-boardH())*T-34;
+    ctx.font=`800 13px ${FNT}`;const pw=ctx.measureText(msg).width+24;
+    ctx.fillStyle='rgba(16,26,30,.88)';rr(8,yb,pw,26,13);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
+    text(msg,20,yb+13,13,'#ffe08a',800,'left');
   }
   if(watching){
     const msg='観戦中：営業が終わったら参加します',y=(VH-1.05)*T;

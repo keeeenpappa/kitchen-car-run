@@ -1148,13 +1148,13 @@ function placeOrTake(p,c){
     if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);act(p,'blend');c.herd=herdOn(p);return}
     say(p,'この組み合わせは混ぜられない');return}
   // a counter holds one plate: empty plates only stack on the plate stand
-  if(!h&&it){p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
+  if(!h&&it){if((c.t==='stove'||c.t==='blender')&&(c.prog>0||c.burn>0)){it.cookP=c.prog;it.cookB=c.burn}p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
   if(h&&it&&emptyPlate(h)&&emptyPlate(it)){say(p,'台には1枚だけ（重ねるのは皿置き場）');return}
   if(h&&it&&h.kind==='dirty'&&it.kind==='dirty'){it.cnt=(it.cnt||1)+(h.cnt||1);p.hold=null;return}   // dirty plates stack (and are carried as a pile)
   if(h&&it&&(h.kind==='dirty'||it.kind==='dirty')){say(p,h.kind==='dirty'?'汚れた皿はシンクへ':'汚れた皿がある');return}
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=0;c.burn=0;if(c.t==='stove')act(p,'cook');else if(c.t==='blender')act(p,'blend');if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
+    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=(c.t==='stove'||c.t==='blender')&&h.cookP||0;c.burn=(c.t==='stove'||c.t==='blender')&&h.cookB||0;delete h.cookP;delete h.cookB;if(c.t==='stove')act(p,'cook');else if(c.t==='blender')act(p,'blend');if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
       if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c);c.herd=herdOn(p)}}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');

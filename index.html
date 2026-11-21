@@ -431,7 +431,7 @@ const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
 // A rare "pro" version (★) exists for some of them.
 const EQUIP={
-  board:{n:'まな板',e:'🔪',price:20,pros:[{n:'よく切れるまな板',d:'切る時間 -40%'},{n:'自動まな板',d:'置いておくと自動で切れる（人の半分の速さ）'}]},
+  board:{n:'まな板',e:'🔪',price:20,pros:[{n:'よく切れるまな板',d:'切る時間 -40%'},{n:'自動まな板',d:'置いておくと自動で切れる（人の7割の速さ）'}]},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
   counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'寝かせカウンター',d:'町が終わったとき上にある食材が、次の町で1段階すすみ、冷蔵庫に同じ食材が1個増える'}]},
@@ -2153,8 +2153,8 @@ function update(dt){
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
   fireUpdate(dt);helpRefresh();
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];   /* ★自動まな板 chops on its own at half a chef's speed */
-    if(c.t==='board'&&c.pro===2&&c.item&&!c.fire&&S.phase!=='layout'&&nextStep(c.item)==='chop'){c.prog+=dt*0.5;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}}}
+  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];   /* ★自動まな板 chops on its own at 70% of a chef's speed */
+    if(c.t==='board'&&c.pro===2&&c.item&&!c.fire&&S.phase!=='layout'&&nextStep(c.item)==='chop'){c.prog+=dt*0.7;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}}}
   const growBoost=c=>(c.boostT||0)>0?2:1;
   for(const c of S.stations){if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);if(c.nbT>0)c.nbT=Math.max(0,c.nbT-dt)}
   for(const c of S.stations){

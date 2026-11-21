@@ -5192,6 +5192,7 @@ const AU={ctx:null,bgm:null,se:null,vol:{bgm:2,se:3},nb:null,track:null,step:0,n
 try{const v=JSON.parse(localStorage.getItem('kcr-snd')||'null');if(v&&typeof v==='object')for(const k of ['bgm','se'])if(Number.isInteger(v[k])&&v[k]>=0&&v[k]<=4)AU.vol[k]=v[k]}catch(_){}
 const mf=m=>440*Math.pow(2,(m-69)/12);
 function auInit(){
+  const hint=document.getElementById('sndHint');if(hint)hint.remove();
   if(AU.ctx){if(AU.ctx.state==='suspended'&&!document.hidden)AU.ctx.resume().catch(()=>{});return}
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   let c;try{c=AU.ctx=new AC()}catch(_){return}
@@ -5210,6 +5211,7 @@ function auInit(){
 }
 function auVol(){if(!AU.ctx)return;AU.se.gain.setTargetAtTime(LV[AU.vol.se]*0.8,AU.ctx.currentTime,0.05)}
 addEventListener('pointerdown',auInit,true);addEventListener('keydown',auInit,true);
+if(location.search){const addHint=()=>{const h=document.createElement('div');h.id='sndHint';h.textContent='画面をタップすると音が鳴ります';h.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:99;background:rgba(16,26,30,.9);color:#ffe08a;padding:6px 14px;border-radius:12px;font-size:13px;font-weight:800;pointer-events:none';document.body.appendChild(h)};document.body?addHint():addEventListener('DOMContentLoaded',addHint)}
 document.addEventListener('visibilitychange',()=>{if(!AU.ctx)return;if(document.hidden)AU.ctx.suspend().catch(()=>{});else AU.ctx.resume().catch(()=>{})});
 const auOn=()=>AU.ctx&&AU.ctx.state==='running';
 function osc(t,f,d,type,v,dest,to,a){

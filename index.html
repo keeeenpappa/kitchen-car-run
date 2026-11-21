@@ -3923,6 +3923,7 @@ function gachaHtml(){
 // the pull: a capsule drops and shakes, bursts open, and the prize comes out (CSS animation on its own screen)
 function gachaPull(){
   if(SV.t<=0){play('nope');return}
+  sfx('gacha');
   SV.t--;const k=SKIN_K[rnd(SKIN_K.length)],dup=SV.own.includes(k);let conv=false;
   if(dup){SV.sh++;if(SV.sh>=SHARDS_PER){SV.sh-=SHARDS_PER;SV.t++;conv=true}}
   else{SV.own.push(k);const sk=SKINS[k].sk;SV.eq[sk]=SV.eq[sk]||{};if(!SV.eq[sk][SKINS[k].slot])SV.eq[sk][SKINS[k].slot]=k}
@@ -5248,6 +5249,7 @@ const SFX={
   buy:t=>{osc(t,1047,0.06,'square',.09);osc(t+0.06,1568,0.22,'square',.09)},
   fuel:t=>{for(let k=0;k<5;k++)osc(t+k*0.07,180+k*35,0.08,'sine',.25,0,120+k*35)},
   mystery:t=>arp(t,[60,64,67,71,74,79],0.05,'square',.08),
+  gacha:t=>{noise(t,0.35,.12,'bandpass',1200,2);arp(t+0.35,[72,76,79,84],0.06,'triangle',.14)},
   bite:t=>{osc(t,1400,0.07,'square',.12);osc(t+0.1,1400,0.07,'square',.12)},
   tap:t=>osc(t,700+rnd(200),0.04,'square',.08),
   catch:t=>arp(t,[72,76,79,84,88],0.05,'triangle',.2),

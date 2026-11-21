@@ -3951,7 +3951,7 @@ function dressToggle(k){
 }
 function dressDone(keep){
   if(keep&&DRESS){SV.eq[DRESS.sk]=DRESS.eq;saveSV();if(NET.room&&NET.role==='guest')NET.room.presence({skn:SV.eq}).catch(()=>{})}
-  DRESS=null;paintOv(gachaHtml());play('confirm');
+  const back=DRESS&&DRESS.sk;DRESS=null;paintOv(gachaHtml());if(back){ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.v===back));markSel()}play('confirm');
 }
 const SEL_ICON_ZOOM={rabbit:1.22,elephant:1.22};   /* their wide ears fill the icon's width, so the face comes out small: shown bigger in the grid */
 function drawSelect(){

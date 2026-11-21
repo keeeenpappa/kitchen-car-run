@@ -684,7 +684,8 @@ function showEquipShop(){
     if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((_,i)=>R.push([id,i+1]));
       const [id,pro]=R[rnd(R.length)];S.eqOffers[rnd(3)]={type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*1.8)}}
   }
-  if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)S.eqOffers.push(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)S.eqOffers.push(equipOffer('lucky',1,0));if(!hasSt('sign')&&Math.random()<SIGN_P)S.eqOffers.push(equipOffer('sign',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
+  const addSpecial=o=>{const cap=3+(S.extraOffer?1:0);if(S.eqOffers.length>=cap)S.eqOffers.splice(S.eqOffers.length-1,1,o);else S.eqOffers.push(o)};
+    if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)addSpecial(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)addSpecial(equipOffer('lucky',1,0));if(!hasSt('sign')&&Math.random()<SIGN_P)addSpecial(equipOffer('sign',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
     const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">

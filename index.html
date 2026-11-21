@@ -4991,7 +4991,7 @@ function guestFrame(dt){
   }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
-  const gq=localP&&localP(),gv=gq&&gq.g&&GOBJ[gq.g.obj]&&GOBJ[gq.g.obj].act==='timing'?Math.round(gq.g.v*100)/100:-1;
+  const gq=S?localP():null,gv=gq&&gq.g&&GOBJ[gq.g.obj]&&GOBJ[gq.g.obj].act==='timing'?Math.round(gq.g.v*100)/100:-1;
   const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,guestLocked()?GSEL:-1,gv];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}

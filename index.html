@@ -1440,7 +1440,7 @@ function gatherInput(p,inp,dt){
     if(tap){g.v++;if(g.v>=g.need)gatherDone(p);else sfx('tap')}
   } else if(O.act==='timing'){
     g.t+=dt;g.v=1-Math.abs(((g.t*1.1)%2)-1);
-    if(tap)gatherDone(p,Math.abs(g.v-0.5)<=timingZone()?2:1);
+    if(tap){const v=inp.gv>=0?inp.gv:g.v;gatherDone(p,Math.abs(v-0.5)<=timingZone()?2:1)}
   } else if(O.act==='pull'){
     const done=c=>{g.need+=c;g.v=0;g.hold=0;
       if(g.need>=4){gatherDone(p);return}
@@ -4851,7 +4851,7 @@ function remoteInput(i){
   const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i], sk=(+r[5]||0)!==(NET.lastSk[i]||0);
   NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];NET.lastSk[i]=+r[5]||0;
   const cl=v=>Math.max(-1,Math.min(1,+v||0));
-  return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk,swH:!!r[6]};
+  const gv=+r[8];return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk,swH:!!r[6],gv:gv>=0&&gv<=1?gv:-1};
 }
 const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
 function guestAction(a,v,slot){
@@ -4993,7 +4993,8 @@ function guestFrame(dt){
   }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,guestLocked()?GSEL:-1];
+  const gq=localP&&localP(),gv=gq&&gq.g&&GOBJ[gq.g.obj]&&GOBJ[gq.g.obj].act==='timing'?Math.round(gq.g.v*100)/100:-1;
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,guestLocked()?GSEL:-1,gv];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state

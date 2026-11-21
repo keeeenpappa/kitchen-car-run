@@ -679,7 +679,7 @@ function showEquipShop(){
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
   // 3 plain items; about every other visit one of them is a rare, picked evenly from ALL rare versions (each ★ is as likely as any other)
   if(!S.eqOffers){
-    S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly),3).map(id=>equipOffer(id,1,PRO_ONLY.includes(id)?1:0));
+    S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly),3+(S.extraOffer?1:0)).map(id=>equipOffer(id,1,PRO_ONLY.includes(id)?1:0));
     if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((_,i)=>R.push([id,i+1]));
       const [id,pro]=R[rnd(R.length)];S.eqOffers[rnd(3)]={type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*1.8)}}
   }
@@ -699,7 +699,7 @@ function startDayLayout(){
   unseatAll();
   const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
   if(S.stop===2)objs.push(makeEquip('board',0),makeEquip('stove',0),makeEquip('planter',0));
-  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqRerolled=false;
+  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
   S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
@@ -1557,7 +1557,7 @@ const MSN={
 const MSN_K=Object.keys(MSN);
 const MSN_COMMON=['serve','chop','cook','wash','plant'];
 const MSN_TOWN={port:'g_pond',forest:'g_log',ranch:'g_barn',busy:'guide',farm:'harvest',sweets:'blend',mountain:'g_tree',snow:'g_field'};
-const MSN_PT=60, MSN_SOLO=3, MSN_GIFT=2;
+const MSN_PT=60, MSN_SOLO=3;
 const msnNeed=()=>S.np===1?MSN_SOLO:1;
 function pickMission(){
   const tk=S.town&&MSN_TOWN[S.town.id],last=S.msnLast;
@@ -1576,7 +1576,7 @@ function act(p,k){
   const M=S.msn;if(!M||M.ok||M.k!==k||S.phase!=='stop')return;
   const need=msnNeed();if((M.d[p.i]||0)>=need)return;M.d[p.i]=(M.d[p.i]||0)+1;
   if(S.players.every(q=>(M.d[q.i]||0)>=need)){M.ok=true;S.msnN=(S.msnN||0)+1;S.msnGift=true;sfx('mystery');
-    S.toast={text:'🎯 ミッション達成！ スコア+'+MSN_PT+'・次の町で材料のおまけ',t:0,life:3.5}}
+    S.toast={text:'🎯 ミッション達成！ スコア+'+MSN_PT+'・次の品ぞろえが1つ増える',t:0,life:3.5}}
   else float(p.x,p.y-0.9,'🎯','#ffe08a');
 }
 function arrive(){
@@ -1588,10 +1588,6 @@ function arrive(){
   S.boostN=0;for(const q of S.players)if(skillOf(q).perTown)q.skT=0;
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];S.arrT=0;
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
-  if(S.msnGift){S.msnGift=false;const l=townNeeds(S.town).filter(i=>!ING[i].mix),got=[];
-    for(let k=0;k<MSN_GIFT&&l.length;k++){const i=l[rnd(l.length)];S.stock[i]=(S.stock[i]||0)+1;got.push(i)}
-    if(got.length){const cnt={};for(const i of got)cnt[i]=(cnt[i]||0)+1;const m='🎯 ミッションのおまけ：'+Object.keys(cnt).map(i=>ING[i].e+ING[i].n+'×'+cnt[i]).join('　');
-      S.toast={text:S.toast&&S.toast.t<0.5?S.toast.text+'　／　'+m:m,t:0,life:5}}}
   S.grpN0=S.grpN||0;pickMission();
 }
 function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
@@ -1723,13 +1719,13 @@ function endStop(){
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
   const lost=clearKitchen();
   const last=S.stop>=STOPS;
-  if(last)S.msnGift=false;
+  S.extraOffer=!!S.msnGift&&!last;S.msnGift=false;
   showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
     <div class="stars big" style="text-align:center">${starsHtml(tst)}</div>
     <div class="bigscore">${tpts}<span>点</span></div>
     <p style="text-align:center" class="mut">合計 <b>${runScore(false).total}点</b></p>
     <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b>${perf?' <span class="perf">ノーミス ＋'+PERFECT_PT+'点</span>':''}</p>
-    ${msnRes?`<p>🎯 ${msnRes.ok?`ミッション達成 <span class="perf">＋${MSN_PT}点</span>${last?'':`　次の町の材料 <b>＋${MSN_GIFT}</b>`}`:`<span class="mut">ミッション未達成（全員が1回ずつ${MSN[msnRes.k]}）</span>`}</p>`:''}
+    ${msnRes?`<p>🎯 ${msnRes.ok?`ミッション達成 <span class="perf">＋${MSN_PT}点</span>${last?'':'　次の品ぞろえ <b>＋1</b>'}`:`<span class="mut">ミッション未達成（全員が1回ずつ${MSN[msnRes.k]}）</span>`}</p>`:''}
     ${grpDone?`<p>👥 団体さん <span class="perf">＋${grpDone*GRP_PT}点</span></p>`:''}
     ${moneyBig('評判 '+'♥'.repeat(S.hearts))}
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
@@ -1769,7 +1765,7 @@ const moneyBig=extra=>`<div class="money"><span class="mk">所持金</span><span
 function showUpgrade(){
   S.phase='upgrade';S.rerollUsed=false;
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
-  S.offers=pickN(pool,3);
+  S.offers=pickN(pool,3+(S.extraOffer?1:0));
   const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
   const cards=S.offers.map((u,i)=>`<button class="ovbtn town hold" data-act="up" data-v="${i}">
       <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}</span>

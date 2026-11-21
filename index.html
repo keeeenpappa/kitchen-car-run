@@ -1870,7 +1870,13 @@ function ovButtons(){return [...ov.querySelectorAll('.ovbtn')]}
 function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel))}
 // online: on the host's screens a guest moves its own cursor; everyone's pick shows as a coloured dot under the button
 let GSEL=0;
-function ovDots(){ovButtons().forEach(b=>{const el=b.querySelector('.pdots');if(el)el.remove()})}
+function ovDots(arr){
+  const bs=ovButtons();
+  bs.forEach((b,i)=>{const me=NET.role==='guest'?NET.mySlot:0,who=S&&S.paused?[]:(arr||[]).map((k,j)=>k===i&&j!==me?j:-1).filter(j=>j>=0),key=who.join(',');if(b._pd===key)return;b._pd=key;
+    let el=b.querySelector('.pdots');if(!who.length){if(el)el.remove();return}
+    if(!el){el=document.createElement('span');el.className='pdots';b.appendChild(el)}
+    el.innerHTML=who.map(j=>`<i style="background:${PCOL[j]}"></i>`).join('')});
+}
 ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&guestLocked()){GSEL=Math.max(0,ovButtons().indexOf(b));return}if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
 const HOLD=0.6, READY_HOLD=0.8;
 let ovHold={btn:null,t:0,src:null},ovHoldLock=false;

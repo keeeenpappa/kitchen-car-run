@@ -4836,7 +4836,7 @@ function hostRoster(){
   // someone who left: their chef stands still (no stuck keys)
   for(const peer in NET.slots)if(!live.has(peer)){NET.inputs[NET.slots[peer]]=null}
   NET.waiting=NET.waiting.filter(peer=>live.has(peer)&&!NET.slots[peer]);
-  const canIn=['select','layout','choose','upgrade','equip'].includes(S.phase);
+  const canIn=S.phase==='choose';
   while(canIn&&NET.waiting.length&&S.players.length<4){
     const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
     const k=S.players.length,[x,y]=spawnSpot(k);

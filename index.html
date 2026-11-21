@@ -2087,7 +2087,7 @@ function overlayInput(){
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
   const sy=p0?p0.ay:0,vsd=sy>0.6?1:sy<-0.6?-1:0;if(Math.abs(sy)<0.3)OVSTICKY=0;let vy=vsd&&vsd!==OVSTICKY?vsd:0;if(vsd)OVSTICKY=vsd;
   if(pressed.has('ArrowDown')||pressed.has('KeyS'))vy=1;if(pressed.has('ArrowUp')||pressed.has('KeyW'))vy=-1;
-  if(vy&&DRESS){ovSel=wrap(ovSel+vy,b.length);markSel();play('tick')}
+  if(vy){const t0=b[0].offsetTop;let cols=0;while(cols<b.length&&b[cols].offsetTop===t0)cols++;const ni=ovSel+vy*Math.max(1,cols);if(ni>=0&&ni<b.length){ovSel=ni;markSel();play('tick')}}
   if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
 }
 

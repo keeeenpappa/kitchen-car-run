@@ -68,6 +68,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .gcount{font-size:18px}.gchars{display:flex;flex-wrap:wrap;gap:6px}
 .gch{display:flex;flex-direction:column;align-items:center;padding:4px;width:58px;font-size:22px;line-height:1}.gch img{width:44px;height:44px}.gch small{font-size:10px;height:12px;color:#ffe08a}
 .dress{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.dress>img{width:200px;height:200px;background:rgba(255,255,255,.06);border-radius:16px}
+.dprev{display:flex;flex-direction:column;align-items:center;gap:8px;align-self:center}.dprev img{width:160px;height:160px;background:rgba(255,255,255,.06);border-radius:16px}
 .dlist{display:flex;flex-direction:column;gap:8px;flex:1;min-width:12em}
 .dsk{display:flex;flex-direction:column;align-items:flex-start;font-size:15px;padding:8px 12px;line-height:1.3;text-align:left}.dsk small{font-size:11px;opacity:.8}.dsk.on{border-color:#ffd84a;background:rgba(255,216,74,.18)}
 .dsk.no{border:2px dashed rgba(157,179,180,.45);border-radius:10px;color:rgba(200,215,215,.6)}
@@ -3898,10 +3899,10 @@ function drawSkinPart(g,k,dir){
   g.save();g.font=`${at[2]}px ${EMO}`;g.textAlign='center';g.textBaseline='middle';g.fillStyle='#000';g.fillText(S0.e,at[0],at[1]);g.restore();
 }
 // ---------- gacha screen (from the title) ----------
-function skinPreview(sk,skins,size){   // a chef wearing these skins, as a data URL for the overlay
+function skinPreview(sk,skins,size,dir){   // a chef wearing these skins, as a data URL for the overlay
   if(!CHEF.ready)return '';
   const an=artAn(SKILL_ANIMAL[sk]),c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');
-  const L=chefLayers(an,PCOL[0],'front',skins);
+  const L=chefLayers(an,PCOL[0],dir||'front',skins);
   g.drawImage(L.under,0,0,size,size);const shoe=chefTint('shoe_front_tint',PCOL[0]);for(const s of [-1,1])g.drawImage(shoe,s*12*size/256,0,size,size);g.drawImage(L.over,0,0,size,size);
   return c.toDataURL();
 }
@@ -3939,7 +3940,7 @@ function dressHtml(){
   const items=ks.map(k=>{const S0=SKINS[k];if(!SV.own.includes(k))return `<span class="dsk no">？<small>まだ持っていない</small></span>`;
     const on=DRESS.eq[S0.slot]===k;return `<button class="ovbtn dsk${on?' on':''}" data-act="dtog" data-v="${k}">${skinPreview(S0.sk,[k],48)?`<img class="skp" src="${skinPreview(S0.sk,[k],48)}" alt="">`:''} ${S0.n}<small>${SLOTN[S0.slot]}</small></button>`}).join('');
   return `<div class="box big"><h2>${K.e} ${K.n}の着せ替え</h2>
-    <div class="dress"><img src="${skinPreview(sk,wear,220)}" alt=""><div class="dlist">${items}</div></div>
+    <div class="dress"><div class="dprev"><img src="${skinPreview(sk,wear,320,'front')}" alt=""><img src="${skinPreview(sk,wear,320,'back')}" alt=""></div><div class="dlist">${items}</div></div>
     <div class="row"><button class="ovbtn autofocus" data-act="dok">確定</button><button class="ovbtn" data-act="dback">もどる</button></div></div>`;
 }
 function dressOpen(sk){if(!SKILLS[sk])return;DRESS={sk,eq:Object.assign({},SV.eq[sk]||{})};paintOv(dressHtml());play('confirm')}

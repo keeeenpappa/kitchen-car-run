@@ -2065,7 +2065,7 @@ function showChoose(){
     <div class="cards">${cards}</div>
     <p class="mut">${isTouch?'カードを長押しで決定':`←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定`}</p></div>`);
 }
-let OVSTICK=0;
+let OVSTICK=0,OVSTICKY=0;
 function overlayInput(){
   const b=ovButtons(); if(!b.length)return;
   if(guestLocked()){   // the host decides; a guest only shows which one it would pick
@@ -2084,6 +2084,9 @@ function overlayInput(){
   if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')||st))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
   for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
+  const sy=p0?p0.ay:0,vsd=sy>0.6?1:sy<-0.6?-1:0;if(Math.abs(sy)<0.3)OVSTICKY=0;let vy=vsd&&vsd!==OVSTICKY?vsd:0;if(vsd)OVSTICKY=vsd;
+  if(pressed.has('ArrowDown')||pressed.has('KeyS'))vy=1;if(pressed.has('ArrowUp')||pressed.has('KeyW'))vy=-1;
+  if(vy&&DRESS){ovSel=wrap(ovSel+vy,b.length);markSel();play('tick')}
   if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
 }
 
@@ -3904,8 +3907,8 @@ function skinPreview(sk,skins,size){   // a chef wearing these skins, as a data 
 }
 const chefIcon=sk=>{const an=artAn(SKILL_ANIMAL[sk]);const u=typeof CHEF_IMG_SRC==='object'&&CHEF_IMG_SRC[an+'_icon'];return u?`<img src="${u}" alt="">`:SKILLS[sk].e};
 function gachaHtml(){
-  const chars=SKILL_K.map(sk=>{const n=SKIN_K.filter(k=>SKINS[k].sk===sk&&SV.own.includes(k)).length;
-    return `<button class="ovbtn gch" data-act="skchar" data-v="${sk}">${chefIcon(sk)}<small>${n?n+'/2':''}</small></button>`}).join('');
+  const chars=SKILL_K.map(sk=>{const n=SKIN_K.filter(k=>SKINS[k].sk===sk&&SV.own.includes(k)).length,tot=SKIN_K.filter(k=>SKINS[k].sk===sk).length;
+    return `<button class="ovbtn gch" data-act="skchar" data-v="${sk}">${chefIcon(sk)}<small>${n?n+'/'+tot:''}</small></button>`}).join('');
   return `<div class="box big"><h2>🎫 ガチャ</h2>
     <p class="gcount">チケット <b>${SV.t}</b>枚　　かけら <b>${SV.sh}</b>/${SHARDS_PER}</p>
     <p class="mut">持っているスキンがまた出ると、かけらになります（どのスキンでも共通）。かけら${SHARDS_PER}つでチケット1枚。</p>

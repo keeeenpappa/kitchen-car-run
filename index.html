@@ -3843,6 +3843,8 @@ const GIFTS={'s3cz8q':10};   /* friends test round, 2026-11 */let GIFT_MSG='';
 // test links: ?tickets=20 adds tickets once (the address is cleaned so a reload does not add more), ?resetsave=1 clears tickets / shards / skins
 try{const q=new URLSearchParams(location.search);let ch=false;
   if(q.has('tickets')){SV.t+=Math.max(0,Math.min(50,parseInt(q.get('tickets'),10)||0));q.delete('tickets');ch=true}
+  /* test link ?testall=1: every skin and 20 tickets, once on this device (for checking) */
+  if(q.has('testall')){SV.own=SKIN_K.slice();SV.t+=20;q.delete('testall');ch=true}
   // a friend's link: ?gift=CODE gives its tickets once on this device
   if(q.has('gift')){const c=String(q.get('gift')||'').trim().toUpperCase();let h=7;for(const ch of c)h=(h*131+ch.charCodeAt(0))>>>0;
     const n=GIFTS[h.toString(36)];SV.gifts=Array.isArray(SV.gifts)?SV.gifts:[];

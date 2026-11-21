@@ -105,8 +105,9 @@ body.touch #pauseBtn{display:none}
 .box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
 .box p{margin:0;line-height:1.7;color:var(--ink)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
-.pdots{position:absolute;top:5px;right:6px;display:flex;gap:3px;pointer-events:none}
-.pdots i{width:11px;height:11px;border-radius:50%;border:2px solid #fff;display:block;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.pdots{position:absolute;top:-6px;right:-6px;display:flex;gap:4px;pointer-events:none}
+.pdots i{width:33px;height:33px;border-radius:50%;border:4px solid #fff;background:#fff;display:block;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.45)}
+.pdots img{width:100%;height:100%;object-fit:cover;display:block}
 .ovbtn{position:relative;font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
 .ovbtn.sel,.ovbtn:focus-visible{border-color:var(--truck);outline:none;background:#36545f}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
@@ -1870,7 +1871,7 @@ function ovDots(arr){
   bs.forEach((b,i)=>{const who=(arr||[]).map((k,j)=>k===i?j:-1).filter(j=>j>=0),key=who.join(',');if(b._pd===key)return;b._pd=key;
     let el=b.querySelector('.pdots');if(!who.length){if(el)el.remove();return}
     if(!el){el=document.createElement('span');el.className='pdots';b.appendChild(el)}
-    el.innerHTML=who.map(j=>`<i style="background:${PCOL[j]}"></i>`).join('')});
+    el.innerHTML=who.map(j=>{const an=SKILL_ANIMAL[S.players[j]&&S.players[j].skill]||'beaver',src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_icon']:null;return `<i style="border-color:${PCOL[j]}">${src?`<img src="${src}" alt="">`:''}</i>`}).join('')});
 }
 ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&guestLocked()){GSEL=Math.max(0,ovButtons().indexOf(b));return}if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
 const HOLD=0.6, READY_HOLD=0.8;

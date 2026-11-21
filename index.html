@@ -105,7 +105,7 @@ body.touch #pauseBtn{display:none}
 .box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
 .box p{margin:0;line-height:1.7;color:var(--ink)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
-.pdots{position:absolute;top:-6px;right:-6px;display:flex;gap:4px;pointer-events:none}
+.pdots{position:absolute;top:4px;right:4px;display:flex;gap:4px;pointer-events:none}
 .pdots i{width:33px;height:33px;border-radius:50%;border:4px solid #fff;background:#fff;display:block;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.45)}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .ovbtn{position:relative;font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
@@ -2054,7 +2054,8 @@ function showChoose(){
   // sell-price rate is rolled each time a town is offered: 0.9 – 1.5
   chooseOpts=pickN(ids,n).map(k=>{
     // the station town is busy by nature: it never rolls a quiet mood
-    const roll=TOWNS[k].lively?[1.1,1.2,1.2,1.3,1.3]:[0.9,1,1,1.1,1.1,1.2,1.2,1.3];
+    const early=S.stop<2;
+    const roll=TOWNS[k].lively?(early?[1,1.1,1.1,1.2,1.2,1.3,1.3]:[1.1,1.2,1.2,1.3,1.3,1.3]):(early?[0.9,0.9,1,1,1.1,1.1,1.2,1.3]:[1,1.1,1.1,1.2,1.2,1.3]);
     const pay=roll[rnd(roll.length)];
     return Object.assign({},TOWNS[k],{id:k,pay,rate:crowdOf(pay),menu:townMenuOn(k,S.stop>=EXTRA_FROM)})});
   const cards=chooseOpts.map((t,i)=>`<button class="ovbtn town hold" data-act="town" data-v="${i}">

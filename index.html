@@ -2175,6 +2175,7 @@ function update(dt){
   }
   // players
   S.players.forEach((p,i)=>{
+    NET.quietFx=NET.role==='host'&&i>0;
     let inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
@@ -2223,6 +2224,7 @@ function update(dt){
     if(!p.hold&&p.hold2){p.hold=p.hold2;p.hold2=null}   // the second dish moves into the hands
     if(p.msgT>0)p.msgT-=dt;
   });
+  NET.quietFx=false;
   tickFlights();
   // phase
   if(S.phase==='layout'){S.timer=Math.max(0,S.timer-dt)}
@@ -3717,6 +3719,7 @@ function selectTap(i,k){const p=S.players[i];if(!p||!p.sel||!(k>=0&&k<SKILL_K.le
   if(p.sel.cur===k){if(!p.sel.ok){p.sel.ok=true;sfx('ready')}}else selMove(p,k)}
 function selectUpdate(dt){
   S.players.forEach((p,i)=>{
+    NET.quietFx=NET.role==='host'&&i>0;
     const inp=readInput(i),s=p.sel;if(!s)return;
     const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,key=dx+','+dy;
     let mv=false;if(key!=='0,0'){if(key!==s.last){mv=true;s.rep=0.32}else{s.rep-=dt;if(s.rep<=0){mv=true;s.rep=0.13}}}
@@ -3726,6 +3729,7 @@ function selectUpdate(dt){
     if(inp.pick&&!s.ok){s.ok=true;sfx('ready')}
     else if(inp.sw&&s.ok){s.ok=false;sfx('put')}
   });
+  NET.quietFx=false;
   // everyone OK → a short countdown (anyone taking it back stops it); the host (P1) can also hold 作業 to go at once
   S.selT=0;
   if(readInput(0).act){S.selHold+=dt;if(S.selHold>=SEL_HOLD){ovHoldLock=true;finishSelect();return}/* the press that started does not also pick a town */}else S.selHold=0;
@@ -5277,7 +5281,7 @@ const SFX={
 const SND_K=Object.keys(SFX);
 function play(n){if(!auOn()||!AU.vol.se)return;const f=SFX[n];if(f)try{f(AU.ctx.currentTime+0.005)}catch(_){}}
 // a game event: played here and sent to the guests with the next snapshot
-function sfx(n){AU.n++;if(NET.role==='host'){(NET.fx||(NET.fx=[])).push([NET.fxSeq=(NET.fxSeq||0)+1,SND_K.indexOf(n),performance.now()])}if(NET.role!=='guest')play(n)}
+function sfx(n){AU.n++;if(NET.role==='host'){(NET.fx||(NET.fx=[])).push([NET.fxSeq=(NET.fxSeq||0)+1,SND_K.indexOf(n),performance.now()])}if(NET.role!=='guest'&&!NET.quietFx)play(n)}
 function cycleSnd(k){if(!(k in AU.vol))return;AU.vol[k]=(AU.vol[k]+1)%5;try{localStorage.setItem('kcr-snd',JSON.stringify(AU.vol))}catch(_){}auVol();AU.bgmLvl=-1}
 const sndRowInner=()=>`<span style="align-self:center;min-width:9em">音量</span><button class="ovbtn" data-act="snd" data-v="bgm">BGM：${SNDN[AU.vol.bgm]}</button><button class="ovbtn" data-act="snd" data-v="se">効果音：${SNDN[AU.vol.se]}</button>`;
 const sndRow=()=>`<div class="row" id="sndRow">${sndRowInner()}</div>`;

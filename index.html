@@ -1991,12 +1991,15 @@ const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table 
   return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:k==='normal'&&CUST.img.dog_front_base?'<span class="fi fk-dog_front_base"></span>':(C.e||'')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
   <div class="row"><button class="ovbtn autofocus" data-act="pback">もどる</button><button class="ovbtn" data-act="resume">つづける</button></div></div>`;
 function pauseGame(){
-  if(!S||S.paused||!canPause())return;
+  if(!S||S.paused||S.localPause||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
+  if(NET.role!=='off'){S.localPause=true;paintOv(pauseHtml());return}
   S.paused=true;showOv(pauseHtml());
 }
 function resumeGame(){
-  if(!S)return;S.paused=false;
+  if(!S)return;
+  if(S.localPause){S.localPause=false;if(S.ovSave){const h=S.ovSave;S.ovSave=null;paintOv(h)}else{ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen')}return}
+  S.paused=false;
   if(S.ovSave){const h=S.ovSave;S.ovSave=null;showOv(h)}else hideOv();
 }
 // 続ける on the result screen: online the room stays and everyone is back in the lobby; alone, the same game starts again

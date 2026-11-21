@@ -257,7 +257,7 @@ const HEART_MAX=3;
 const PLATES_TOTAL=5, WASH=2.0;   // the truck owns 5 plates; washing one at the sink takes 2 s (作業 hold)
 const WAIT_PAT=1.2, SMILE_MUL=0.8, SIGN_MUL=0.85, SIGN_P=0.08;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
-const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=0.6;
+const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=1.2;
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
 const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FNT='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif';
@@ -2996,7 +2996,7 @@ function drawShops(){
     const X=s.x*T,Y=7.25*T,W=2*T;
     if(X>GW*T+4||X+W<-4)continue;
     ctx.save();ctx.globalAlpha=s.fade?Math.max(0,1-s.fade/0.3):1;
-    const near=[3,13].some(w=>w+0.5>=s.x-WMARGIN&&w+0.5<=s.x+2+WMARGIN);
+    const near=[3,12].some(w=>w+0.5>=s.x-WMARGIN&&w+0.5<=s.x+2+WMARGIN);
     if(near){ctx.fillStyle='rgba(255,226,122,.35)';rr(X-4,Y-4,W+8,1.75*T+8,12);ctx.fill()}
     ctx.save();ctx.translate(X+W/2,Y);ctx.scale(0.8,0.8);ctx.translate(-(X+W/2),-Y);drawStall(X+W/2,Y+1.75*T,W,1.75*T,s.type.c,s.type.e,s.type.n);ctx.restore();
     if(near){ctx.strokeStyle='#ffe27a';ctx.lineWidth=3;rr(X-4,Y-4,W+8,1.75*T+8,12);ctx.stroke()}

@@ -122,6 +122,7 @@ body.touch #pauseBtn{display:none}
 .dsk img.skp{width:2.2em;height:2.2em;vertical-align:middle}
 .tn img.upic,b img.upic{width:1.3em;height:1.3em;vertical-align:-.3em}
 .money .mv img.coin{width:1.15em;height:1.15em;vertical-align:-.2em}
+.bonusbadge{background:linear-gradient(90deg,#2fb8a6,#3b82f6);box-shadow:0 0 0 2px #fff3,0 0 14px #2fb8a688}
 .rarebadge{display:inline-block;align-self:flex-start;background:linear-gradient(90deg,#ff4fa3,#9b5cff);color:#fff;font-weight:800;font-size:15px;letter-spacing:.12em;padding:3px 12px;border-radius:999px;box-shadow:0 0 0 2px #fff3,0 0 14px #ff4fa388}
 .box .mut{color:var(--muted)} .box .good{color:var(--good)}
 .netrow{align-items:center} .netrow .lab{min-width:9em}
@@ -681,7 +682,7 @@ function showEquipShop(){
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
   // 3 plain items; about every other visit one of them is a rare, picked evenly from ALL rare versions (each ★ is as likely as any other)
   if(!S.eqOffers){
-    S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly),3+(S.extraOffer?1:0)).map(id=>equipOffer(id,1,PRO_ONLY.includes(id)?1:0));
+    S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly),3+(S.extraOffer?1:0)).map((id,i)=>{const o=equipOffer(id,1,PRO_ONLY.includes(id)?1:0);return i===3&&S.extraOffer?Object.assign(o,{bonus:1}):o});
     if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((_,i)=>R.push([id,i+1]));
       const [id,pro]=R[rnd(R.length)];S.eqOffers[rnd(3)]={type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*1.8)}}
   }
@@ -690,7 +691,7 @@ function showEquipShop(){
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
     const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
-      ${o.pro?'<span class="rarebadge">★ レア</span>':''}
+      ${o.pro?'<span class="rarebadge">★ レア</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
@@ -1768,9 +1769,10 @@ const moneyBig=extra=>`<div class="money"><span class="mk">所持金</span><span
 function showUpgrade(){
   S.phase='upgrade';S.rerollUsed=false;
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
-  S.offers=pickN(pool,3+(S.extraOffer?1:0));
+  S.offers=pickN(pool,3+(S.extraOffer?1:0)).map((u,i)=>i===3&&S.extraOffer?Object.assign({},u,{bonus:1}):u);
   const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
   const cards=S.offers.map((u,i)=>`<button class="ovbtn town hold" data-act="up" data-v="${i}">
+      ${u.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}
       <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}</span>
       <span class="needs">${u.tgt?`<span class="pay">↑ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>

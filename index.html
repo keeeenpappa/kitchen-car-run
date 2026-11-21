@@ -3617,10 +3617,10 @@ function skillGlyph(k,x,y,u,col){
 function drawWaiting(){
   const n=S.waitN||0,watching=NET.role==='guest'&&NET.mySlot<0;
   if(n>0){
-    const msg='待機中 '+n+'人（営業が終わったら参加）',yb=(VH-boardH())*T-34;
-    ctx.font=`800 13px ${FNT}`;const pw=ctx.measureText(msg).width+24;
-    ctx.fillStyle='rgba(16,26,30,.88)';rr(8,yb,pw,26,13);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
-    text(msg,20,yb+13,13,'#ffe08a',800,'left');
+    const msg='待機中 '+n+'人（営業が終わったら参加）',yb=VH*T-34;
+    ctx.font=`800 13px ${FNT}`;const pw=ctx.measureText(msg).width+24,px=GW*T-pw-12;
+    ctx.fillStyle='rgba(16,26,30,.88)';rr(px,yb,pw,26,13);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=1.5;ctx.stroke();
+    text(msg,px+12,yb+13,13,'#ffe08a',800,'left');
   }
   if(watching){
     const msg='観戦中：営業が終わったら参加します',y=(VH-1.05)*T;

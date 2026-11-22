@@ -4444,7 +4444,7 @@ function updateCam(dt){
   let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2+(S.phase==='drive'&&nearWindow(p)?0.9:0)));   // centred on the chef (a little lower at a window, so the shop's list and its key hint stay in view)
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
   // a soft slide, no jumps, and never faster than the chef walks (4.2 tiles/s)
-  const k=Math.min(1,dt*2.2),mx=4.2*dt,cl=v=>Math.max(-mx,Math.min(mx,v));CAM.x+=cl((tx-CAM.x)*k);CAM.y+=cl((ty-CAM.y)*k);
+  const k=Math.min(1,dt*2.2),mx=4.2*(S.up.speed||1)*((p.skT||0)>0&&p.skill==='dash'?1.5:1)*(1+0.05*pupN(p,'spd'))*dt,cl=v=>Math.max(-mx,Math.min(mx,v));CAM.x+=cl((tx-CAM.x)*k);CAM.y+=cl((ty-CAM.y)*k);
 }
 // phone: the camera doesn't show the road ahead, so the next shops (and what they sell) are listed at the top while driving
 function drawUpcomingPhone(){

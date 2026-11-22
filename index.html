@@ -1507,7 +1507,7 @@ function serve(p,tx,ty,c){
   if(!rid){say(p,'料理になっていない');return}
   const CT=ctypeOf(c);
   // which order this dish fills (a family has two; either can come first)
-  let k=-1;if(c.orders)k=c.orders.findIndex((o,i)=>o===rid&&!c.got[i]);else if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
+  let k=-1;if(c.type==='boss'){const bi=c.got.indexOf(false);k=bi>=0&&c.orders[bi]===rid?bi:-1}else if(c.orders)k=c.orders.findIndex((o,i)=>o===rid&&!c.got[i]);else if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
   if(k<0){say(p,'注文は '+orderText(c));return}
   const [pay,tip]=payTip(c,rid);
   S.combo=comboNext();S.comboMax=COMBO_T[S.np]||17;S.comboT=S.comboMax;S.comboPop=0;
@@ -1515,10 +1515,12 @@ function serve(p,tx,ty,c){
   const ex=2*pupN(p,'srv');S.money+=pay+tip+ex;S.earned+=pay+tip+ex;S.served++;p.hold=null;act(p,'serve');
   if(c.got)c.got[k]=true;
   if(CT.takeout){ticketCheck(tx+.5,ty);startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
+  if(c.type==='boss'&&!c.got.every(Boolean)){const nx=c.orders[c.got.indexOf(false)];float(tx+.5,ty-1,RECIPES[nx].e+' つぎの注文','#fff')}
   // they start eating once everything they ordered is on the table
   ticketCheck(tx+.5,ty);
   if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1)*(1-0.1*pupN(p,'srv'));if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5);
-    if(c.orders){S.grpN=(S.grpN||0)+1;float(tx+.5,ty-0.6,'団体ボーナス スコア+'+GRP_PT,'#ffd0f0');sfx('mystery')}}
+    if(c.type==='boss'){c.t=3;bossWin(tx,ty)}
+    if(c.orders&&c.type!=='boss'){S.grpN=(S.grpN||0)+1;float(tx+.5,ty-0.6,'団体ボーナス スコア+'+GRP_PT,'#ffd0f0');sfx('mystery')}}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');
 }
 
@@ -1595,7 +1597,7 @@ function arrive(){
   S.boostN=0;for(const q of S.players)if(skillOf(q).perTown)q.skT=0;
   S.phase='stop';S.view='town';S.town=S.next;S.sub='prep';S.timer=PREP;S.cust=[];S.arrT=0;
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
-  S.grpN0=S.grpN||0;pickMission();
+  S.grpN0=S.grpN||0;S.bossDone=false;S.bossOk=false;pickMission();
 }
 function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
 // st: wait (in line) -> follow (led by player `by`) -> seat (at table tx,ty, order shown) -> eat (paid, leaves after EAT_T)
@@ -1640,6 +1642,7 @@ const CTYPE={
   takeout:{n:'お持ち帰り',e:'🥡',w:1.1,takeout:true},  // stays in the line: bring the dish there; the plate comes back dirty at once
   vip:{n:'VIP',e:'👑',w:0.45,pat:0.7,pay:2},          // rare, short fuse, pays double
   regular:{n:'常連',e:'🎫',w:0,reg:true},              // never random: see S.reg
+  boss:{n:'ボス客',e:'🎩',w:0,pat:2,boss:true},        // never random: the last town only, after the last order: 3 dishes in one shared patience gauge
   group:{n:'団体',e:'👥',w:0,grp:true},                // never random: once per town (2+ players), announced first: see S.grp
 };
 // 団体客: announced GRP_LEAD seconds ahead with their orders (time to get cooking), then 3-4 arrive together and share one table
@@ -1654,7 +1657,7 @@ const CUST_ALL=Object.values(CUST_AN).flat().concat(['tanuki']);
 const REG_NAME='常連さん', REG_HUE=30;   // no personal name: just 常連
 const pickAnimal=()=>{const k=S.town&&(S.town.id||Object.keys(TOWNS).find(k=>TOWNS[k]===S.town)),l=CUST_AN[k]||CUST_ALL;return l[rnd(l.length)]};
 // the orders still to bring (a family has two)
-const pendingOrders=c=>c.orders?c.orders.filter((o,k)=>!c.got[k]):c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
+const pendingOrders=c=>c.type==='boss'?(c.got.indexOf(false)<0?[]:[c.orders[c.got.indexOf(false)]]):c.orders?c.orders.filter((o,k)=>!c.got[k]):c.type==='family'?[c.order,c.order2].filter((o,k)=>o&&!(c.got&&c.got[k])):[c.order];
 const orderText=c=>pendingOrders(c).map(o=>RECIPES[o].e+RECIPES[o].n).join('・');
 function spawnCust(){
   if(waiting().length>=QMAX)return;
@@ -1666,6 +1669,21 @@ function spawnCust(){
   if(CT.two){c.order2=pickMenu();c.got=[false,false]}
   if(type==='regular'){if(!S.reg)S.reg={order:c.order,st:'cand'};else{S.regCame=true;S.toast={text:'🎫 '+REG_NAME+'が来た！ いつもの：'+RECIPES[c.order].n,t:0,life:3.5}}}
   S.cust.push(c);sfx('bell');
+}
+// ボス客: the last town, after the last order. 3 dishes, one patience gauge (2x an ordinary customer's) that is not refilled by serving.
+// Win: score +BOSS_PT and sometimes a gacha ticket. Lose (the gauge runs out): nothing (no heart lost).
+const BOSS_PT=150, BOSS_TICKET_P=0.5;
+function spawnBoss(){
+  S.bossDone=true;S.sub='boss';
+  const CT=CTYPE.boss,max=(S.np===1?85:70)*S.up.pat*CT.pat,orders=[...S.town.menu].sort(()=>Math.random()-0.5);while(orders.length<3)orders.push(pickMenu());orders.length=3;orders.sort(()=>Math.random()-0.5);
+  S.cust.push({type:'boss',orders,got:[false,false,false],order:orders[0],pat:max,max,hue:rnd(360),an:pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0,ans:[],hues:[]});
+  sfx('bell');S.toast={text:'🎩 ボス客が来た！ 3品を出そう（待ち時間は共通・出してもリセットされない）',t:0,life:4.5};
+}
+function bossWin(tx,ty){
+  S.bossN=(S.bossN||0)+1;S.bossOk=true;sfx('mystery');
+  let t='🎩 ボス客を満足させた！ スコア+'+BOSS_PT;
+  if(NET.role!=='guest'&&Math.random()<BOSS_TICKET_P){SV.t++;SV.dry=0;saveSV();S.tkSeq=(S.tkSeq||0)+1;S.tkPop={x:tx+.5,y:ty,t:0};t+='　🎫 ガチャチケット！'}
+  S.toast={text:t,t:0,life:4.5};
 }
 function spawnGroup(){
   const G=S.grp,n=G.orders.length,max=GRP_PAT[S.np]||140;
@@ -1721,7 +1739,7 @@ function endStop(){
   S.grp=null;S.msn=null;S.dirtyDrops=[];S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);S.townIds.push(S.town&&S.town.id);
-  const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0)+(msnRes&&msnRes.ok?MSN_PT:0)+grpDone*GRP_PT;
+  const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0)+(msnRes&&msnRes.ok?MSN_PT:0)+grpDone*GRP_PT+(S.bossOk?BOSS_PT:0);
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
   const lost=clearKitchen();
@@ -1734,6 +1752,7 @@ function endStop(){
     <p>売上 <b>${S.earned}G</b> ／ 提供 <b>${S.served}皿</b> ／ 怒って帰った客 <b>${S.missed}人</b>${perf?' <span class="perf">ノーミス ＋'+PERFECT_PT+'点</span>':''}</p>
     ${msnRes?`<p>🎯 ${msnRes.ok?`ミッション達成 <span class="perf">＋${MSN_PT}点</span>${last?'':'　次の品ぞろえ <b>＋1</b>'}`:`<span class="mut">ミッション未達成（全員が1回ずつ${MSN[msnRes.k]}）</span>`}</p>`:''}
     ${grpDone?`<p>👥 団体さん <span class="perf">＋${grpDone*GRP_PT}点</span></p>`:''}
+    ${S.bossOk?`<p>🎩 ボス客 <span class="perf">＋${BOSS_PT}点</span></p>`:''}
     ${moneyBig('評判 '+'♥'.repeat(S.hearts))}
     ${lost?`<p class="mut">台や皿、手に残っていた${lost}個は片付けで捨てました（菜園はそのまま）。</p>`:''}
     <div class="row"><button class="ovbtn hold autofocus" data-act="${last?'end':'upg'}">${last?'結果を見る':'強化を選ぶ'}（${OVK()}）</button></div></div>`);
@@ -1837,6 +1856,7 @@ function runScore(clear){
   const rows=[['売上 '+earned+'G',earned],['提供 '+served+'皿 ×'+SERVE_PT,served*SERVE_PT],['ノーミスの町 '+S.perfect+' ×'+PERFECT_PT,S.perfect*PERFECT_PT]];
   if(S.msnN)rows.push(['ミッション達成 '+S.msnN+'回 ×'+MSN_PT,S.msnN*MSN_PT]);
   if(S.grpN)rows.push(['団体さん '+S.grpN+'組 ×'+GRP_PT,S.grpN*GRP_PT]);
+  if(S.bossN)rows.push(['ボス客 '+S.bossN+'回 ×'+BOSS_PT,S.bossN*BOSS_PT]);
   if(clear){rows.push(['完走ボーナス',CLEAR_PT]);rows.push(['残った評判 '+S.hearts+' ×'+HEART_PT,S.hearts*HEART_PT])}
   return {rows,total:rows.reduce((a,r)=>a+r[1],0)};
 }
@@ -2025,7 +2045,7 @@ const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べ
   takeout:'席に座らず列で待つ。料理を列まで持っていって渡す（皿はその場で汚れた皿になる）',vip:'たまに来る。王冠をかぶっている。待てる時間は短いけど、料金が2倍',
   group:'2人以上のときだけ、町ごとに1回。先に「団体さんが来るよ！」と注文が出て、少しあとに3〜4人で来て1つのテーブルに座る。人数分の料理をそろえると団体ボーナス（スコア）',
   regular:'ポイントカードを持ったタヌキ。最初の町のどこかで来て、そのとき頼んだ料理を「いつもの」として、ほかの町でも毎回頼む（その町のメニューになくても）。町を進むほどチップが増える。怒らせると来なくなる'};
-const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
+const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.filter(k=>k!=='boss').map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
   return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:k==='normal'&&CUST.img.dog_front_base?'<span class="fi fk-dog_front_base"></span>':(C.e||'')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
   <div class="row"><button class="ovbtn autofocus" data-act="pback">もどる</button><button class="ovbtn" data-act="resume">つづける</button></div></div>`;
 function pauseGame(){
@@ -2327,10 +2347,12 @@ function update(dt){
           if(ctypeOf(c).second&&!c.secondDone){c.secondDone=true;c.order=pickMenu();c.st='seat';c.pat=c.max;float(c.tx+.5,c.ty-0.3,'おかわり！','#ffe08a','status_refill');sfx('seat');continue}
           startLeave(c,false)}continue}
         if(!(c.st==='follow'&&pupN(S.players[c.by],'led')))c.pat-=c.st==='wait'?dt/WAIT_PAT*(skillOn('smile')?SMILE_MUL:1)*(S._sign?SIGN_MUL:1):dt;   /* まねきネコ after the refill / 呼び込み看板 */   // waiting in line to be led to a table lasts a little longer
+        if(c.pat<=0&&c.type==='boss'){S.toast={text:'ボス客は怒って帰ってしまった…',t:0,life:3.5};startLeave(c,true);sfx('angry');continue}
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
       if(S.sub==='service'&&S.timer<=0){S.sub='last';S.timer=0;S.grp=null;sfx('close');S.toast={text:'ラストオーダー！',t:0,life:2};for(const c of S.cust)if(c.st==='wait')startLeave(c,false);if(S.served>0)ticketCheck(null)}
-      if(S.sub==='last'&&S.cust.length===0){S.sub='closing';S.closeT=2}
+      if(S.sub==='last'&&S.cust.length===0){if(S.stop+1>=STOPS&&!S.bossDone)spawnBoss();else{S.sub='closing';S.closeT=2}}
+      else if(S.sub==='boss'&&S.cust.length===0){S.sub='closing';S.closeT=2}
     }
   }
   if(S.toast){S.toast.t+=dt;if(S.toast.t>S.toast.life)S.toast=null}
@@ -3304,9 +3326,10 @@ function drawCustBody(X,Y,c){
     const X0=seat&&c.ans&&c.ans.length>=3?X+T*0.26:X;
     const drawMem=f=>{for(const m of mem)if(m.front===f){if(!seat)softShadow(X+m.ox,Y+15+m.oy,11,4,.3);drawCustFig(X+m.ox,FY+m.oy,m.an,m.hue,dir,flip,0.92,'normal')}};
     drawMem(false);
-    const HY=drawCustFig(X0,FY,c.an,c.hue,dir,flip,1,c.type);
+    const HY=drawCustFig(X0,FY,c.an,c.hue,dir,flip,c.type==='boss'?1.25:1,c.type);
     drawMem(true);
     if(c.type==='vip'&&HY!=null)drawVip(X,HY,FY);
+    if(c.type==='boss'&&HY!=null){const m='ボス '+Math.min(3,(c.got?c.got.filter(Boolean).length:0)+1)+'/3';ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;const bx=X+17,by=FY-52;ctx.fillStyle='rgba(196,48,48,.95)';rr(bx,by,w,15,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();text(m,bx+w/2,by+7.5,11,'#fff',800)}
     if(c.type==='regular'&&HY!=null){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('常連').width+10;ctx.fillStyle='rgba(124,74,180,.9)';rr(X-w/2,FY+2,w,14,7);ctx.fill();text('常連',X,FY+9,10,'#fff',800)}
     if(CT.e&&!custIcon(X,HY,c.type)){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,7.5,0,7);ctx.fill();emoji(CT.e,X-16,HY-11.5,10)}
     return}
@@ -4268,7 +4291,7 @@ function drawTopBarPhone(){
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'配置 '+fmtT(S.timer):'時間切れ';
   else if(S.phase==='drive')ph=kmTxt(Math.min(S.dist,S.route))+'/'+kmTxt(S.route)+'km';
-  else if(S.phase==='stop')ph=S.sub==='last'||S.sub==='closing'?'ラストオーダー':(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
+  else if(S.phase==='stop')ph=S.sub==='boss'?'ボス客':S.sub==='last'||S.sub==='closing'?'ラストオーダー':(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
   if(lastCount()){const on=Math.floor(S.t*(S.timer<=2?4:2))%2===0;ctx.font=`800 19px ${FNT}`;const pw=ctx.measureText(ph).width+18;
     ctx.fillStyle=on?'#d63b3b':'#fff';rr(W-14-pw,9,pw,26,13);ctx.fill();text(ph,W-23,y,19,on?'#fff':'#d63b3b',800,'right')}
   else text(ph,W-16,y,18,'#f4eedf',800,'right');
@@ -4322,7 +4345,7 @@ function drawTopBar(){
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'レイアウト '+fmtT(S.timer):'時間切れ';
   else if(S.phase==='drive')ph='🛣 '+kmTxt(Math.min(S.dist,S.route))+' / '+kmTxt(S.route)+' km';
-  else if(S.phase==='stop')ph=S.sub==='last'||S.sub==='closing'?'ラストオーダー':(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
+  else if(S.phase==='stop')ph=S.sub==='boss'?'ボス客':S.sub==='last'||S.sub==='closing'?'ラストオーダー':(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
   else if(S.phase==='choose')ph='町を選ぶ';
   // which town: where we are heading (drive, layout before a drive) or where we are open (stop)
   const tw=S.phase==='stop'?S.town:(S.phase==='drive'||(S.phase==='layout'&&S.stop>0))?S.next:null;
@@ -4379,7 +4402,7 @@ function drawCustBoard(y0,h){
     const r=c.st==='eat'?1:Math.max(0,Math.min(1,c.pat/(c.max||1)));
     ctx.fillStyle='#1a2a30';rr(x+6,by+38,cw-12,6,3);ctx.fill();
     ctx.fillStyle=r>0.35?'#f6d36a':'#d63b3b';rr(x+6,by+38,(cw-12)*r,6,3);ctx.fill();
-    const oid=c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(dishIc(oid),cx,by+bh-15,28);
+    const oid=c.type==='boss'?pendingOrders(c)[0]:c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(dishIc(oid),cx,by+bh-15,28);
   };
   for(let i=0;i<9;i++)card(12+i*(cw+gap),seats[i]||null,false,true);
   for(let i=0;i<5;i++){const c=wait[i]||null;card(630+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}

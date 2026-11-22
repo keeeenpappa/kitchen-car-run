@@ -1515,6 +1515,7 @@ function serve(p,tx,ty,c){
   const ex=2*pupN(p,'srv');S.money+=pay+tip+ex;S.earned+=pay+tip+ex;S.served++;p.hold=null;act(p,'serve');
   if(c.got)c.got[k]=true;
   if(CT.takeout){ticketCheck(tx+.5,ty);startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
+  if(c.type==='boss')bossTicket(tx,ty);
   if(c.type==='boss'&&!c.got.every(Boolean)){const nx=c.orders[c.got.indexOf(false)];float(tx+.5,ty-1,RECIPES[nx].e+' つぎの注文','#fff')}
   // they start eating once everything they ordered is on the table
   ticketCheck(tx+.5,ty);
@@ -1672,7 +1673,7 @@ function spawnCust(){
 }
 // ボス客: the last town, after the last order. 3 dishes, one patience gauge (2x an ordinary customer's) that is not refilled by serving.
 // Win: score +BOSS_PT and sometimes a gacha ticket. Lose (the gauge runs out): nothing (no heart lost).
-const BOSS_PT=150, BOSS_TICKET_P=0.5;
+const BOSS_PT=150, BOSS_TICKET_P=0.3;   // the ticket chance is rolled for every dish served to the boss
 function spawnBoss(){
   S.bossDone=true;S.sub='boss';
   const CT=CTYPE.boss,max=(S.np===1?85:70)*S.up.pat*CT.pat,orders=[...S.town.menu].sort(()=>Math.random()-0.5);while(orders.length<3)orders.push(pickMenu());orders.length=3;orders.sort(()=>Math.random()-0.5);
@@ -1681,9 +1682,11 @@ function spawnBoss(){
 }
 function bossWin(tx,ty){
   S.bossN=(S.bossN||0)+1;S.bossOk=true;sfx('mystery');
-  let t='🎩 ボス客を満足させた！ スコア+'+BOSS_PT;
-  if(NET.role!=='guest'&&Math.random()<BOSS_TICKET_P){SV.t++;SV.dry=0;saveSV();S.tkSeq=(S.tkSeq||0)+1;S.tkPop={x:tx+.5,y:ty,t:0};t+='　🎫 ガチャチケット！'}
-  S.toast={text:t,t:0,life:4.5};
+  S.toast={text:'🎩 ボス客を満足させた！ スコア+'+BOSS_PT,t:0,life:4.5};
+}
+function bossTicket(tx,ty){
+  if(NET.role==='guest'||Math.random()>=BOSS_TICKET_P)return;
+  SV.t++;SV.dry=0;saveSV();S.tkSeq=(S.tkSeq||0)+1;S.tkPop={x:tx+.5,y:ty,t:0};sfx('mystery');S.toast={text:'🎫 ガチャチケットを手に入れた！',t:0,life:3};
 }
 function spawnGroup(){
   const G=S.grp,n=G.orders.length,max=GRP_PAT[S.np]||140;

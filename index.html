@@ -4337,6 +4337,18 @@ function drawMission(x,y,zm){
     if(on){ctx.fillStyle=PCOL[q.i];ctx.fill()}ctx.strokeStyle=on?'#fff':PCOL[q.i];ctx.lineWidth=2;ctx.stroke()});
   ctx.restore();return w*zm;
 }
+// 営業開始！: a big pop-up text in the middle when the service starts (about 1.6 s), on every screen
+function drawStartBanner(){
+  if(!S||S.phase!=='stop'||S.sub!=='service')return;
+  if(S._bannerFor!==S.stop){S._bannerFor=S.stop;S._bannerAt=performance.now()/1000}
+  const t=performance.now()/1000-S._bannerAt,L=1.6;if(t>=L)return;
+  const pop=Math.min(1,t/0.25),sc=1+0.5*Math.pow(1-pop,2)*1.2,al=t<1.2?1:1-(t-1.2)/0.4;
+  ctx.save();ctx.globalAlpha=Math.max(0,al);ctx.translate(GW*T/2,T*4.2);ctx.scale(sc,sc);
+  ctx.font=`900 64px ${FNT}`;const w=ctx.measureText('営業開始！').width+70;
+  ctx.fillStyle='rgba(16,26,30,.78)';rr(-w/2,-50,w,100,50);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=4;ctx.stroke();
+  ctx.lineJoin='round';ctx.strokeStyle='#8a5a12';ctx.lineWidth=8;ctx.textAlign='center';ctx.textBaseline='middle';ctx.strokeText('営業開始！',0,3);ctx.fillStyle='#ffe08a';ctx.fillText('営業開始！',0,3);
+  ctx.restore();
+}
 function drawCombo(x,y,zm,compact){zm=zm||1;
   if(S.comboPop!=null)S.comboPop+=1/60;if(S.comboBreak!=null)S.comboBreak+=1/60;
   if(S.phase!=='stop'||!S.combo){
@@ -4467,6 +4479,7 @@ function draw(){
   if(bh)drawCustBoard((VH-bh)*T,bh*T);
   if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawUpcomingPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
+  drawStartBanner();
   ctx.save();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawMenus();ctx.restore();
   drawWaiting();
   drawClosing();

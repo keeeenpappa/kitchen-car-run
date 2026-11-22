@@ -3964,7 +3964,8 @@ function chefLayers(an,col,dir,sk,puff){
   const bk='body_'+dir+(sk.some(k=>SKINS[k].slot==='front')&&I('body_'+dir+'_noapron_base')?'_noapron':'');
   const body=()=>{og.drawImage(chefTint(bk+'_tint',col),0,0,256,256);put(og,bk+'_base')};
   const dy=dir==='back'?-2:0,paws=()=>{put(og,an+'_paw',0,dy);put(og,an+'_paw',0,dy,true)};
-  for(const k of sk)if(SKINS[k].ph==='before_body')drawSkinPart(og,k,dir);
+  const rearTail=k=>dir==='back'&&SKINS[k].slot==='tail';
+  for(const k of sk)if(SKINS[k].ph==='before_body'&&!rearTail(k))drawSkinPart(og,k,dir);
   if(oct&&dir!=='side'){paws();body()}   // octopus arms hang from under the sleeves
   else{body();
     if(dir==='back'&&!oct&&!hideTail)put(og,an+'_tail_back');
@@ -3978,7 +3979,7 @@ function chefLayers(an,col,dir,sk,puff){
   put(og,an+'_head_'+dir+(puff?'_puff':''));
   const hat=sk.find(k=>SKINS[k].slot==='hat');
   if(hat)drawSkinPart(og,hat,dir);else{og.drawImage(chefTint('hat_'+dir+'_tint',col),hp[0],hp[1],256,256);put(og,'hat_'+dir+'_base',hp[0],hp[1])}
-  for(const k of sk)if(SKINS[k].slot!=='hat'&&!early(k)&&(!SKINS[k].ph||SKINS[k].ph==='after_head'||SKINS[k].ph==='after_hat'))drawSkinPart(og,k,dir);
+  for(const k of sk)if(SKINS[k].slot!=='hat'&&!early(k)&&(rearTail(k)||!SKINS[k].ph||SKINS[k].ph==='after_head'||SKINS[k].ph==='after_hat'))drawSkinPart(og,k,dir);
   L={under:uc,over:oc};CHEF.cache.set(ck,L);return L;
 }
 function drawChefSprite(p,X,Y){
@@ -5257,7 +5258,7 @@ function sendSnap(){
     ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,pi:S.pupI==null?-1:S.pupI,o:ov.hidden?0:NET.ovId,
     tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
-    sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,
+    sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,dd:(S.dirtyDrops||[]).map(d=>[d.tx,d.ty,d.n||1]),
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),cp:S.cleanPlates,
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
@@ -5410,6 +5411,7 @@ function applySnap(d){
   S.up={cook:n(u[0])||1,chop:n(u[1])||1,blend:n(u[2])||1,burn:n(u[3]),gatherSpd:n(u[4])||1,canCap:n(u[5])||3,basketCap:n(u[6])||4,pay:n(u[7])||1,tip:n(u[8])||1};
   ING_K.forEach((k,i)=>{S.stock[k]=n((d.sk||[])[i]);S.seeds[k]=n((d.sd||[])[i])});
   S.gatherLeft=Array.isArray(d.gl)?d.gl.map(n):[0,0];
+  S.dirtyDrops=(Array.isArray(d.dd)?d.dd:[]).slice(0,12).map(a=>({tx:n(a[0]),ty:n(a[1]),n:Math.max(1,Math.min(9,n(a[2])||1))}));
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];

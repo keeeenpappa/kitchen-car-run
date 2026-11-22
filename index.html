@@ -4691,7 +4691,7 @@ function renderHud(){
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
     const SIC={chop:'stp_chop',cook:'stp_cook',blend:'stp_blend'};   // knife / flame / swirl, side by side: no words, no arrows
     const stepTxt=i0=>{const i=rid(i0),sic=ING[i].steps.slice(0,rstep(i0)).map(s=>ITOK+SIC[s]+ITOK).join('');return ING[i].mix?mixOf(i).in.map(x=>itok(x)).join('')+sic:itok(i)+sic};
-    info+=`<b style="color:#7fd893">${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+MK+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
+    info+=(S.phase==='drive'?`<b style="color:#7fd893">次の町：${tw.e} ${tw.n}</b>　`:'')+`${tw.menu.map(r=>dtok(r)+RECIPES[r].n+MK+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
     if(regDish())info+=`常連：${dtok(regDish())}${RECIPES[regDish()].n}${MK}（${RECIPES[regDish()].ings.map(stepTxt).join(' ＋ ')}）<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${itok(id)}${n}</span>`}).join(' ');
     if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>dtok(o)).join('')).join(' '):'')}

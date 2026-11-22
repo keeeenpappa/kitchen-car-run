@@ -451,7 +451,7 @@ const EQUIP={
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
 };
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,sink:0.4};
-const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=40; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
+const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=40, PUP_TIME=15; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
 function equipOffer(id,priceMul,proChance){
   const L=proList(id),pro=L.length&&Math.random()<proChance?1+rnd(L.length):0;
   return {type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*priceMul*(pro?1.8:1))};
@@ -1055,11 +1055,11 @@ function useSkill(p){
   if(p.skill==='pouch'&&(p.skT||0)>0){pouchPut(p);return}
   if((p.skT||0)>0)return;
   if((p.skCD||0)>0){say(p,K.perTown?'次の町への走行でまた使える':'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
-  if(p.skill==='tray'){if(throwPlate(p))p.skCD=K.cd;return}
+  if(p.skill==='tray'){if(throwPlate(p))p.skCD=K.cd*(1-0.05*pupN(p,'scd'));return}
   // an instant skill: works at once (and is not used up when there is nothing to do)
   if(K.now&&!skillNow(p,K))return;
   let fs=null;if(p.skill==='haggle'&&S.phase==='drive'){fs=foxTarget();if(!fs){say(p,'この先にお店がない');sfx('nope');return}}
-  p.skT=K.dur;p.skCD=K.cd;sfx('skill');
+  p.skT=K.dur*(1+0.1*pupN(p,'sdur'));p.skCD=K.cd*(1-0.05*pupN(p,'scd'));sfx('skill');
   if(fs)foxShop(p,fs);
   // elephant: stoves / mixers within 2 tiles when it is used stay safe for the whole skill
   if(p.skill==='nofire')for(const c of S.stations)if((c.t==='stove'||c.t==='blender')&&Math.max(Math.abs(c._x-p.tx),Math.abs(c._y-p.ty))<=2)c.nbT=K.dur;
@@ -1147,7 +1147,7 @@ function placeOrTake(p,c){
   // a mixer still being filled: empty hand takes the last one back out, a fitting raw ingredient goes in
   if(c.t==='blender'&&it&&it.kind==='mix'){
     if(!h){p.hold=newIng(it.items.pop());if(!it.items.length)c.item=null;return}
-    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;mixStart(c);act(p,'blend');c.herd=herdOn(p);return}
+    if(h.kind==='ing'&&!ING[h.id].mix&&h.step===0&&!h.burnt&&mixCan(it.items,h.id)){it.items.push(h.id);p.hold=null;c.owner=p.i;mixStart(c);act(p,'blend');c.herd=herdOn(p);return}
     say(p,'この組み合わせは混ぜられない');return}
   // a counter holds one plate: empty plates only stack on the plate stand
   if(!h&&it){if((c.t==='stove'||c.t==='blender')&&(c.prog>0||c.burn>0)){it.cookP=c.prog;it.cookB=c.burn}p.hold=it;c.item=null;c.prog=0;c.burn=0;return}
@@ -1156,7 +1156,7 @@ function placeOrTake(p,c){
   if(h&&it&&(h.kind==='dirty'||it.kind==='dirty')){say(p,h.kind==='dirty'?'汚れた皿はシンクへ':'汚れた皿がある');return}
   // お盆じょうず: while the skill works, a second dish can be picked up on top of the one in hand
   if(h&&!it){
-    if(accepts(c,h)){c.item=h;p.hold=null;c.prog=(c.t==='stove'||c.t==='blender')&&h.cookP||0;c.burn=(c.t==='stove'||c.t==='blender')&&h.cookB||0;delete h.cookP;delete h.cookB;if(c.t==='stove')act(p,'cook');else if(c.t==='blender')act(p,'blend');if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
+    if(accepts(c,h)){c.item=h;p.hold=null;c.owner=p.i;c.prog=(c.t==='stove'||c.t==='blender')&&h.cookP||0;c.burn=(c.t==='stove'||c.t==='blender')&&h.cookB||0;delete h.cookP;delete h.cookB;if(c.t==='stove')act(p,'cook');else if(c.t==='blender')act(p,'blend');if(c.t==='lucky')delete h.lucked;c.fast=(c.t==='stove'||c.t==='blender')&&(p.skT||0)>0&&p.skill==='fire';c.herd=(c.t==='stove'||c.t==='blender')&&herdOn(p);
       if(c.t==='blender'&&!ING[h.id].mix){c.item={kind:'mix',items:[h.id]};mixStart(c);c.herd=herdOn(p)}}
     else if(c.t==='board')say(p,'切らなくていい');
     else if(c.t==='stove')say(p,'焼く食材じゃない');
@@ -1255,10 +1255,10 @@ function doPick(p,c,tx,ty){
     case 'planter':
       if(c.plant){
         if(p.hold&&p.hold.kind==='can'){waterPlant(p,c,tx,ty);return}
-        if(c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest')}
+        if(c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty,p);act(p,'harvest')}
         else say(p,c.plant.watered?'まだ育っていない':'水が必要（じょうろ）');
       }
-      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false};p.hold=null;act(p,'plant');say(p,'じょうろで水をあげる');sfx('plant')}
+      else if(p.hold&&p.hold.kind==='seed'){c.plant={id:p.hold.id,t:0,watered:false,gm:1+0.08*pupN(p,'farm')};p.hold=null;act(p,'plant');say(p,'じょうろで水をあげる');sfx('plant')}
       else if(p.hold&&p.hold.kind==='can')say(p,'先に種を植える');
       else say(p,'種を持ってくる');
       return;
@@ -1328,7 +1328,7 @@ function waterPlant(p,c,tx,ty){
   if(can.water<=0){say(p,'じょうろが空。シンクで汲む');return}
   can.water--;c.plant.watered=true;float(tx+.5,ty,'💧','#9fd8ff');sfx('water');
 }
-function harvest(c,tx,ty){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6');sfx('harvest')}
+function harvest(c,tx,ty,p){const id=c.plant.id,n=YIELD+S.up.yieldPlus+(c.pro===1?1:0)+upN(c,'yield')+pupN(p,'farm');S.stock[id]=(S.stock[id]||0)+n;c.plant=null;float(tx+.5,ty,'+'+n+' '+ING[id].e,'#bff2c6');sfx('harvest')}
 function shopAtWindow(tx){const wc=tx+0.5;return S.shops.find(s=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN)}
 // 値切り上手: road-shop prices 30% off for the one who has the skill working
 // キツネ: on the road it marks one shop (+1 item, 30% off for everyone there); in town everyone buys 30% off while it works
@@ -1401,10 +1401,10 @@ function doAct(p,c,tx,ty,dt){
     else say(p,'燃えている！ 消火器で消す');
   }else if(p.hold&&p.hold.kind==='ext')p.actT+=dt;
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'&&p.hold){say(p,'手を空けて切る');return}
-  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
-  if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty);act(p,'harvest');p.lock=true;return}
+  if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*pupSp(p,'chp',0.08)*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
+  if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty,p);act(p,'harvest');p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;act(p,'wash');if(upN(c,'ret'))S.cleanPlates++;else c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,upN(c,'ret')?'🍽 皿置き場へ':'✨','#cdeeff')}
+    p.actT+=dt*pupSp(p,'wsh',0.1)*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;act(p,'wash');if(upN(c,'ret'))S.cleanPlates++;else c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,upN(c,'ret')?'🍽 皿置き場へ':'✨','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
@@ -1418,10 +1418,10 @@ function startGather(p,c,tx,ty){
   if(S.phase!=='stop')return;
   const O=GOBJ[c.obj];if(!O)return;
   if(!p.hold||p.hold.kind!=='basket'){say(p,'カゴを持ってくる');return}
-  if(p.hold.items.length>=basketCap(p.hold)){say(p,'カゴがいっぱい。冷蔵庫へ');return}
+  if(p.hold.items.length>=basketCap(p.hold)+pupN(p,'hand')){say(p,'カゴがいっぱい。冷蔵庫へ');return}
   p.g={obj:c.obj,x:tx,y:ty,st:0,v:0,t:0,need:0,seq:[],item:null};
-  if(O.act==='fish')p.g.t=(1.4+Math.random()*2.2)/S.up.gatherSpd;
-  if(O.act==='mash')p.g.need=Math.max(3,Math.round(MASH_N/S.up.gatherSpd));
+  if(O.act==='fish')p.g.t=(1.4+Math.random()*2.2)/(S.up.gatherSpd*(1+0.1*pupN(p,'gat')));
+  if(O.act==='mash')p.g.need=Math.max(3,Math.round(MASH_N/(S.up.gatherSpd*(1+0.1*pupN(p,'gat')))));
   if(O.act==='arrows')p.g.seq=[rnd(4),rnd(4)];
   if(O.act==='pull')p.g.seq=[pullZone()];
   p.gLast='0,0';
@@ -1472,7 +1472,7 @@ function gatherDone(p,n){
 }
 function addToBasket(p,ids){
   const b=p.hold;if(!b||b.kind!=='basket')return;
-  const put=ids.slice(0,Math.max(0,basketCap(b)-b.items.length));
+  const put=ids.slice(0,Math.max(0,basketCap(b)+pupN(p,'hand')-b.items.length));
   b.items.push(...put);
   if(put.length<ids.length&&p.skill==='pouch'&&(p.skT||0)>0){p.pouch=p.pouch||[];for(const id of ids.slice(put.length)){if(p.pouch.length>=POUCH_MAX)break;p.pouch.push(newIng(id));put.push(id)}}   // ハムスター: what the basket cannot take goes in the cheeks
   const g=p.g;float(g?g.x+.5:p.x,g?g.y:p.y,'+'+put.length+' '+put.map(id=>ING[id].e).join(''),'#bff2c6');
@@ -1510,12 +1510,12 @@ function serve(p,tx,ty,c){
   const [pay,tip]=payTip(c,rid);
   S.combo=comboNext();S.comboMax=COMBO_T[S.np]||17;S.comboT=S.comboMax;S.comboPop=0;
   if(CT.reg&&S.reg&&S.reg.st==='cand')S.reg.st='on';
-  S.money+=pay+tip;S.earned+=pay+tip;S.served++;p.hold=null;act(p,'serve');
+  const ex=2*pupN(p,'srv');S.money+=pay+tip+ex;S.earned+=pay+tip+ex;S.served++;p.hold=null;act(p,'serve');
   if(c.got)c.got[k]=true;
   if(CT.takeout){ticketCheck(tx+.5,ty);startLeave(c,false);p.hold={kind:'dirty',cnt:1};float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');return}
   // they start eating once everything they ordered is on the table
   ticketCheck(tx+.5,ty);
-  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1);if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5);
+  if(!c.got||c.got.every(Boolean)){c.st='eat';c.t=EAT_T*(CT.eat||1)*(1-0.1*pupN(p,'srv'));if(CT.kid)c.kidAt=c.t*(0.3+Math.random()*0.5);
     if(c.orders){S.grpN=(S.grpN||0)+1;float(tx+.5,ty-0.6,'団体ボーナス スコア+'+GRP_PT,'#ffd0f0');sfx('mystery')}}
   float(tx+.5,ty,'+'+(pay+tip)+'G','#ffe08a','status_tip');sfx('coin');
 }
@@ -1767,6 +1767,38 @@ const upById=id=>UPS.find(u=>u.id===id);
 const upIcHtml=u=>typeof FOOD_IMG_SRC==='object'&&FOOD_IMG_SRC['up_'+u.id]?`<img class="upic" src="${FOOD_IMG_SRC['up_'+u.id]}" alt="">`:u.e;   /* a power-up's delivered icon in the HTML screens */
 const coinHtml=()=>typeof CUST_IMG_SRC==='object'&&CUST_IMG_SRC.status_tip?`<img class="coin" src="${CUST_IMG_SRC.status_tip}" alt="">`:'🪙';
 const moneyBig=extra=>`<div class="money"><span class="mk">所持金</span><span class="mv">${coinHtml()} ${S.money}G</span>${extra?`<span class="mx">${extra}</span>`:''}</div>`;
+const PUPS=[
+  {id:'spd',e:'👟',n:'足が速くなる',d:'移動速度 +5%',max:2},
+  {id:'hand',e:'🧺',n:'もてる数',d:'カゴに入る数 +1',max:2},
+  {id:'scd',e:'⏳',n:'スキルの回復',d:'スキルの待ち時間 -5%',max:2},
+  {id:'sdur',e:'✨',n:'スキルの持続',d:'スキルの効果時間 +10%',max:2},
+  {id:'chp',e:'🔪',n:'切る名人',d:'切る時間 -8%',max:2},
+  {id:'ckb',e:'🔥',n:'焼く・混ぜる名人',d:'焼く・混ぜる時間 -8%',max:2},
+  {id:'wsh',e:'🧽',n:'洗う名人',d:'洗う時間 -10%',max:2},
+  {id:'gat',e:'🎣',n:'採取名人',d:'採取の速さ +10%',max:3},
+  {id:'farm',e:'🌱',n:'菜園名人',d:'収穫 +1個・植えた種の成長 +8%',max:2},
+  {id:'led',e:'🤝',n:'案内上手',d:'客を連れている間、ゲージが減らず、足が +5%',max:2},
+  {id:'srv',e:'💰',n:'接客上手',d:'提供で追加チップ +2G・客の食事 -10%',max:3},
+];
+const pupN=(p,id)=>(p&&p.pup&&p.pup[id])||0;
+const pupSp=(p,id,per)=>Math.pow(1/(1-per),pupN(p,id));
+function showPersonal(){
+  S.phase='pup';const p=S.players[S.pupI];
+  if(!p){S.pupI=null;S.ovT=UP_TIME;showUpgrade();return}
+  const pool=PUPS.filter(u=>pupN(p,u.id)<u.max);
+  S.pupOffers=pickN(pool,3);
+  if(!S.pupOffers.length){S.pupI++;showPersonal();return}
+  const cards=S.pupOffers.map((u,i)=>`<button class="ovbtn town hold" data-act="pup" data-v="${i}">
+      <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
+      <span class="needs"><span class="sub">${pupN(p,u.id)?'もらった数 '+pupN(p,u.id)+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
+  showOv(`<div class="box big"><h2>P${p.i+1} の個人パワーアップ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
+    <p>P${p.i+1} が無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>
+    <div class="cards">${cards}</div></div>`);
+}
+function takePersonal(i){
+  const p=S.players[S.pupI],u=S.pupOffers&&S.pupOffers[i];if(!p||!u)return;
+  p.pup=p.pup||{};p.pup[u.id]=(p.pup[u.id]||0)+1;S.pupI++;S.ovT=PUP_TIME;showPersonal();
+}
 function showUpgrade(){
   S.phase='upgrade';S.rerollUsed=false;
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
@@ -1885,7 +1917,7 @@ const setP=(b,f)=>{if(b)b.style.setProperty('--p',Math.round(Math.min(1,f)*100)+
 const holdReset=()=>{setP(ovHold.btn,0);ovHold={btn:null,t:0,src:null}};
 // online: town / upgrade / shop / result screens are the host's to choose. Guests see the host's cursor and can't move it
 // (only the pause screen is shared: anyone can press つづける there)
-const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused);
+const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused)&&!(S&&S.phase==='pup'&&S.pupI===NET.mySlot);
 ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if(!b||guestLocked())return;e.preventDefault();
   holdReset();ovHold={btn:b,t:0,src:'ptr'};ovSel=Math.max(0,ovButtons().indexOf(b));markSel();try{b.setPointerCapture(e.pointerId)}catch(_){}});
 for(const ev of ['pointerup','pointercancel'])ov.addEventListener(ev,()=>{if(ovHold.src==='ptr')holdReset()});
@@ -1953,7 +1985,8 @@ function ovAction(a,v){
   }
   else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();
-  else if(a==='upg'){S.ovT=UP_TIME;showUpgrade()}
+  else if(a==='upg'){S.ovT=PUP_TIME;S.pupI=0;showPersonal()}
+  else if(a==='pup'){if(NET.role==='off'||S.pupI===0)takePersonal(+v)}
   else if(a==='up')takeUpgrade(+v);
   else if(a==='reroll'){
     if(S.money<S.rerollCost){const b=ov.querySelector('[data-act=reroll]');if(b)b.textContent='お金が足りない（'+S.rerollCost+'G）';return}
@@ -1968,12 +2001,13 @@ function ovAction(a,v){
   else if(a==='pause')pauseGame();
 }
 function ovTimerTick(dt){
-  if((S.phase!=='upgrade'&&S.phase!=='equip')||S.paused)return;
+  if((S.phase!=='upgrade'&&S.phase!=='equip'&&S.phase!=='pup')||S.paused)return;
   S.ovT=(S.ovT||0)-dt;
   const v=String(Math.max(0,Math.ceil(S.ovT)));
   for(const el of ov.querySelectorAll('.ovtime'))if(el.textContent!==v)el.textContent=v;
   if(S.ovT>0)return;
-  if(S.phase==='upgrade'){S.ovT=EQ_TIME;showEquipShop()}  // time's up: no upgrade this time
+  if(S.phase==='pup'){S.pupI++;S.ovT=PUP_TIME;showPersonal()}
+  else if(S.phase==='upgrade'){S.ovT=EQ_TIME;showEquipShop()}  // time's up: no upgrade this time
   else showChoose();                                                      // time's up: leave the shop
 }
 function canPause(){
@@ -2170,17 +2204,17 @@ function update(dt){
     if(c.t==='lucky'){if(c.item&&c.item.kind==='ing'&&!c.item.lucked){c.prog+=dt;if(c.prog>=LUCKY_T){c.prog=0;luckyRoll(c)}}continue}
     if(c.t==='planter'){
       // a plant grows once it has been watered (one watering per seed)
-      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered&&S.phase!=='layout')c.plant.t+=dt*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*(c.help?1/HELP_MUL:1)*Math.pow(1.3,upN(c,'grow'));
+      if(c.plant&&c.plant.t<ING[c.plant.id].grow&&c.plant.watered&&S.phase!=='layout')c.plant.t+=dt*(c.plant.gm||1)*growBoost(c)*S.up.grow*(c.pro===2?1.5:1)*(c.help?1/HELP_MUL:1)*Math.pow(1.3,upN(c,'grow'));
       continue}
     if(c.fire)continue;   // a burning unit does nothing until it is put out
     const it=c.item; if(!it){c.fast=false;c.herd=false;c.smoke=0;continue}
     if(c.t==='stove'&&it.kind==='ing'&&it.burnt){if(!((c.nbT||0)>0)&&!((c.wet||0)>0))c.smoke=(c.smoke||0)+dt;if(c.smoke>=FIRE_T)igniteTile(c);continue}
     if(it.kind!=='ing'||it.burnt)continue;
     if(c.t==='stove'){
-      if(nextStep(it)==='cook'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
+      if(nextStep(it)==='cook'){c.prog+=dt*pupSp(S.players[c.owner],'ckb',0.08)*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=cookT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='cook'){if(!((c.nbT||0)>0))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     } else if(c.t==='blender'){
-      if(nextStep(it)==='blend'){c.prog+=dt*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
+      if(nextStep(it)==='blend'){c.prog+=dt*pupSp(S.players[c.owner],'ckb',0.08)*Math.max(c.fast?2:1,c.herd?HERD:1);if(c.prog>=blendT(c)){it.step++;c.prog=0;c.burn=0}}
       else if(isDone(it)&&ING[it.id].steps.at(-1)==='blend'){if(!((c.nbT||0)>0))c.burn+=dt;if(c.burn>=burnT(c))it.burnt=true}
     }
   }
@@ -2200,7 +2234,7 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1);   // はやあし's skill; ★足速カウンター multiplies on top
+      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1);   // はやあし's skill; ★足速カウンター multiplies on top
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);
@@ -2289,7 +2323,7 @@ function update(dt){
           // 大食い: one more dish (the empty plate stays on the table)
           if(ctypeOf(c).second&&!c.secondDone){c.secondDone=true;c.order=pickMenu();c.st='seat';c.pat=c.max;float(c.tx+.5,c.ty-0.3,'おかわり！','#ffe08a','status_refill');sfx('seat');continue}
           startLeave(c,false)}continue}
-        c.pat-=c.st==='wait'?dt/WAIT_PAT*(skillOn('smile')?SMILE_MUL:1)*(S._sign?SIGN_MUL:1):dt;   /* まねきネコ after the refill / 呼び込み看板 */   // waiting in line to be led to a table lasts a little longer
+        if(!(c.st==='follow'&&pupN(S.players[c.by],'led')))c.pat-=c.st==='wait'?dt/WAIT_PAT*(skillOn('smile')?SMILE_MUL:1)*(S._sign?SIGN_MUL:1):dt;   /* まねきネコ after the refill / 呼び込み看板 */   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
       if(S.sub==='service'&&S.timer<=0){S.sub='last';S.timer=0;S.grp=null;sfx('close');S.toast={text:'ラストオーダー！',t:0,life:2};for(const c of S.cust)if(c.st==='wait')startLeave(c,false);if(S.served>0)ticketCheck(null)}
@@ -4712,7 +4746,7 @@ function showRoomSetup(){
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);
 }
-const PHASE_N={choose:'町選び',select:'キャラ選び',layout:'配置',drive:'走行中',upgrade:'買い物',equip:'買い物',end:'結果',over:'結果'};
+const PHASE_N={pup:'個人強化',choose:'町選び',select:'キャラ選び',layout:'配置',drive:'走行中',upgrade:'買い物',equip:'買い物',end:'結果',over:'結果'};
 function roomInfo(){
   let n,ch,where='',ph='メンバー待ち';
   if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,STOPS)}/${STOPS}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
@@ -4889,6 +4923,7 @@ function guestAction(a,v,slot){
   if(a==='selpick'){if(S&&S.phase==='select'&&slot!=null)selectTap(slot,+v);return}   // a guest tapped an animal
   if(a==='ready'){if(ov.hidden)finishLayout();return}
   if(a==='pause'){pauseGame();return}
+  if(a==='pup'){if(S&&S.phase==='pup'&&slot===S.pupI)takePersonal(+v);return}
   if(!GUEST_OK.has(a)||ov.hidden)return;
   // only a button that is on the host's screen right now counts
   const vs=v==null?'':String(v);
@@ -4950,7 +4985,7 @@ function sendSnap(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&c.item)ground.push([x,y,encItem(c.item)])}
   const mk=k=>k==='fridge'?1:k==='seedbox'?2:0;
   const d={q:++NET.seq,ph:S.phase,v:S.view,sb:S.sub,tm:Math.round(S.timer*10),m:S.money,h:S.hearts,st:S.stop,np:S.np,
-    ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,o:ov.hidden?0:NET.ovId,
+    ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,pi:S.pupI==null?-1:S.pupI,o:ov.hidden?0:NET.ovId,
     tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
     sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,
@@ -5095,7 +5130,7 @@ function applySnap(d){
   // a guest remembers the animal it played once the select screen is over
   if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
   S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
-  S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;
+  S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;S.pupI=n(d.pi)>=0?n(d.pi):null;
   S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
   S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;
   S.waitN=Math.max(0,Math.min(3,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;

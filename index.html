@@ -1631,7 +1631,17 @@ const TUT=[
   // ---- drive: stand at the front window, a shop passes, buy something ----
   {t:p=>'走行中！ 右の窓口（窓口前）の前に立って、お店が来るのを待とう',tg:()=>tutWindow(),enter:()=>{S.money=Math.max(S.money,100)},ok:p=>S.shops.some(inWindowZone)&&nearTile(p,tutWindow(),1.8)},
   {t:p=>AL(p,'sw','切替')+'でほしい物を選んで、'+AL(p,'act','購入',1)+'で買おう',tg:()=>tutWindow(),enter:()=>{S.tut.m0=S.money},ok:p=>S.money<S.tut.m0},
+  // ---- the town: market, then gathering ----
+  {t:p=>'町に着いた！ 左下の市場に向かって '+BL(p,'pick')+'（買い物画面が開く）',tg:()=>MKT,enter:()=>tutToTown(),ok:p=>!!p.mk},
+  {t:p=>AL(p,'sw','切替')+'でほしい物を選んで、'+AL(p,'act','購入',1)+'で買おう（種も買える）',tg:()=>MKT,enter:()=>{S.tut.m0=S.money},ok:p=>S.money<S.tut.m0},
+  {t:p=>'買い終わったら '+BL(p,'pick')+'（閉じる）',tg:()=>null,ok:p=>!p.mk},
+  {t:p=>'最後は「採取」。カゴを持ったまま、木に向かって '+BL(p,'pick')+' → '+AL(p,'act','作業')+'を連打 → 出た物を '+BL(p,'pick')+'（カゴに入れる）',tg:()=>[GOBJ.tree.x,GROW],enter:()=>{const q=S.players[0];q.hold={kind:'basket',items:[]};q.mk=false},ok:p=>!!p.hold&&p.hold.kind==='basket'&&p.hold.items.length>0},
 ];
+function tutToTown(){
+  arrive();hideOv();S.arrT=99;
+  S.sub='service';S.timer=999;S.spawnT=1e9;S.msn=null;S.grp=null;S.tkPlan=null;S.tkGot=true;S.toast=null;S.bonus=0;S.cust=[];
+  S.money=Math.max(S.money,100);
+}
 const tutCounters=()=>{let n=0;for(let y=2;y<=6;y++)for(let x=2;x<=13;x++)if(S.map[y][x].t==='counter')n++;return n};
 const tutOutsideItem=()=>{for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&c.item&&c.item.kind==='station')return [x,y]}return null};
 const tutWindow=()=>{for(let y=1;y<=6;y++)for(let x=1;x<=16;x++)if(S.map[y][x].t==='window'&&S.map[y][x].win==='前')return [x,y];return null};
@@ -1667,7 +1677,7 @@ function tutUpdate(dt){
 function tutFinish(){
   sfx('mystery');
   showOv(`<div class="box"><h2>チュートリアルおわり！</h2>
-    <p>これで基本の流れ（取る → 切る → 焼く → 皿にのせる → 出す → 洗う）と、配置、走行中の買い物ができました。</p>
+    <p>これで基本の流れ（取る → 切る → 焼く → 皿にのせる → 出す → 洗う）と、配置、走行中の買い物、市場での買い物、採取ができました。</p>
     <p class="mut">本番では、メニューがいくつもあり、ミキサーや菜園、採取、団体さんやボス客も出てきます。走っている間に窓口で買い物をして、町から町へ進みます。</p>
     <div class="row"><button class="ovbtn autofocus" data-act="tutgo">1人で本編を始める</button><button class="ovbtn" data-act="title">タイトルへ</button></div></div>`);
 }
@@ -1681,7 +1691,7 @@ function drawTutMark(){
 function drawTutorial(){
   const T0=S&&S.tut;if(!T0||T0.done||!(S.phase==='stop'||S.phase==='layout'||S.phase==='drive')||(S.phase==='stop'&&S.arrT!=null&&S.arrT<ARRIVE_T))return;
   const st=TUT[T0.i];if(!st)return;const p=S.players[0],msg=st.t(p);
-  ctx.font=`800 16px ${FNT}`;const w=Math.min(GW*T-30,ctx.measureText(msg).width+112),x=(GW*T-w)/2,y=T*7.15;   // just under the truck, so the kitchen stays visible
+  ctx.font=`800 16px ${FNT}`;const w=Math.min(GW*T-30,ctx.measureText(msg).width+112),x=(GW*T-w)/2,y=(VH-boardH())*T-48;   // bottom of the play area: out of the way of the kitchen, the queue and the tables
   ctx.fillStyle='rgba(16,26,30,.92)';rr(x,y,w,40,20);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=2.5;ctx.stroke();
   ctx.fillStyle='#ffd84a';rr(x+8,y+7,58,26,13);ctx.fill();text((T0.i+1)+'/'+TUT.length,x+37,y+20,14,'#3a2a00',900);
   text(msg,x+74,y+20,16,'#fff',800,'left');

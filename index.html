@@ -1792,7 +1792,7 @@ function showPersonal(){
   if(!S.pupOffers.length){S.pupI++;showPersonal();return}
   const cards=S.pupOffers.map((u,i)=>`<button class="ovbtn town hold" data-act="pup" data-v="${i}">
       <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
-      <span class="needs"><span class="sub">${pupN(p,u.id)?'もらった数 '+pupN(p,u.id)+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
+      <span class="needs"><span class="sub pupc">${pupN(p,u.id)?'もらった数 '+pupN(p,u.id)+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>P${p.i+1} の個人パワーアップ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>P${p.i+1} が無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>
     <div class="cards">${cards}</div></div>`);
@@ -1890,7 +1890,8 @@ function showEnd(){
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
 function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
-function paintOv(html){ov.innerHTML=emoHtml(html);fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
+function pupMask(){if(!S||S.phase!=='pup'||NET.role==='off')return;const mine=NET.role==='guest'?NET.mySlot:0;if(S.pupI!==mine)for(const el of ov.querySelectorAll('.pupc'))el.style.visibility='hidden'}
+function paintOv(html){ov.innerHTML=emoHtml(html);pupMask();fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
 // 1.5x on a full-HD screen (game area about 1815 px wide), smaller windows scale down, never taller than the game area
 function fitOv(){
   const b=ov.querySelector('.box.big');if(!b)return;

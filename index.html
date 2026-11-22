@@ -3310,6 +3310,17 @@ function custIcon(X,HY,type){
   ctx.drawImage(im,X-18-9.5,HY-13-9.5,19,19);return true;
 }
 const KID_HUE=h=>(h+140)%360;
+// ボス客: twice the size of an ordinary customer, with a golden glow and sparkles around it (placeholder until the boss characters' own art arrives)
+const BOSS_SCALE=2;
+function drawBossAura(X,FY){
+  const t=S?S.t:0,r=44+3*Math.sin(t*2.2),g=ctx.createRadialGradient(X,FY-30,6,X,FY-30,r*1.5);
+  g.addColorStop(0,'rgba(255,226,120,.55)');g.addColorStop(1,'rgba(255,226,120,0)');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,FY-30,r*1.2,r*1.5,0,0,7);ctx.fill();
+}
+function drawBossSparkles(X,FY){
+  const t=S?S.t:0;
+  for(let k=0;k<6;k++){const a=t*1.2+k*Math.PI/3,rx=40+4*Math.sin(t*3+k),sx=X+Math.cos(a)*rx,sy=FY-48+Math.sin(a)*rx*0.9,z=4+3*Math.abs(Math.sin(t*4+k*1.7));
+    ctx.fillStyle='rgba(255,236,140,.95)';ctx.beginPath();for(let j=0;j<8;j++){const r2=j%2?z*0.35:z,b=j*Math.PI/4;ctx.lineTo(sx+Math.cos(b)*r2,sy+Math.sin(b)*r2)}ctx.closePath();ctx.fill()}
+}
 function drawCustBody(X,Y,c){
   const CT=ctypeOf(c);
   if(c.an&&cimg(c.an+'_front_base')){
@@ -3329,10 +3340,12 @@ function drawCustBody(X,Y,c){
     const X0=seat&&c.ans&&c.ans.length>=3?X+T*0.26:X;
     const drawMem=f=>{for(const m of mem)if(m.front===f){if(!seat)softShadow(X+m.ox,Y+15+m.oy,11,4,.3);drawCustFig(X+m.ox,FY+m.oy,m.an,m.hue,dir,flip,0.92,'normal')}};
     drawMem(false);
-    const HY=drawCustFig(X0,FY,c.an,c.hue,dir,flip,c.type==='boss'?1.25:1,c.type);
+    if(c.type==='boss')drawBossAura(X,FY);
+    const HY=drawCustFig(X0,FY,c.an,c.hue,dir,flip,c.type==='boss'?BOSS_SCALE:1,c.type);
     drawMem(true);
     if(c.type==='vip'&&HY!=null)drawVip(X,HY,FY);
-    if(c.type==='boss'&&HY!=null){const m='ボス '+Math.min(3,(c.got?c.got.filter(Boolean).length:0)+1)+'/3';ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;const bx=X+17,by=FY-52;ctx.fillStyle='rgba(196,48,48,.95)';rr(bx,by,w,15,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();text(m,bx+w/2,by+7.5,11,'#fff',800)}
+    if(c.type==='boss')drawBossSparkles(X,FY);
+    if(c.type==='boss'&&HY!=null){const m='ボス '+Math.min(3,(c.got?c.got.filter(Boolean).length:0)+1)+'/3';ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;const bx=X+30,by=HY+2;ctx.fillStyle='rgba(196,48,48,.95)';rr(bx,by,w,15,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();text(m,bx+w/2,by+7.5,11,'#fff',800)}
     if(c.type==='regular'&&HY!=null){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('常連').width+10;ctx.fillStyle='rgba(124,74,180,.9)';rr(X-w/2,FY+2,w,14,7);ctx.fill();text('常連',X,FY+9,10,'#fff',800)}
     if(CT.e&&!custIcon(X,HY,c.type)){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,7.5,0,7);ctx.fill();emoji(CT.e,X-16,HY-11.5,10)}
     return}
@@ -3379,7 +3392,7 @@ function drawCustomers(){
     if(c.st==='wait'&&c.type==='takeout'){const top=Y-58,bs=30;ctx.fillStyle='#fff';rr(X-bs/2,top,bs,bs,8);ctx.fill();
       ctx.beginPath();ctx.moveTo(X-4,top+bs);ctx.lineTo(X+4,top+bs);ctx.lineTo(X,top+bs+5);ctx.fill();emoji(dishIc(c.order),X,top+bs/2,20);goldTag(X+bs/2+3,top+bs/2,c)}
     if(c.st==='leave'){if(c.mad)emoji(stIc('status_angry','😠'),X+12,Y-14,16);continue}
-    bar(X-17,Y+15,34,f,col);
+    c.type==='boss'?bar(X-30,Y+15,60,f,col):bar(X-17,Y+15,34,f,col);
   }
 }
 function drawSeatBubbles(){
@@ -3387,13 +3400,13 @@ function drawSeatBubbles(){
     if(c.st!=='seat'&&c.st!=='eat')continue;
     const [px,py]=custPos(c),X=px*T,f=c.pat/c.max,col=f>0.5?'#7fd893':f>0.25?'#ffd25a':'#ff6d6d';
     const Y=py*T-T*0.42;
-    const top=Y-58,bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?[stIc('status_kid_missing','👶')]:[stIc('status_eating','😋')]):pendingOrders(c).map(o=>dishIc(o)),bw=ord.length>1?28*ord.length+10:40;
+    const top=Y-58-(c.type==='boss'?118*CUST_K*(BOSS_SCALE-1):0),bh=36,ord=c.st==='eat'?(c.kidAway&&c.t<=0?[stIc('status_kid_missing','👶')]:[stIc('status_eating','😋')]):pendingOrders(c).map(o=>dishIc(o)),bw=ord.length>1?28*ord.length+10:40;
     ctx.fillStyle='#fff';rr(X-bw/2,top,bw,bh,9);ctx.fill();
     ctx.beginPath();ctx.moveTo(X-5,top+bh);ctx.lineTo(X+5,top+bh);ctx.lineTo(X,top+bh+6);ctx.fill();
     ord.forEach((e,k)=>emoji(e,X+(k-(ord.length-1)/2)*28,top+bh/2,ord.length>1?21:24));
     if(c.st==='seat')goldTag(X+bw/2+3,top+bh/2,c);
     if(c.type==='regular'&&c.st==='seat'){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('いつもの').width+10;ctx.fillStyle='#7c4ab4';rr(X-w/2,top-9,w,14,7);ctx.fill();text('いつもの',X,top-2,10,'#fff',800)}
-    if(c.st==='seat')bar(X-17,Y+15,34,f,col);
+    if(c.st==='seat')c.type==='boss'?bar(X-30,Y+15,60,f,col):bar(X-17,Y+15,34,f,col);
   }
 }
 function drawLayoutGround(){

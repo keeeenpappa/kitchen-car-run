@@ -68,7 +68,7 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 .gcount{font-size:18px}.gchars{display:flex;flex-wrap:wrap;gap:6px}
 .gch{display:flex;flex-direction:column;align-items:center;padding:4px;width:58px;font-size:22px;line-height:1}.gch img{width:44px;height:44px}.gch small{font-size:10px;height:12px;color:#ffe08a}
 .dress{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.dress>img{width:200px;height:200px;background:rgba(255,255,255,.06);border-radius:16px}
-.dprev{display:flex;flex-direction:column;align-items:center;gap:8px;align-self:center}.dprev img{width:130px;height:130px;background:rgba(255,255,255,.06);border-radius:16px}
+.dprev{display:flex;flex-direction:column;align-items:center;gap:8px;align-self:center;width:210px}.dprev img{width:210px;height:210px;background:rgba(255,255,255,.06);border-radius:16px}
 .dskill{width:210px;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 10px;font-size:12px;line-height:1.5;color:#cfe0e2}.dskill b{color:#ffe08a;font-size:13px}.dskill small{display:block;color:#ffe08a;margin-top:2px}
 .dlist{display:flex;flex-direction:column;gap:8px;flex:1;min-width:12em}
 .dsk{display:flex;flex-direction:column;align-items:flex-start;font-size:15px;padding:8px 12px;line-height:1.3;text-align:left}.dsk small{font-size:11px;opacity:.8}.dsk.on{border-color:#ffd84a;background:rgba(255,216,74,.18)}
@@ -982,7 +982,7 @@ const SKILLS={knife:{n:'ビーバー',e:'🦫',d:'切るのが2倍速',dur:10,cd
   smile:{n:'まねきネコ',e:'🐱',d:'列の近くで使うと、並んでいるお客さんの我慢ゲージを満タンにして、そのあと10秒間ゆっくり減る（×0.8）',dur:10,cd:45,now:true},
   forage:{n:'リス',e:'🐿️',d:'採取で1回に2倍とれる（カゴに入らない分は捨てる）',dur:15,cd:45},
   haggle:{n:'キツネ',e:'🦊',d:'走行中：窓口のお店（いなければ次に来るお店）の品ぞろえ＋1、そのお店は誰が買っても3割引き。町：17秒間、誰が市場で買っても3割引き',dur:17,cd:45},
-  tray:{n:'ゴリラ',e:'🦍',d:'完成した料理の皿を持って使うと、5マス以内で待ち時間が一番短いお客さんに投げて出す（持ち帰りのお客さんの前には汚れた皿が残る）',dur:0,cd:45},
+  tray:{n:'ゴリラ',e:'🦍',d:'使うと9秒間、皿に完成した料理を盛ると、7マス以内で待ち時間が一番短いお客さんへ自動で投げて出す（持ち帰りも対象。投げた先に汚れた皿が残るので、拾ってシンクへ）',dur:9,cd:40},
   fire:{n:'ちびドラゴン',e:'🐲',d:'発動中にコンロやミキサーに入れた食材は、できあがるまで2倍速',dur:12,cd:45},
   boost:{n:'ウマ',e:'🐎',d:'走行中に使うと、10秒間、燃料なしで「急ぐ」より少し速く走る（窓口でお店と並んでいる間はいつもの速さで、残り時間も減らない）',dur:10,cd:40,now:true},
   nofire:{n:'ゾウ',e:'🐘',d:'発動したときにまわり2マスにあるコンロ・ミキサーの料理が12秒間焦げない（焦げかけも止まる）。発動中は、自分のまわり2マスの火を鼻の水で消す',dur:12,cd:45},
@@ -1073,20 +1073,20 @@ function pouchInput(p,inp,dt){   // returns true while the pouch picker is open 
 function pouchEnd(){   // leaving a town: raw ingredients go back to the fridge, anything worked on is lost
   for(const p of S.players){for(const it of p.pouch||[])if(it&&it.kind==='ing'&&!it.step&&!it.burnt)S.stock[it.id]=(S.stock[it.id]||0)+1;p.pouch=[];p.pouchSel=null}
 }
-function throwPlate(p){
+function throwPlate(p,quiet){
   const h=p.hold;
-  if(!(h&&h.kind==='plate'&&!h.bare&&h.items.length&&matchRecipe(h.items))){say(p,'完成した料理の皿を持って使う');sfx('nope');return false}
+  if(!(h&&h.kind==='plate'&&!h.bare&&h.items.length&&matchRecipe(h.items))){if(!quiet){say(p,'完成した料理の皿を持って使う');sfx('nope')}return false}
   const rid=matchRecipe(h.items);
   let best=null,bd=Infinity;
   for(const c of S.cust){
     const ok=(c.st==='seat'&&pendingOrders(c).includes(rid))||(c.st==='wait'&&c.type==='takeout'&&c.order===rid);
     if(!ok)continue;
     const [px,py]=custPos(c);
-    if(Math.hypot(px-p.x,py-p.y)>5)continue;
+    if(Math.hypot(px-p.x,py-p.y)>7)continue;
     const r=c.pat/(c.max||1);
     if(r<bd){bd=r;best=c}
   }
-  if(!best){say(p,'5マス以内に、この料理を待っているお客さんがいない');sfx('nope');return false}
+  if(!best){if(!quiet){say(p,'7マス以内に、この料理を待っているお客さんがいない');sfx('nope')}return false}
   const [px,py]=custPos(best);
   (S.flights||(S.flights=[])).push({x0:p.x,y0:p.y-0.3,x1:px,y1:py-0.3,t0:S.t,dur:0.45,plate:h,c:best,p});
   p.hold=null;sfx('put');
@@ -1099,24 +1099,24 @@ function tickFlights(){
     if(S.t-f.t0<f.dur){left.push(f);continue}
     const c=f.c,p=f.p;
     if(!S.cust.includes(c)){if(!p.hold)p.hold=f.plate;continue}
-    p.hold=f.plate;
+    const keep=p.hold;p.hold=f.plate;   // whatever the chef picked up while the plate was flying stays in the hands
     const [px,py]=custPos(c);
     serve(p,Math.floor(px),Math.floor(py),c);
-    if(c.type==='takeout'&&p.hold&&p.hold.kind==='dirty'){(S.dirtyDrops||(S.dirtyDrops=[])).push({x:px,y:py});p.hold=null}
+    if(c.type==='takeout'&&p.hold&&p.hold.kind==='dirty'){const dd=S.dirtyDrops||(S.dirtyDrops=[]),tx=Math.floor(px),ty=Math.floor(py),e=dd.find(d=>d.tx===tx&&d.ty===ty);if(e)e.n++;else dd.push({tx,ty,n:1});p.hold=null}
     else if(p.hold===f.plate&&!p.hold.bare)p.hold=null;
+    if(keep)p.hold=keep;
   }
   S.flights=left;
 }
 function drawFlights(){
   for(const f of S.flights||[]){const a=Math.min(1,(S.t-f.t0)/f.dur),x=f.x0+(f.x1-f.x0)*a,y=f.y0+(f.y1-f.y0)*a-Math.sin(Math.PI*a)*1.2;drawItem(f.plate,x*T+T/2,y*T+T/2,T*0.7,true)}
-  for(const d of S.dirtyDrops||[])drawItem({kind:'dirty',cnt:1},d.x*T+T/2,d.y*T+T*0.5,T*0.5);
+  if(S.view!=='road')for(const d of S.dirtyDrops||[])drawItem({kind:'dirty',cnt:d.n||1},(d.tx+.5)*T,(d.ty+.5)*T,T*0.5);
 }
 function useSkill(p){
   const K=skillOf(p);if(!K)return;
   if(p.skill==='pouch'&&(p.skT||0)>0){pouchPut(p);return}
   if((p.skT||0)>0)return;
   if((p.skCD||0)>0){say(p,K.perTown?'次の町への走行でまた使える':'スキルはあと'+Math.ceil(p.skCD)+'秒');sfx('nope');return}
-  if(p.skill==='tray'){if(throwPlate(p))p.skCD=K.cd*(1-0.05*pupN(p,'scd'));return}
   // an instant skill: works at once (and is not used up when there is nothing to do)
   if(K.now&&!skillNow(p,K))return;
   let fs=null;if(p.skill==='haggle'&&S.phase==='drive'){fs=foxTarget();if(!fs){say(p,'この先にお店がない');sfx('nope');return}}
@@ -1261,6 +1261,10 @@ function autoPlate(p){
   sfx('plate');
 }
 function doPick(p,c,tx,ty){
+  // a dirty plate left on the ground (thrown to a takeout customer): pick it up, to carry to the sink
+  {const dd=S.dirtyDrops||[],k=dd.findIndex(d=>d.tx===tx&&d.ty===ty);
+   if(k>=0&&(!p.hold||p.hold.kind==='dirty')&&!(c&&c.t==='queue'&&waiting()[c.slot])&&S.phase!=='layout'){
+     const d=dd[k];if(p.hold)p.hold.cnt=(p.hold.cnt||1)+d.n;else p.hold={kind:'dirty',cnt:d.n};dd.splice(k,1);sfx('pick');return}}
   if(Math.floor(p.x)===LEVER_FRONT[0]&&Math.floor(p.y)===LEVER_FRONT[1]&&p.dx>0&&!p.hold&&(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&!S.players.some(q=>q.seat)){takeSeat(p);sfx('lever');return}
   if(c&&c.fire&&S.phase!=='layout'){say(p,p.hold&&p.hold.kind==='ext'?AL(p,'act','消火',1):'燃えている！ 消火器で消す');return}
   {const k=kidNear(p);if(k){k.kidAway=2;float(k.kx,k.ky-0.6,'👶 はーい','#8fe39a');sfx('seat');return}}
@@ -1913,7 +1917,7 @@ function endStop(){
   for(const c of S.cust)if(c.st==='eat'&&!c.plateLeft){const tb=tile(c.tx,c.ty);if(tb&&tb.t==='table'&&!tb.item)tb.item={kind:'dirty',cnt:c.orders?c.orders.length:c.order2?2:1}}
   pouchEnd();
   const msnRes=S.msn?{ok:S.msn.ok,k:S.msn.k}:null,grpDone=(S.grpN||0)-(S.grpN0||0);
-  S.grp=null;S.msn=null;S.dirtyDrops=[];S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
+  S.grp=null;S.msn=null;S.phase='result';S.stop++;S.totalEarned+=S.earned;S.totalServed+=S.served;S.cust=[];
   const perf=S.missed===0&&S.served>0;if(perf)S.perfect++;
   const tst=townStars(S.served,S.missed);S.townStars.push(tst);S.townIds.push(S.town&&S.town.id);
   const tpts=S.earned+S.served*SERVE_PT+(perf?PERFECT_PT:0)+(msnRes&&msnRes.ok?MSN_PT:0)+grpDone*GRP_PT+(S.bossOk?BOSS_PT:0);
@@ -2481,6 +2485,9 @@ function update(dt){
         if(sn)doPick(p,S.map[sn[1]][sn[0]],sn[0],sn[1]);else doPick(p,c,tx,ty);pickSnd(p,h0,m0,n0,mn0)}
       if(inp.act)doAct(p,c,tx,ty,dt);
     }
+    if(p.skill==='tray'&&(p.skT||0)>0&&S.phase==='stop'){   // ゴリラ: a plated dish flies to the customer by itself
+      p.atT=(p.atT||0)-dt;
+      if(p.atT<=0&&isDish(p.hold)&&matchRecipe(p.hold.items)){p.atT=throwPlate(p,true)?0.25:0.4}}
     if(!p.hold&&p.hold2){p.hold=p.hold2;p.hold2=null}   // the second dish moves into the hands
     if(p.msgT>0)p.msgT-=dt;
   });
@@ -3250,13 +3257,13 @@ function drawShops(){
     if(X>GW*T+4||X+W<-4)continue;
     ctx.save();ctx.globalAlpha=s.fade?Math.max(0,1-s.fade/0.3):1;
     const near=[3,12].some(w=>w+0.5>=s.x-WMARGIN&&w+0.5<=s.x+2+WMARGIN);
-    // the stall is drawn small (so the list and the key hint under it stay on the screen when zoomed); its name is a big pill under it
-    const SC=0.64,sh=1.75*T*SC;ctx.font=`800 16px ${FNT}`;const lw=Math.max(W*SC+8,ctx.measureText(s.type.n).width+18),fx=X+W/2-lw/2,fy=Y+sh+2;
-    if(near){ctx.fillStyle='rgba(255,226,122,.35)';rr(fx-4,Y-4,lw+8,sh+26+8,12);ctx.fill()}
+    // the stall is drawn small (so the list and the key hint under it stay on the screen when zoomed); its name is white lettering on the stall front
+    const SC=0.64,sh=1.75*T*SC;
+    if(near){ctx.fillStyle='rgba(255,226,122,.35)';rr(X+W/2-W*SC/2-6,Y-4,W*SC+12,sh+8,12);ctx.fill()}
     ctx.save();ctx.translate(X+W/2,Y);ctx.scale(SC,SC);ctx.translate(-(X+W/2),-Y);drawStall(X+W/2,Y+1.75*T,W,1.75*T,s.type.c,s.type.e,'');ctx.restore();
-    ctx.fillStyle='rgba(16,26,30,.9)';rr(fx,fy,lw,22,11);ctx.fill();text(s.type.n,X+W/2,fy+11.5,16,'#ffe08a',800);
-    if(near){ctx.strokeStyle='#ffe27a';ctx.lineWidth=3;rr(fx-4,Y-4,lw+8,sh+26+8,12);ctx.stroke()}
-    if(!s.fade)drawOffer(s.items,X+W/2,8.95*T,s);
+    {const ly=Y+SC*(1.75*T*0.78+3);ctx.font=`800 12px ${FNT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=3.5;ctx.strokeStyle='rgba(30,20,10,.75)';ctx.strokeText(s.type.n,X+W/2,ly);ctx.fillStyle='#fff';ctx.fillText(s.type.n,X+W/2,ly)}
+    if(near){ctx.strokeStyle='#ffe27a';ctx.lineWidth=3;rr(X+W/2-W*SC/2-6,Y-4,W*SC+12,sh+8,12);ctx.stroke()}
+    if(!s.fade)drawOffer(s.items,X+W/2,8.75*T,s);
     ctx.restore();
   }
 }
@@ -4433,7 +4440,7 @@ function updateCam(dt){
   if(!camFollow()){CAM.ok=false;return}
   const p=localP();if(!p)return;
   const z=camZoom(),vw=GW/z,vh=(VH-boardH())/z;
-  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2));   // centred on the chef
+  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2+(S.phase==='drive'&&nearWindow(p)?0.9:0)));   // centred on the chef (a little lower at a window, so the shop's list and its key hint stay in view)
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
   const k=Math.min(1,dt*2.2);CAM.x+=(tx-CAM.x)*k;CAM.y+=(ty-CAM.y)*k;   // a soft slide, no jumps
 }

@@ -679,6 +679,7 @@ function finishLayout(){
   else startDrive();             // between towns the town was already chosen
 }
 // ---------- equipment shop (between towns) → short layout ----------
+const eqPrice=o=>Math.round(o.price*[1,1.5,2][Math.min(2,S.eqBuys||0)]);
 function showEquipShop(){
   S.phase='equip';
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
@@ -690,22 +691,22 @@ function showEquipShop(){
   }
   const addSpecial=o=>{const cap=3+(S.extraOffer?1:0);if(S.eqOffers.length>=cap)S.eqOffers.splice(S.eqOffers.length-1,1,o);else S.eqOffers.push(o)};
     if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)addSpecial(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)addSpecial(equipOffer('lucky',1,0));if(!hasSt('sign')&&Math.random()<SIGN_P)addSpecial(equipOffer('sign',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
-  const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=S.eqBought!=null;
+  const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=(S.eqBuys||0)>=3,pr=eqPrice(o);
     const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
-    return `<button class="ovbtn town hold${done&&S.eqBought!==i?' dim':''}" data-act="eqbuy" data-v="${i}">
+    return `<button class="ovbtn town hold${done?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro?'<span class="rarebadge">★ レア</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}
-      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${S.eqBought===i?'購入済み':o.price+'G'}</span><span class="sub">${done?'':S.money>=o.price?'買うと残り '+(S.money-o.price)+'G':'お金が足りない'}</span>
+      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${pr}G</span><span class="sub">${done?'これ以上買えません':S.money>=pr?'買うと残り '+(S.money-pr)+'G':'お金が足りない'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
-    <p>今日の品ぞろえは3つ。買えるのは<b>1つだけ</b>（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
+    <p>買えるのは最大<b>3つ</b>まで（${S.eqBuys||0}/3）。同じ器具も買えますが、買うたびに値段が上がります（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
     <div class="cards">${cards}</div>
-    <div class="row">${S.eqRerolled||S.eqBought!=null?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${S.eqBought!=null?' autofocus':''}" data-act="eqdone">${S.eqBought!=null?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
+    <div class="row">${S.eqRerolled||(S.eqBuys||0)>0?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${(S.eqBuys||0)>0?' autofocus':''}" data-act="eqdone">${(S.eqBuys||0)>0?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
 function startDayLayout(){
   unseatAll();
   const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
   if(S.stop===2)objs.push(makeEquip('board',0),makeEquip('stove',0),makeEquip('planter',0));
-  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqRerolled=false;S.extraOffer=false;
+  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
   S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
@@ -1974,13 +1975,13 @@ function ovAction(a,v){
   if(a==='np'){const [n,m]=String(v).split('|');newRun(+n,m||'preset')}
   else if(a==='town'){S.next=chooseOpts[+v];if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
-    if(S.eqBought!=null)return;
-    const o=S.eqOffers[+v];if(!o)return;
-    if(S.money<o.price){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=o.price+'G（お金が足りない）';return}
-    S.money-=o.price;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBought=+v;showChoose();
+    if((S.eqBuys||0)>=3)return;
+    const o=S.eqOffers[+v];if(!o)return;const pr=eqPrice(o);
+    if(S.money<pr){const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=pr+'G（お金が足りない）';return}
+    S.money-=pr;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBuys=(S.eqBuys||0)+1;const left=S.ovT;sfx('coin');showEquipShop();S.ovT=left;
   }
   else if(a==='eqreroll'){
-    if(S.eqRerolled||S.eqBought!=null)return;
+    if(S.eqRerolled||(S.eqBuys||0)>0)return;
     if(S.money<S.rerollCost){const b=ov.querySelector('[data-act=eqreroll]');if(b)b.textContent='お金が足りない（'+S.rerollCost+'G）';return}
     const left=S.ovT;S.money-=S.rerollCost;S.eqRerolled=true;S.eqOffers=null;showEquipShop();S.ovT=left;
   }

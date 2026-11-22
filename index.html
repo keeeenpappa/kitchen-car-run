@@ -301,6 +301,18 @@ const ingName=it=>{const I=ING[it.id];return I.doneN&&isDone(it)?I.doneN:I.n};
 // or the emoji while the picture is not there
 const FOOD={img:{}};
 (function(){const src=typeof FOOD_IMG_SRC==='object'?FOOD_IMG_SRC:null;if(!src)return;for(const k in src){const im=new Image();if(k.startsWith('st_')||k.startsWith('tool_'))im.onload=()=>{try{SPR.clear()}catch(_){}};im.src=src[k];FOOD.img[k]=im}})();   // unit pictures go into cached sprites: rebuild them once loaded
+// step icons for the recipe text (white shapes: knife = chop, flame = cook, swirl = mixer), drawn here so no picture files are needed
+(function(){
+  const mk=(key,draw)=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.translate(32,32);g.fillStyle='#fff';g.strokeStyle='#fff';g.lineCap='round';g.lineJoin='round';draw(g);
+    const im=new Image();im.src=c.toDataURL('image/png');FOOD.img[key]=im};
+  mk('stp_chop',g=>{g.rotate(-0.72);g.scale(0.92,0.92);
+    g.beginPath();g.moveTo(-33,3);g.lineTo(-14,-11);g.lineTo(12,-11);g.lineTo(12,10);g.lineTo(-8,10);g.quadraticCurveTo(-26,10,-33,3);g.closePath();g.fill();   // a pointed chef's knife
+    g.beginPath();g.roundRect(10,-6,21,12,6);g.fill()});
+  mk('stp_cook',g=>{
+    g.beginPath();g.moveTo(1,-28);g.bezierCurveTo(10,-14,23,-6,23,9);g.bezierCurveTo(23,21,13,28,0,28);g.bezierCurveTo(-13,28,-23,21,-23,9);g.bezierCurveTo(-23,-1,-15,-8,-10,-19);g.bezierCurveTo(-7,-12,-5,-8,-2,-6);g.bezierCurveTo(-3,-14,-2,-22,1,-28);g.closePath();g.fill();
+    g.globalCompositeOperation='destination-out';g.beginPath();g.moveTo(0,7);g.bezierCurveTo(6,13,9,17,9,21);g.bezierCurveTo(9,26,4,28,0,28);g.bezierCurveTo(-4,28,-9,26,-9,21);g.bezierCurveTo(-9,17,-5,13,0,7);g.closePath();g.fill()});
+  mk('stp_blend',g=>{g.lineWidth=8;g.beginPath();for(let t=0;t<=2.8*Math.PI;t+=0.12){const r=3+t*2.9,x=Math.cos(t)*r,y=Math.sin(t)*r;t===0?g.moveTo(x,y):g.lineTo(x,y)}g.stroke()});
+})();
 const FTOK='';
 // status icons (status_*) live with the customer pictures
 const stIc=(k,e)=>FTOK+k+FTOK+e;
@@ -312,6 +324,7 @@ const dishIc=r=>FOOD.img['d_'+r]?FTOK+'d_'+r+FTOK+RECIPES[r].e:RECIPES[r].e;
 // the same for HTML (the stock bar)
 const ITOK='';
 const itok=id=>{const k=ingKey(id,0);return FOOD.img[k]?ITOK+k+ITOK:ING[id].e};
+const MK='',NL='';   // dish-name / recipe separator in the side text, and the forced line break it may turn into
 const dtok=r=>FOOD.img['d_'+r]?ITOK+'d_'+r+ITOK:RECIPES[r].e;
 const tokHtml=h=>h.replace(/([^]+)/g,(m,k)=>FOOD.img[k]?`<img class="fic" src="${FOOD.img[k].src}" alt="">`:'');
 // overlay HTML (also sent to online guests, who keep only class names): <span class="fi fk-KEY"> filled with the picture here
@@ -4554,12 +4567,17 @@ function drawSidePanel(px,py,pw,phh){
     const top=st[st.length-1];
     m[4].replace(/&amp;/g,'&').split(/[　｜]/).forEach((seg,i)=>{if(i>0)runs.push(null);if(seg.trim())runs.push({t:seg,c:top.c,b:top.b})});
   }
-  const lh=17,right=x0+w-pad;let x=x0+pad,y=y0+pad+8,empty=true;
+  const lh=17,gap=5,right=x0+w-pad;   // lh: a wrapped line, gap: extra space between separate lines (each dish)
+  let x=x0+pad,y=y0+pad+8,empty=true;
   ctx.textBaseline='middle';ctx.textAlign='left';
   for(const r of runs){
-    if(!r){if(!empty){y+=lh;empty=true}x=x0+pad;continue}
+    if(!r){if(!empty){y+=lh+gap;empty=true}x=x0+pad;continue}
     ctx.font=`${r.b?800:600} 12px ${FNT}`;ctx.fillStyle=r.c;
-    for(const ch of r.t.split(/([^]+)/).flatMap(t=>t[0]===ITOK?[t]:graphemes(t))){
+    const chs=t=>t.split(/([^]+)/).flatMap(x=>x[0]===ITOK?[x]:graphemes(x));
+    let tt=r.t;   // a dish line 'name MK (recipe)': the recipe is never cut in the middle - if it does not fit on the name's line, it goes on the next line
+    {const i=tt.indexOf(MK);if(i>=0){const hd=tt.slice(0,i),tl=tt.slice(i+1),wd=t=>chs(t).reduce((a,c)=>a+(c[0]===ITOK?17:ctx.measureText(c).width),0);tt=wd(hd)+wd(tl)<=right-x?hd+tl:hd+NL+tl}}
+    for(const ch of chs(tt)){
+      if(ch===NL){y+=lh;x=x0+pad+8;empty=false;continue}
       if(ch[0]===ITOK){const im=fimg(ch.slice(1,-1)),cw=17;if(x+cw>right){y+=lh;x=x0+pad+8}if(im)ctx.drawImage(im,x-1,y-9,18,18);x+=cw;empty=false;continue}
       if(empty&&ch===' ')continue;
       const cw=ctx.measureText(ch).width;
@@ -4671,10 +4689,10 @@ function renderHud(){
   const tw=S.phase==='drive'?S.next:S.town;
   let info='';
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
-    const SHORT={chop:'切',cook:'焼',blend:'混'};
-    const stepTxt=i0=>{const i=rid(i0),st=ING[i].steps.slice(0,rstep(i0));return ING[i].mix?'('+mixOf(i).in.map(x=>itok(x)).join('+')+')'+st.map(s=>SHORT[s]).join('→'):itok(i)+(st.length?st.map(s=>SHORT[s]).join('→'):'素')};
-    info+=`<b style="color:#7fd893">${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
-    if(regDish())info+=`常連：${dtok(regDish())}${RECIPES[regDish()].n}（${RECIPES[regDish()].ings.map(stepTxt).join(' ＋ ')}）<br>`;
+    const SIC={chop:'stp_chop',cook:'stp_cook',blend:'stp_blend'};   // knife / flame / swirl, side by side: no words, no arrows
+    const stepTxt=i0=>{const i=rid(i0),sic=ING[i].steps.slice(0,rstep(i0)).map(s=>ITOK+SIC[s]+ITOK).join('');return ING[i].mix?mixOf(i).in.map(x=>itok(x)).join('')+sic:itok(i)+sic};
+    info+=`<b style="color:#7fd893">${S.phase==='drive'?'次の町':'今の町'}：${tw.e} ${tw.n}</b>　${tw.menu.map(r=>dtok(r)+RECIPES[r].n+MK+'（'+RECIPES[r].ings.map(stepTxt).join(' ＋ ')+'）').join('　')}<br>`;
+    if(regDish())info+=`常連：${dtok(regDish())}${RECIPES[regDish()].n}${MK}（${RECIPES[regDish()].ings.map(stepTxt).join(' ＋ ')}）<br>`;
     info+='必要な食材：'+townNeeds(tw).map(id=>{const n=S.stock[id]||0;return `<span class="${n>0?'ok':'ng'}">${itok(id)}${n}</span>`}).join(' ');
     if(S.phase==='stop'&&S.cust.length){const sat=S.cust.filter(c=>c.st==='seat');info+=(sat.length?'　<b>注文：</b>'+sat.map(c=>pendingOrders(c).map(o=>dtok(o)).join('')).join(' '):'')}
     if(S.phase==='drive'){
@@ -4705,7 +4723,7 @@ function renderHud(){
   pauseBtn.style.left=S.phase==='select'?'30%':'';
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
-  {const h=tokHtml(info)||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=emoHtml(h);fillFood(infoEl)}}S.sideInfo=info;
+  {const h=tokHtml(info.split(MK).join(''))||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=emoHtml(h);fillFood(infoEl)}}S.sideInfo=info;
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
   const ch=ids.map(k=>{const n=S.stock[k]||0;return `<span class="chip${n?'':' zero'}">${ingHtml(k)} ${ING[k].n} ${n}</span>`}).join('');

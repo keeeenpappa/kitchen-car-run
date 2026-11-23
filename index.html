@@ -303,7 +303,8 @@ const PLATES_TOTAL=5, WASH=2.0;   // the truck owns 5 plates; washing one at the
 const WAIT_PAT=1.2, SMILE_MUL=0.8, SIGN_MUL=0.85, SIGN_P=0.08;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
 const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=1.2;
-const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff'];
+const MAXP=8;   // most players in one room (more than 4 only online)
+const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff','#ffb13b','#2fd0c8','#ff8ad1','#c3d84a'];
 const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FNT='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif';
 
@@ -485,11 +486,18 @@ const ALLSHOPS=[...SHOPTYPES,MYSTERY_SHOP,GAS_SHOP];
 // While a shop is in front of a window the truck always rolls at WIN_SPEED (buying time never changes);
 // between shops it runs at the lever's speed. Arriving earlier/later than at ふつう changes the service time.
 const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう','急ぐ'], FUEL_USE_TXT=['','⛽約2','⛽約6'];
-const FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
-const SHOP_GAP=10, KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
+let FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
+let SHOP_GAP=10; const KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
 const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
-const LEVER=[14,4], LEVER_FRONT=[13,4];
-const inWindowZone=s=>[3.5,12.5].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
+let LEVER=[14,4], LEVER_FRONT=[13,4];
+// 5+ players get a longer truck: TX extra floor columns between the kitchen and the cab (the world stays 24 wide)
+let TX=0, IX1=13;   // IX1: last floor column
+const TX_FOR=np=>np>=7?6:np>=5?3:0;
+function applyTruck(tx){
+  TX=tx;IX1=13+tx;LEVER=[14+tx,4];LEVER_FRONT=[13+tx,4];SEAT=[15.5+tx,2.8];EXT_HOME=[[13+tx,5],[12+tx,5],[3,5],[2,5]];
+  WHEELS=[3.35,15.05+tx];SHOP_GAP=10+tx;FIRST_SHOP_X=17+2.7+tx;DOOR_XS=[2,4,5,6,7,8,9,10,11].concat(Array.from({length:tx},(_,i)=>12+i));
+}
+const inWindowZone=s=>[3.5,12.5+TX].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
 const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);
 // kitchen equipment that can be bought: same function as the default ones.
 // A rare "pro" version (★) exists for some of them.
@@ -546,7 +554,7 @@ const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 
 const proMul=c=>(c.pro===1?(PRO_MUL[c.t]||1):1)*(c.help?HELP_MUL:1);
 function helpRefresh(){   /* marks the units standing next to a ★お手伝いカウンター (run on host and guests alike) */
   if(!S||!S.map)return;S._sign=S.map.some(r=>r.some(c=>c.t==='sign'));
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];
     c.help=HELP_T.has(c.t)&&DIRS.some(([dx,dy])=>{const t=S.map[y+dy]&&S.map[y+dy][x+dx];return t&&t.t==='counter'&&t.pro===1})}
 }
 const HELP_T=new Set(['stove','board','blender','sink','planter']);
@@ -591,19 +599,19 @@ function buildMap(){
   for(let y=0;y<GH;y++){const r=[];for(let x=0;x<GW;x++)r.push({t:'out'});m.push(r)}
   const set=(x,y,t,ex)=>{m[y][x]=Object.assign({t,item:null,prog:0,burn:0},ex||{})};
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)set(x,y,'ground');
-  for(let x=1;x<=16;x++)set(x,1,'wall');
-  for(let y=1;y<=6;y++){set(1,y,'wall');for(let x=14;x<=16;x++)set(x,y,'wall')}
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++)set(x,y,'floor');
+  for(let x=1;x<=16+TX;x++)set(x,1,'wall');
+  for(let y=1;y<=6;y++){set(1,y,'wall');for(let x=14+TX;x<=16+TX;x++)set(x,y,'wall')}
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++)set(x,y,'floor');
   /* the ready-made kitchen holds exactly what a self-made layout gets: COUNTERS_GIVEN counters, PLANTERS_GIVEN planters, one of each unit */
   const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','plates','trash'];
   top.forEach((t,i)=>set(2+i,2,t));
   set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
-  set(14,4,'lever');
+  set(14+TX,4,'lever');
   set(8,4,'counter');set(9,4,'counter');
-  const bot=['gap','window','gap','gap','gap','gap','gap','gap','gap','gap','window','gap'];
+  const bot=Array(12+TX).fill('gap');bot[1]='window';bot[10+TX]='window';
   bot.forEach((t,i)=>set(2+i,6,t));
   {const dx=DOOR_XS[rnd(DOOR_XS.length)];set(dx,6,'door');DOOR_FRONT=[dx,5]}   /* the door is somewhere new on the outer row every trip (never a window) */
-  m[6][3].win='後'; m[6][12].win='前';
+  m[6][3].win='後'; m[6][12+TX].win='前';
   set(MKT[0],MKT[1],'market'); for(const k of GOBJ_K)set(GOBJ[k].x,GROW,'gather',{obj:k});
   for(let x=0;x<QSPAN;x++)set(QX+x,QY,'queue',{slot:Math.round(x/QGAP)});
   for(const [x,y] of PRESET_TABLES)set(x,y,'table');
@@ -612,9 +620,9 @@ function buildMap(){
 
 // ---------- state ----------
 let S=null;
-const START_POS=[[4.5,3.5],[11.5,3.5],[4.5,5.5],[11.5,5.5]];
+const START_POS=[[4.5,3.5],[11.5,3.5],[4.5,5.5],[11.5,5.5],[6.5,3.5],[9.5,3.5],[6.5,5.5],[9.5,5.5]];
 function newRun(np,mode){
-  LASTRUN=[np,mode];
+  LASTRUN=[np,mode];applyTruck(TX_FOR(np));
   S={np,money:40,hearts:HEART_MAX,fuel:FUEL_MAX,speed:1,dist:0,route:1,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
     phase:'choose',view:'road',town:null,next:null,timer:0,sub:'',shops:[],cust:[],spawnT:0,
     earned:0,served:0,missed:0,totalEarned:0,totalServed:0,floats:[],map:buildMap(),players:[],
@@ -635,11 +643,23 @@ function newRun(np,mode){
   S.startMode=mode;startSelect();
 }
 // the extinguisher stands on the floor by itself (tile 'extst'); picked up alone, set down on any free floor tile in the truck
-const EXT_HOME=[[13,5],[12,5],[3,5],[2,5]];
+let EXT_HOME=[[13,5],[12,5],[3,5],[2,5]];
 function extStand(){
   for(const [x,y] of EXT_HOME){const c=S.map[y][x];if(c.t==='floor'&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])){S.map[y][x]={t:'extst',item:null,prog:0,burn:0};return true}}
-  for(let y=5;y>=2;y--)for(let x=13;x>=2;x--){const c=S.map[y][x];if(c.t==='floor'&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])&&!(x===LEVER_FRONT[0]&&y===LEVER_FRONT[1])){S.map[y][x]={t:'extst',item:null,prog:0,burn:0};return true}}
+  for(let y=5;y>=2;y--)for(let x=IX1;x>=2;x--){const c=S.map[y][x];if(c.t==='floor'&&!(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])&&!(x===LEVER_FRONT[0]&&y===LEVER_FRONT[1])){S.map[y][x]={t:'extst',item:null,prog:0,burn:0};return true}}
   return false;
+}
+// a player joined and the truck needs to be longer: keep the kitchen and the town as they are, add floor columns before the cab
+function growTruck(nt){
+  if(!S||!S.map||nt<=TX)return;
+  const o=TX,old=S.map,df=DOOR_FRONT;
+  applyTruck(nt);
+  const m=buildMap();
+  for(let x=2;x<=IX1;x++)if(m[6][x].t==='door')m[6][x]={t:'gap',item:null,prog:0,burn:0};
+  for(let y=2;y<=5;y++)for(let x=2;x<=13+o;x++)m[y][x]=old[y][x];
+  for(let x=2;x<=13+o;x++)if(old[6][x].t==='door')m[6][x]=old[6][x];
+  for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)m[y][x]=old[y][x];
+  DOOR_FRONT=df;S.map=m;rebuildStations();CAM.ok=false;
 }
 function rebuildStations(){
   S.stations=[];
@@ -648,15 +668,15 @@ function rebuildStations(){
 // ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
 const MOVABLE=['fridge','seedbox','sink','board','stove','blender','plates','trash','lucky'];
 const LAYOUT_TIME=90;
-const inTruck=(x,y)=>x>=2&&x<=13&&y>=2&&y<=6;
+const inTruck=(x,y)=>x>=2&&x<=IX1&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
 // only tools (watering can, basket) and food go on top of a counter.
 const FIXED=new Set(['door','window','serve']);
 const FURN=['counter','planter','table','warp',...MOVABLE];
 const PILE=['counter','planter','table'];          // these come stacked in one pile outside
-const COUNTERS_GIVEN=6, PLANTERS_GIVEN=2, DOOR_XS=[2,4,5,6,7,8,9,10,11];
+const COUNTERS_GIVEN=6, PLANTERS_GIVEN=2; let DOOR_XS=[2,4,5,6,7,8,9,10,11];
 let DOOR_FRONT=[6,5];
-const syncDoor=()=>{for(let x=2;x<=13;x++)if(S.map[6][x].t==='door')DOOR_FRONT=[x,5]};   /* guests: the door's spot comes with the map */
+const syncDoor=()=>{for(let x=2;x<=IX1;x++)if(S.map[6][x].t==='door')DOOR_FRONT=[x,5]};   /* guests: the door's spot comes with the map */
 const emptyT=y=>y===6?'gap':'floor';
 const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 // spots outside for things handed over at layout time: first the row just outside the door (the door's own column stays free;
@@ -692,7 +712,7 @@ function toolsOnCounters(objs){
 }
 function setupLayout(){
   const objs=[{kind:'station',st:'counter',n:COUNTERS_GIVEN},{kind:'station',st:'planter',n:PLANTERS_GIVEN}];
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x];
     if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,top:c.item||null});
     if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'||c.item.kind==='ext'))objs.push(c.item);
@@ -712,7 +732,7 @@ const REQN={seedbox:'種箱',fridge:'冷蔵庫'};
 const reqName=id=>REQN[id]||(EQUIP[id]&&EQUIP[id].n)||id;
 function missingUnits(){
   const have=new Set();
-  for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];have.add(c.t);if(c.item&&c.item.kind)have.add(c.item.kind)}
+  for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const c=S.map[y][x];have.add(c.t);if(c.item&&c.item.kind)have.add(c.item.kind)}
   for(const q of S.players)if(q.hold){have.add(q.hold.kind);if(q.hold.st)have.add(q.hold.st)}
   return REQUIRED.filter(id=>!have.has(id));
 }
@@ -787,7 +807,7 @@ function reachFloor(){
 const touchesFloor=(ok,x,y)=>DIRS.some(([dx,dy])=>ok.has((x+dx)+','+(y+dy)));
 function unreachable(){
   const ok=reachFloor(),bad=[];
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x];
     if(c.t==='floor'||c.t==='gap'||c.t==='counter'||c.t==='warp')continue;
     if(!touchesFloor(ok,x,y))bad.push([x,y]);
@@ -968,7 +988,7 @@ function bringInside(){
   unseatAll();
   S.players.forEach((p,i)=>{p.menu=null;p.g=null;if(p.y>=5.99||hit(p.x,p.y)){
     let [x,y]=START_POS[i];
-    if(hit(x,y)){for(let yy=5;yy>=2&&hit(x,y);yy--)for(let xx=3;xx<=14;xx++)if(!hit(xx+.5,yy+.5)){x=xx+.5;y=yy+.5;break}}
+    if(hit(x,y)){for(let yy=5;yy>=2&&hit(x,y);yy--)for(let xx=3;xx<=IX1+1;xx++)if(!hit(xx+.5,yy+.5)){x=xx+.5;y=yy+.5;break}}
     p.x=x;p.y=y}});
 }
 
@@ -1001,7 +1021,7 @@ const skillOn=k=>!!S&&S.players.some(q=>q.skill===k&&(q.skT||0)>0);   // someone
 const SKILL_K=Object.keys(SKILLS);
 const skillOf=p=>SKILLS[p&&p.skill]||SKILLS.knife;
 // each player's skill is picked on the title (this device's choice is remembered)
-let PSKILL=['knife','knife','knife','knife'];
+let PSKILL=Array(MAXP).fill('knife');
 try{const v=JSON.parse(localStorage.getItem('kcr-skill')||'null');if(Array.isArray(v))PSKILL=PSKILL.map((d,i)=>SKILLS[v[i]]?v[i]:d)}catch(_){}
 function cycleSkill(i){PSKILL[i]=SKILL_K[(SKILL_K.indexOf(PSKILL[i])+1)%SKILL_K.length];try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
 // the animal's face (delivered icon) next to its skill name, when the pictures are in
@@ -1138,7 +1158,7 @@ const DEVK={
 const DEVN={auto:'自動',kb:'キーボード',xbox:'Xbox',ns:'Switchプロコン',ps:'PlayStation'};
 let DEVPREF=['auto','auto','auto','auto'];
 try{const v=JSON.parse(localStorage.getItem('kcr-dev')||'null');if(Array.isArray(v))DEVPREF=DEVPREF.map((d,i)=>DEVN[v[i]]?v[i]:d)}catch(_){}
-const LASTIN=['kb','kb','pad','pad'];   // which of keyboard / pad this player used last (P1, P2 have both)
+const LASTIN=['kb','kb','pad','pad','pad','pad','pad','pad'];   // which of keyboard / pad this player used last (P1, P2 have both)
 function padKind(gp){const id=(gp&&gp.id)||'';
   if(/054c|playstation|dualsense|dualshock|wireless controller/i.test(id))return 'ps';
   if(/057e|nintendo|pro controller|switch|joy-con/i.test(id))return 'ns';
@@ -1260,7 +1280,7 @@ function autoPlate(p){
   const bare=h.kind==='plate'&&h.bare&&h.items.length&&matchRecipe(h.items),one=h.kind==='ing'&&plateOk(h)&&!h.burnt&&matchRecipe([h]);
   if(!bare&&!one)return;
   if(S.cleanPlates>0)S.cleanPlates--;
-  else{const sk=[];for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0)sk.push(k)}if(!sk.length)return;sk[0].clean--}
+  else{const sk=[];for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0)sk.push(k)}if(!sk.length)return;sk[0].clean--}
   if(bare)h.bare=false;else p.hold={kind:'plate',items:[h]};
   sfx('plate');
 }
@@ -1395,7 +1415,7 @@ function doPick(p,c,tx,ty){
   }
 }
 // the driver's seat in the cab, next to the lever. Sit down by pressing 持つ while facing the lever from the tile in front of it.
-const SEAT=[15.5,2.8];
+let SEAT=[15.5,2.8];
 const canSeat=p=>(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&p.tx===LEVER[0]&&p.ty===LEVER[1]&&!S.players.some(q=>q.seat);
 function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1];p.dx=1;p.dy=0;p.tx=-9;p.ty=-9;p.actT=0}
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
@@ -1467,10 +1487,10 @@ function igniteTile(c){
 function fireUpdate(dt){
   // elephant: while the skill runs, fires within 2 tiles of it are put out
   for(const p of S.players){if(p.skill!=='nofire'||!((p.skT||0)>0))continue;
-    for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];
+    for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];
       if(c.fire&&Math.max(Math.abs(x-p.tx),Math.abs(y-p.ty))<=2){c.fire=0;c.smoke=0;sfx('water');float(x+.5,y,'消えた！','#cdeeff')}}
     if(!S.map.some(r=>r.some(t=>t.fire)))S.fireWarn=false}
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];if(c.wet>0)c.wet-=dt;if(!c.fire)continue;
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];if(c.wet>0)c.wet-=dt;if(!c.fire)continue;
     const before=c.fire;c.fire+=dt;
     if(Math.floor(c.fire/FIRE_SPREAD)>Math.floor(before/FIRE_SPREAD)){
       const nb=DIRS.map(([dx,dy])=>tile(x+dx,y+dy)).filter(t=>t&&!t.fire&&FLAMMABLE.includes(t.t));
@@ -1577,7 +1597,9 @@ function payTip(c,rid){
   return [pay,tip];
 }
 // combo: serving again before the gauge runs out adds one; the tip grows 10% per step (up to x1.5)
-const COMBO_T=[0,32,17,14,12];   // seconds per gauge, by player count
+const COMBO_T=[0,32,17,14,12,11,10,9,8];   // seconds per gauge, by player count (5-8: provisional)
+const SPAWN_INT=[0,15,11,9,7.5,6.5,5.8,5.3,4.9];   // seconds between customers, by player count (5-8: provisional)
+const byNp=(t,np)=>t[Math.max(1,Math.min(t.length-1,np|0))];
 const comboMulOf=n=>1+0.1*Math.min(5,Math.max(0,n-1));
 const comboNext=()=>S.comboT>0?(S.combo||0)+1:1;
 const orderGold=c=>pendingOrders(c).reduce((a,o)=>{const [p,t]=payTip(c,o);return a+p+t},0);
@@ -1593,7 +1615,7 @@ function serve(p,tx,ty,c){
   let k=-1;if(c.type==='boss'){const bi=c.got.indexOf(false);k=bi>=0&&c.orders[bi]===rid?bi:-1}else if(c.orders)k=c.orders.findIndex((o,i)=>o===rid&&!c.got[i]);else if(rid===c.order&&!(c.got&&c.got[0]))k=0;else if(c.order2&&rid===c.order2&&!(c.got&&c.got[1]))k=1;
   if(k<0){say(p,'注文は '+orderText(c));return}
   const [pay,tip]=payTip(c,rid);
-  S.combo=comboNext();S.comboMax=COMBO_T[S.np]||17;S.comboT=S.comboMax;S.comboPop=0;
+  S.combo=comboNext();S.comboMax=byNp(COMBO_T,S.np)||17;S.comboT=S.comboMax;S.comboPop=0;
   if(CT.reg&&S.reg&&S.reg.st==='cand')S.reg.st='on';
   const ex=2*pupN(p,'srv');S.money+=pay+tip+ex;S.earned+=pay+tip+ex;S.served++;p.hold=null;act(p,'serve');
   if(c.got)c.got[k]=true;
@@ -1612,7 +1634,7 @@ function serve(p,tx,ty,c){
 // ---------- tutorial (title → チュートリアル) ----------
 // One guided customer in the real kitchen: fridge → board → stove → plate → customer → table → washing. A step is done by looking at the state.
 // The timer is frozen, customers never lose patience, nothing burns, and no ticket / score is saved.
-const tileOf=t=>{for(let y=1;y<=6;y++)for(let x=1;x<=16;x++)if(S.map[y][x].t===t)return [x,y];return null};
+const tileOf=t=>{for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++)if(S.map[y][x].t===t)return [x,y];return null};
 const tileItem=t=>{const g=tileOf(t);return g?S.map[g[1]][g[0]].item:null};
 const nearTile=(p,g,d)=>!!g&&Math.hypot(p.x-(g[0]+.5),p.y-(g[1]+.5))<d;
 const tutCust=()=>S.cust.find(c=>c.order==='bakedapple');
@@ -1650,9 +1672,9 @@ function tutToTown(){
   S.sub='service';S.timer=999;S.spawnT=1e9;S.msn=null;S.grp=null;S.tkPlan=null;S.tkGot=true;S.toast=null;S.bonus=0;S.cust=[];
   S.money=Math.max(S.money,100);
 }
-const tutCounters=()=>{let n=0;for(let y=2;y<=6;y++)for(let x=2;x<=13;x++)if(S.map[y][x].t==='counter')n++;return n};
+const tutCounters=()=>{let n=0;for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++)if(S.map[y][x].t==='counter')n++;return n};
 const tutOutsideItem=()=>{for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&c.item&&c.item.kind==='station')return [x,y]}return null};
-const tutWindow=()=>{for(let y=1;y<=6;y++)for(let x=1;x<=16;x++)if(S.map[y][x].t==='window'&&S.map[y][x].win==='前')return [x,y];return null};
+const tutWindow=()=>{for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++)if(S.map[y][x].t==='window'&&S.map[y][x].win==='前')return [x,y];return null};
 function tutFreeFloor(){
   // a floor spot where a counter does not cut anyone off (tried on a copy of the tile, so the check is the real one)
   for(let y=4;y<=5;y++)for(let x=11;x>=2;x--){const c=S.map[y][x];if(c.t!=='floor'||(x===DOOR_FRONT[0]&&y===DOOR_FRONT[1])||(x===LEVER_FRONT[0]&&y===LEVER_FRONT[1]))continue;
@@ -1779,7 +1801,7 @@ function arrive(){
   S.gatherLeft=[6+S.up.gatherPlus,6+S.up.gatherPlus];S.market=genMarket(S.town);S.earned=0;S.served=0;S.missed=0;S.shops=[];
   S.grpN0=S.grpN||0;S.bossDone=false;S.bossOk=false;pickMission();
 }
-function spawnInterval(){return [0,15,11,9,7.5][S.np]/S.town.rate}
+function spawnInterval(){return byNp(SPAWN_INT,S.np)/S.town.rate}
 // st: wait (in line) -> follow (led by player `by`) -> seat (at table tx,ty, order shown) -> eat (paid, leaves after EAT_T)
 const waiting=()=>S.cust.filter(c=>c.st==='wait');
 const follower=p=>S.cust.find(c=>c.st==='follow'&&c.by===p.i);
@@ -1827,8 +1849,8 @@ const CTYPE={
 };
 // 団体客: announced GRP_LEAD seconds ahead with their orders (time to get cooking), then 3-4 arrive together and share one table
 const GRP_LEAD=20, GRP_PT=60;
-const GRP_N=[0,0,3,4,4];            // people in the group, by player count (no group when playing alone)
-const GRP_PAT=[0,0,150,140,130];    // how long they wait at the table (seconds), by player count
+const GRP_N=[0,0,3,4,4,4,4,4,4];            // people in the group, by player count (no group when playing alone)
+const GRP_PAT=[0,0,150,140,130,125,120,115,110];    // how long they wait at the table (seconds), by player count
 const CTYPE_K=Object.keys(CTYPE);
 const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
 const pickMenu=()=>S.town.menu[rnd(S.town.menu.length)];
@@ -1871,7 +1893,7 @@ function bossTicket(tx,ty){
   SV.t++;SV.dry=0;saveSV();S.tkSeq=(S.tkSeq||0)+1;S.tkPop={x:tx+.5,y:ty,t:0};sfx('mystery');S.toast={text:'🎫 ガチャチケットを手に入れた！',t:0,life:3};
 }
 function spawnGroup(){
-  const G=S.grp,n=G.orders.length,max=GRP_PAT[S.np]||140;
+  const G=S.grp,n=G.orders.length,max=byNp(GRP_PAT,S.np)||140;
   const c={type:'group',orders:G.orders.slice(),got:G.orders.map(()=>false),order:G.orders[0],pat:max,max,hue:rnd(360),an:pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0,ans:[],hues:[]};
   for(let k=1;k<n;k++){c.ans.push(pickAnimal());c.hues.push(rnd(360))}
   S.cust.push(c);sfx('bell');S.toast={text:'👥 団体さんが来た！ テーブルに案内しよう',t:0,life:3};
@@ -1906,7 +1928,7 @@ function clearKitchen(){
       if(p.hold.kind==='basket'){lost+=p.hold.items.length;p.hold.items=[]}
       // an empty counter someone can reach from the floor
       const ok=reachFloor(),spots=[];
-      for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];if(c.t==='counter'&&!c.item&&touchesFloor(ok,x,y))spots.push(c)}
+      for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];if(c.t==='counter'&&!c.item&&touchesFloor(ok,x,y))spots.push(c)}
       const spot=spots[0];
       if(spot)spot.item=p.hold;else S.stored.push(p.hold); // no free counter: it waits outside for the next layout
       p.hold=null;
@@ -2029,7 +2051,7 @@ function takeUpgrade(i){
 // ---------- score (score attack: best per player count, kept in this browser) ----------
 const SERVE_PT=20, PERFECT_PT=50, CLEAR_PT=300, HEART_PT=100;
 // customers a town sends on average (the stars are measured against this)
-const expCust=()=>SERVICE/[0,15,11,9,7.5][S.np];
+const expCust=()=>SERVICE/byNp(SPAWN_INT,S.np);
 // town stars: plates served against the town's customers, half a star off per angry customer
 function townStars(served,missed){
   const r=served/(expCust()*((S.town&&S.town.rate)||1));
@@ -2409,7 +2431,7 @@ function sinkNear(p,c){
   if(!((h.kind==='ing'&&plateOk(h)&&!h.burnt)||(h.kind==='plate'&&h.bare&&h.items.length)))return null;
   if(!c||c.t==='sink'||!['floor','gap','wall','ground'].includes(c.t))return null;
   let best=null,bd=1.4;
-  for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0){const d=Math.hypot(p.x-(x+.5),p.y-(y+.5));if(d<bd){bd=d;best=[x,y]}}}
+  for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0){const d=Math.hypot(p.x-(x+.5),p.y-(y+.5));if(d<bd){bd=d;best=[x,y]}}}
   return best;
 }
 // ---------- update ----------
@@ -2423,7 +2445,7 @@ function update(dt){
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
   fireUpdate(dt);helpRefresh();
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];   /* ★自動まな板 chops on its own at 70% of a chef's speed */
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];   /* ★自動まな板 chops on its own at 70% of a chef's speed */
     if(c.t==='board'&&c.pro===2&&c.item&&!c.fire&&S.phase!=='layout'&&nextStep(c.item)==='chop'){c.prog+=dt*0.7;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}}}
   const growBoost=c=>(c.boostT||0)>0?2:1;
   for(const c of S.stations){if(c.boostT>0)c.boostT=Math.max(0,c.boostT-dt);if(c.nbT>0)c.nbT=Math.max(0,c.nbT-dt)}
@@ -2529,7 +2551,7 @@ function update(dt){
     if(S.sub==='prep'){if(S.timer<=0){
       const b=S.bonus||0;
       S.sub='service';S.timer=Math.max(60,SERVICE+b);S.spawnT=1.5;S.combo=0;S.comboT=0;S.regCame=false;S.regAt=S.timer*(0.4+Math.random()*0.45);sfx('service');
-      S.grp=GRP_N[S.np]?{st:0,ann:S.timer*(0.5+Math.random()*0.25),orders:Array.from({length:GRP_N[S.np]},pickMenu)}:null;
+      S.grp=byNp(GRP_N,S.np)?{st:0,ann:S.timer*(0.5+Math.random()*0.25),orders:Array.from({length:byNp(GRP_N,S.np)},pickMenu)}:null;
       if(b){S.toast={text:'営業時間 '+(b>0?'+':'−')+Math.abs(b)+'秒（配置と到着の早さ）',t:0,life:3};S.bonus=0}}}
     else if(S.sub==='closing'){S.timer=0;S.closeT-=dt;if(S.closeT<=0)endStop()}
     else{
@@ -2837,7 +2859,7 @@ function drawFloor(x,y){
 }
 // soft shading where the floor meets the truck walls
 function drawFloorAO(){
-  const x0=2*T,x1=16*T,y0=2*T,y1=6*T;
+  const x0=2*T,x1=(16+TX)*T,y0=2*T,y1=6*T;
   let g=ctx.createLinearGradient(0,y0,0,y0+16);g.addColorStop(0,'rgba(90,55,15,.28)');g.addColorStop(1,'rgba(90,55,15,0)');ctx.fillStyle=g;ctx.fillRect(x0,y0,x1-x0,16);
   g=ctx.createLinearGradient(x0,0,x0+12,0);g.addColorStop(0,'rgba(90,55,15,.2)');g.addColorStop(1,'rgba(90,55,15,0)');ctx.fillStyle=g;ctx.fillRect(x0,y0,12,y1-y0);
   g=ctx.createLinearGradient(x1,0,x1-12,0);g.addColorStop(0,'rgba(90,55,15,.2)');g.addColorStop(1,'rgba(90,55,15,0)');ctx.fillStyle=g;ctx.fillRect(x1-12,y0,12,y1-y0);
@@ -2997,13 +3019,13 @@ function unitBase(c,X,Y,loose){
 // the driver's seat and steering wheel, seen through the cab window (the seated chef sits between the two)
 function cabSparkle(){
   if(!S||!skillOn('boost'))return;const t=S.t;
-  for(let k=0;k<7;k++){const a=(t*1.3+k/7)%1,x=16.3*T+((k*37)%60)+4,y=3.5*T-a*1.2*T,z=2.5+2*Math.sin(t*6+k);
+  for(let k=0;k<7;k++){const a=(t*1.3+k/7)%1,x=(16.3+TX)*T+((k*37)%60)+4,y=3.5*T-a*1.2*T,z=2.5+2*Math.sin(t*6+k);
     ctx.globalAlpha=1-a;ctx.fillStyle=k%2?'#fff3a0':'#ffd23a';ctx.beginPath();
     for(let q=0;q<8;q++){const r=q%2?z*0.4:z*1.5,an=q*Math.PI/4;ctx.lineTo(x+Math.cos(an)*r,y+Math.sin(an)*r)}ctx.closePath();ctx.fill()}
   ctx.globalAlpha=1;
 }
 function drawCab(front){
-  ctx.save();ctx.beginPath();ctx.roundRect(14.85*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.clip();
+  ctx.save();ctx.translate(TX*T,0);ctx.beginPath();ctx.roundRect(14.85*T,2.2*T,T*1.25,T*1.35,[8,22,8,8]);ctx.clip();
   if(!front){
     ctx.fillStyle='rgba(40,70,80,.18)';ctx.fillRect(14.85*T,3.15*T,T*1.25,T*0.4);       // the dashboard shadow
     ctx.fillStyle='#24605c';rr(14.93*T,2.55*T,T*0.3,T*1.05,9);ctx.fill();               // seat back
@@ -3133,12 +3155,13 @@ function drawTile(c,x,y){
   }
 }
 function drawTruckShell(){
-  cachedRect('truck',0,0.5*T,GW*T,7.4*T,()=>drawTruckBody());
+  cachedRect('truck'+TX,0,0.5*T,GW*T,7.4*T,()=>drawTruckBody());
   drawWheels();
 }
 function drawTruckBody(){
-  softShadow(9.4*T,7*T+12,9.2*T,16,.35);
-  // cab
+  softShadow((9.4+TX/2)*T,7*T+12,(9.2+TX/2)*T,16,.35);
+  // cab (rides on the right end of a longer truck)
+  ctx.save();ctx.translate(TX*T,0);
   {const g=ctx.createLinearGradient(0,1.9*T,0,7*T);g.addColorStop(0,'#f6c04c');g.addColorStop(0.6,'#e9a92c');g.addColorStop(1,'#c98918');
    ctx.fillStyle=g;rr(14.2*T,1.9*T,T*2.2,5.1*T-2,[10,30,22,10]);ctx.fill();
    ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(14.4*T,1.9*T+2);ctx.lineTo(15.8*T,1.9*T+2);ctx.quadraticCurveTo(16.35*T,1.95*T,16.38*T,2.5*T);ctx.stroke()}
@@ -3150,23 +3173,24 @@ function drawTruckBody(){
   // headlight with a glow
   {const hx=16.32*T,hy=5.7*T,g=ctx.createRadialGradient(hx,hy,2,hx,hy,16);g.addColorStop(0,'rgba(255,245,200,.6)');g.addColorStop(1,'rgba(255,245,200,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(hx,hy,16,0,7);ctx.fill();
    ctx.fillStyle='#b77d16';ctx.beginPath();ctx.arc(hx,hy,9,0,7);ctx.fill();ctx.fillStyle='#fff8e2';ctx.beginPath();ctx.arc(hx,hy,7,0,7);ctx.fill();ctx.fillStyle='#ffe28a';ctx.beginPath();ctx.arc(hx+1,hy+1,4,0,7);ctx.fill()}
+  ctx.restore();
   // body: rounded box, lit from above, darker towards the bottom
   {const g=ctx.createLinearGradient(0,T,0,7*T);g.addColorStop(0,'#f8c652');g.addColorStop(0.15,'#eeae30');g.addColorStop(0.85,'#e3a228');g.addColorStop(1,'#c4861a');
-   ctx.fillStyle=g;rr(T,T,14*T,6*T-2,24);ctx.fill();
+   ctx.fillStyle=g;rr(T,T,(14+TX)*T,6*T-2,24);ctx.fill();
    ctx.strokeStyle='rgba(120,70,0,.35)';ctx.lineWidth=1.5;ctx.stroke();
-   ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(T+24,T+2.5);ctx.lineTo(15*T-24,T+2.5);ctx.stroke()}
+   ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(T+24,T+2.5);ctx.lineTo((15+TX)*T-24,T+2.5);ctx.stroke()}
   // the kitchen opening sits a little lower than the body (inner rim)
-  ctx.strokeStyle='rgba(120,70,0,.3)';ctx.lineWidth=3;rr(2*T-2,2*T-2,14*T+4,4*T+4,6);ctx.stroke();
+  ctx.strokeStyle='rgba(120,70,0,.3)';ctx.lineWidth=3;rr(2*T-2,2*T-2,(14+TX)*T+4,4*T+4,6);ctx.stroke();
   // roof trim
-  ctx.fillStyle='#f6d36a';rr(T+14,T+6,14*T-28,5,3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.6)';rr(T+14,T+6,14*T-28,2,1);ctx.fill();
+  ctx.fillStyle='#f6d36a';rr(T+14,T+6,(14+TX)*T-28,5,3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.6)';rr(T+14,T+6,(14+TX)*T-28,2,1);ctx.fill();
   // scalloped skirt
   const sy=7*T-6;
-  ctx.fillStyle='#b8461a';rr(T+10,sy-4,14*T-20,8,4);ctx.fill();
-  ctx.fillStyle='#d4561c';rr(T+10,sy-6,14*T-20,7,4);ctx.fill();
-  for(let k=0;k<30;k++){const x=T+22+k*(14*T-44)/29;ctx.fillStyle=k%2?'#fff3d6':'#d4561c';ctx.beginPath();ctx.arc(x,sy+2,7,0,Math.PI);ctx.fill();
+  ctx.fillStyle='#b8461a';rr(T+10,sy-4,(14+TX)*T-20,8,4);ctx.fill();
+  ctx.fillStyle='#d4561c';rr(T+10,sy-6,(14+TX)*T-20,7,4);ctx.fill();
+  const NSC=30+Math.round(TX*2.18);for(let k=0;k<NSC;k++){const x=T+22+k*((14+TX)*T-44)/(NSC-1);ctx.fillStyle=k%2?'#fff3d6':'#d4561c';ctx.beginPath();ctx.arc(x,sy+2,7,0,Math.PI);ctx.fill();
     ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.arc(x,sy+2,7,0.2*Math.PI,0.8*Math.PI);ctx.fill()}
 }
-const WHEELS=[3.35,15.05], WHEEL_R=22;
+let WHEELS=[3.35,15.05]; const WHEEL_R=22;
 function drawWheels(){
   const ang=(S?S.roadOff:idleOff)*T/(WHEEL_R*1.0);
   for(const wx of WHEELS){
@@ -3265,7 +3289,7 @@ function drawShops(){
     const X=s.x*T,Y=7.25*T,W=2*T;
     if(X>GW*T+4||X+W<-4)continue;
     ctx.save();ctx.globalAlpha=s.fade?Math.max(0,1-s.fade/0.3):1;
-    const near=[3,12].some(w=>w+0.5>=s.x-WMARGIN&&w+0.5<=s.x+2+WMARGIN);
+    const near=[3,12+TX].some(w=>w+0.5>=s.x-WMARGIN&&w+0.5<=s.x+2+WMARGIN);
     // the stall is drawn small (so the list and the key hint under it stay on the screen when zoomed); its name is white lettering on the stall front
     const SC=0.64,sh=1.75*T*SC;
     if(near){ctx.fillStyle='rgba(255,226,122,.35)';rr(X+W/2-W*SC/2-6,Y-4,W*SC+12,sh+8,12);ctx.fill()}
@@ -3755,7 +3779,7 @@ function drawExtFx(){
 }
 function drawFires(){
   if(!S.map)return;const t=S.t||0;helpRefresh();
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){const c=S.map[y][x];
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];
     if(proMark(c.t,c.pro)){ctx.globalAlpha=0.9;emoji(proMark(c.t,c.pro),x*T+10,y*T+T-10,13);ctx.globalAlpha=1}
     if(c.help){const b=Math.sin(t*4+x)*1.5;ctx.fillStyle='#4fd27a';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x*T+T-14,y*T+T-8+b);ctx.lineTo(x*T+T-8,y*T+T-16+b);ctx.lineTo(x*T+T-2,y*T+T-8+b);ctx.closePath();ctx.stroke();ctx.fill()}
     // elephant's skill: a blinking water-blue frame on the stoves / mixers that cannot burn
@@ -4309,19 +4333,23 @@ function drawSelect(){
   // cursors: each player's colour, nudged so several on one animal stay visible
   S.players.forEach((p,i)=>{if(!p.sel)return;const {x,y}=selCell(p.sel.cur),d=i*4;
     ctx.strokeStyle=PCOL[i];ctx.lineWidth=p.sel.ok?5:3;rr(x+4+d,y+2+d,SELG.cw-8-2*d,SELG.ch-4-2*d,14);ctx.stroke();
-    ctx.fillStyle=PCOL[i];rr(x+6+i*28,y-6,26,16,8);ctx.fill();text('P'+(i+1),x+19+i*28,y+2,10,'#fff',800)});
+    const bw=S.players.length>4?19:26,bs=S.players.length>4?15:28;ctx.fillStyle=PCOL[i];rr(x+6+i*bs,y-6,bw,16,8);ctx.fill();text('P'+(i+1),x+6+i*bs+bw/2,y+2,10,'#fff',800)});
   // one panel per player
-  const n=S.players.length,pw=Math.min(268,(W-60)/n-12),py=366,ph=H-py-14,tot=n*pw+(n-1)*12,px0=(W-tot)/2;
-  S.players.forEach((p,i)=>{const x=px0+i*(pw+12),K=SKILLS[p.skill]||SKILLS.knife,an=SKILL_ANIMAL[p.skill]||'beaver',ok=p.sel&&p.sel.ok;
+  const n=S.players.length,compact=n>4,gap=compact?8:12,pw=compact?Math.floor((W-40)/n)-gap:Math.min(268,(W-60)/n-12),py=366,ph=H-py-14,tot=n*pw+(n-1)*gap,px0=(W-tot)/2;
+  S.players.forEach((p,i)=>{const x=px0+i*(pw+gap),K=SKILLS[p.skill]||SKILLS.knife,an=SKILL_ANIMAL[p.skill]||'beaver',ok=p.sel&&p.sel.ok;
     ctx.fillStyle='rgba(16,26,30,.88)';rr(x,py,pw,ph,16);ctx.fill();ctx.strokeStyle=ok?'#ffd84a':PCOL[i];ctx.lineWidth=ok?3:2;ctx.stroke();
     ctx.fillStyle=PCOL[i];rr(x,py,pw,28,[16,16,0,0]);ctx.fill();
-    const me=NET.role!=='off'&&NET.mySlot===i;text('P'+(i+1)+(me?'　あなた':''),x+14,py+14,14,'#fff',800,'left');
+    const me=NET.role!=='off'&&NET.mySlot===i;text('P'+(i+1)+(me?(compact?'★':'　あなた'):''),x+14,py+14,14,'#fff',800,'left');
     text(ok?'OK!':'えらび中…',x+pw-14,py+14,13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
+    if(compact){   // 5+ players: just the chef and the animal's name (the description is in the cursor's cell)
+      drawChefBig(an,PCOL[i],x+pw/2,py+ph-62,110,S.t+i,skinsOf(p));
+      text(K.n,x+pw/2,py+ph-34,14,'#fff',800);text(SKILLS[p.skill]?SKILLS[p.skill].e:'',x+pw/2,py+ph-14,14,'#fff',800)}
+    else{
     drawChefBig(an,PCOL[i],x+70,py+176,150,S.t+i,skinsOf(p));
     text(K.n,x+136,py+52,17,'#fff',800,'left');
     wrapText(K.d,x+136,py+80,pw-148,19,12.5,'#d8e6e7',600,Math.max(5,Math.floor((ph-26-16-80)/19)+1));   // down to just above the effect / wait line
-    text(selSkillLine(K),x+136,py+ph-26,11.5,'#ffe08a',700,'left');
-    if(ok){ctx.save();ctx.translate(x+pw-48,py+ph-60);ctx.rotate(-0.18);ctx.strokeStyle='#ffd84a';ctx.lineWidth=3;rr(-34,-16,68,32,8);ctx.stroke();text('OK!',0,1,20,'#ffd84a',900);ctx.restore()}
+    text(selSkillLine(K),x+136,py+ph-26,11.5,'#ffe08a',700,'left')}
+    if(ok&&!compact){ctx.save();ctx.translate(x+pw-48,py+ph-60);ctx.rotate(-0.18);ctx.strokeStyle='#ffd84a';ctx.lineWidth=3;rr(-34,-16,68,32,8);ctx.stroke();text('OK!',0,1,20,'#ffd84a',900);ctx.restore()}
   });
   // footer: what starts the run
   const host=NET.role!=='guest';
@@ -4500,7 +4528,7 @@ function drawUpcomingPhone(){
     x+=w+8;
   }
 }
-const nearWindow=p=>{for(let y=1;y<=7;y++)for(let x=1;x<=16;x++)if(S.map[y][x].t==='window'&&Math.abs(x+0.5-p.x)<=2.6&&Math.abs(y+0.5-p.y)<=1.6)return true;return false};
+const nearWindow=p=>{for(let y=1;y<=7;y++)for(let x=1;x<=16+TX;x++)if(S.map[y][x].t==='window'&&Math.abs(x+0.5-p.x)<=2.6&&Math.abs(y+0.5-p.y)<=1.6)return true;return false};
 // a tiny roadside stall: striped awning in the shop's colour over a counter with its sign
 function miniStall(x,y,col,icon){
   const w=28;
@@ -4708,7 +4736,7 @@ function draw(){
   ctx.restore();
   if(bh)drawCustBoard((VH-bh)*T,bh*T);
   if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawUpcomingPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
-  else{drawTopBar();ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()
+  else{drawTopBar();if(!TX){ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
     // the customers waiting in line stay in front of the info panel (it can cover them when the camera is zoomed)
     if(S.view==='town'&&S.cust.some(c=>c.st==='wait')){ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawCustomers(true);ctx.restore()}}
   drawStartBanner();
@@ -4739,9 +4767,9 @@ function drawWorld(arr){
   const bounce=0;
   ctx.save();ctx.translate(0,-bounce);
   drawTruckShell();
-  cachedRect('floor',2*T,2*T,12*T,4*T,()=>{for(let y=2;y<=5;y++)for(let x=2;x<=13;x++)drawFloor(x,y);drawFloorAO()});
-  for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(FLOORISH.has(c.t))drawTile(c,x,y)}
-  for(let y=1;y<=6;y++)for(let x=1;x<=16;x++){const c=S.map[y][x];if(!FLOORISH.has(c.t))drawTile(c,x,y)}
+  cachedRect('floor'+TX,2*T,2*T,(12+TX)*T,4*T,()=>{for(let y=2;y<=5;y++)for(let x=2;x<=IX1;x++)drawFloor(x,y);drawFloorAO()});
+  for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const c=S.map[y][x];if(FLOORISH.has(c.t))drawTile(c,x,y)}
+  for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const c=S.map[y][x];if(!FLOORISH.has(c.t))drawTile(c,x,y)}
   drawSeatBubbles();
   drawFlights();
   drawTutMark();
@@ -4808,11 +4836,12 @@ function drawSidePanel(px,py,pw,phh){
 }
 let idleOff=0;
 function drawRoadIdle(){
+  if(TX)applyTruck(0);
   drawRoad();   // the same passing town, road and wheels as the drive phase
   // title screen only: a cuter truck that bobs along, with pop lettering on its side
   const tt=performance.now()/1000,bob=Math.abs(Math.sin(tt*5))*-3;
   ctx.save();ctx.translate(0,bob);
-  cachedRect('truck',0,0.5*T,GW*T,7.4*T,()=>drawTruckBody());
+  cachedRect('truck'+TX,0,0.5*T,GW*T,7.4*T,()=>drawTruckBody());
   drawTitleDeco(tt);
   ctx.restore();drawWheels();
   // little exhaust puffs behind the truck
@@ -5046,7 +5075,7 @@ const PHASE_N={pup:'個人強化',choose:'町選び',select:'キャラ選び',la
 function roomInfo(){
   let n,ch,where='',ph='メンバー待ち';
   if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,STOPS)}/${STOPS}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
-  else{const g=hostGuests().slice(0,3);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
+  else{const g=hostGuests().slice(0,MAXP-1);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
   return {pw:!!NET.pw,n,ch,where,ph};
 }
 function beaconStart(){
@@ -5060,7 +5089,7 @@ function beaconStart(){
       conn.on('data',m=>{if(!m||typeof m!=='object')return;
         if(m.t==='info')conn.send({t:'info',r:roomInfo()});
         else if(m.t==='join'){const r=roomInfo();
-          if(r.n>=4&&!S)conn.send({t:'full'});
+          if(r.n>=MAXP&&!S)conn.send({t:'full'});
           else if(NET.pw&&String(m.pw||'')!==NET.pw)conn.send({t:'ng'});
           else conn.send({t:'ok',code:NET.code})}});
       setTimeout(()=>{try{conn.close()}catch(_){}},8000)});
@@ -5106,9 +5135,9 @@ function renderRooms(force){
   const ks=Object.keys(NET.rooms||{}).map(Number).sort((a,b)=>a-b);
   const icon=an=>{const src=typeof CHEF_IMG_SRC==='object'&&an?CHEF_IMG_SRC[an+'_icon']:null;return src?`<img src="${src}" alt="">`:''};
   const h=ks.length?ks.map(i=>{const r=NET.rooms[i],n=Math.max(1,Math.min(4,+r.n||1));
-    return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' <small>（パスワード付き）</small>':''}</span><span class="rp">${n}/4人</span>
+    return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' <small>（パスワード付き）</small>':''}</span><span class="rp">${n}/${MAXP}人</span>
       <span class="rs">${[r.where,r.ph].filter(Boolean).map(x=>String(x).replace(/[<>&"]/g,'')).join('・')}</span>
-      <span class="rc">${(Array.isArray(r.ch)?r.ch:[]).slice(0,4).map(a=>icon(String(a).replace(/[^a-z]/g,''))).join('')}</span>
+      <span class="rc">${(Array.isArray(r.ch)?r.ch:[]).slice(0,MAXP).map(a=>icon(String(a).replace(/[^a-z]/g,''))).join('')}</span>
       <button class="ovbtn hold" data-act="ljoin" data-v="${i}">参加（${ovkText()}）</button></div>`}).join('')
     :'<p class="mut">今は部屋がありません。ホストが「部屋を作る」と、ここに出ます。</p>';
   if(!force&&el._h===h)return;
@@ -5148,15 +5177,15 @@ function hostGuests(){
 function showHostLobby(){
   if(NET.role!=='host'||S)return;
   const g=hostGuests();
-  NET.lobby.presence({host:{code:NET.code,n:1+Math.min(3,g.length),open:true}}).catch(()=>{});
-  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(3,g.length)}).catch(()=>{});
+  NET.lobby.presence({host:{code:NET.code,n:1+Math.min(MAXP-1,g.length),open:true}}).catch(()=>{});
+  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(MAXP-1,g.length)}).catch(()=>{});
   paintOv(`<div class="box"><h2>${NET.peer?'部屋'+(NET.pw?' 🔒':''):'部屋 '+NET.code}</h2>
-    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,3).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大4人）</p>
+    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,MAXP-1).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大${MAXP}人）</p>
     <p class="mut">${NET.peer?(NET.beaconSlot!=null?`ロビーに部屋を出しました。フレンドはタイトルの「ロビーへ入る」から参加できます。${NET.pw?'パスワード：<b>'+NET.pw.replace(/[<>&"]/g,'')+'</b>':'パスワードなし'}`:'ロビーに部屋を出しています…'):`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
     <div class="row"><button class="ovbtn" data-act="hstart" data-v="layout">キッチンを自分で並べて開始</button><button class="ovbtn" data-act="hstart" data-v="preset">初期配置済みで開始</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
 }
 function hostStart(mode){
-  const g=hostGuests().slice(0,3);
+  const g=hostGuests().slice(0,MAXP-1);
   NET.slots={};NET.uidSlot={};NET.waiting=[];
   if(NET.room)NET.room.presence({lb:0}).catch(()=>{});
   g.forEach((p,i)=>bindSlot(p,i+1));
@@ -5177,7 +5206,7 @@ function bindSlot(p,k){
 // a free spot on the truck floor near the slot's start position
 function spawnSpot(k){
   let [x,y]=START_POS[k]||START_POS[0];
-  if(S.phase==='stop'||hit(x,y)){for(let yy=5;yy>=2;yy--)for(let xx=3;xx<=14;xx++)if(!hit(xx+.5,yy+.5)&&!S.players.some(q=>Math.hypot(q.x-xx-.5,q.y-yy-.5)<0.8))return [xx+.5,yy+.5]}
+  if(S.phase==='stop'||hit(x,y)){for(let yy=5;yy>=2;yy--)for(let xx=3;xx<=IX1+1;xx++)if(!hit(xx+.5,yy+.5)&&!S.players.some(q=>Math.hypot(q.x-xx-.5,q.y-yy-.5)<0.8))return [xx+.5,yy+.5]}
   return [x,y];
 }
 // guests in the room but not playing yet; rejoining guests get their old chef back at once,
@@ -5195,16 +5224,16 @@ function hostRoster(){
   for(const peer in NET.slots)if(!live.has(peer)){NET.inputs[NET.slots[peer]]=null}
   NET.waiting=NET.waiting.filter(peer=>live.has(peer)&&!NET.slots[peer]);
   const canIn=S.phase==='choose';
-  while(canIn&&NET.waiting.length&&S.players.length<4){
+  while(canIn&&NET.waiting.length&&S.players.length<MAXP){
     const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
     const k=S.players.length,[x,y]=spawnSpot(k);
     S.players.push({i:k,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:guestSkill(p)});
-    S.np=S.players.length;bindSlot(p,k);
+    S.np=S.players.length;growTruck(TX_FOR(S.np));bindSlot(p,k);
     {const q=S.players[k];if(S.phase==='select')q.sel={cur:Math.max(0,SKILL_K.indexOf(q.skill)),ok:false,last:'0,0',rep:0}}
     S.toast={text:'P'+(k+1)+' が参加しました！',t:0,life:3};sfx('ready');
     NET.lobby.presence({host:{code:NET.code,n:S.np,open:true}}).catch(()=>{});
   }
-  S.waitN=Math.min(NET.waiting.length,4-S.players.length);
+  S.waitN=Math.min(NET.waiting.length,MAXP-S.players.length);
 }
 function remoteInput(i){
   const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false,sk:false};
@@ -5271,7 +5300,7 @@ const CST_K=['wait','follow','seat','eat','leave'];
 function tablesList(){const a=[];for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table')a.push([x,y]);return a}
 function sendSnap(){
   const tiles=[];
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
     const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0,c.fire?1:0,Math.round((c.smoke||0)*10),(c.nbT||0)>0?1:0];
     while(a.length>1&&!a[a.length-1])a.pop();
@@ -5328,12 +5357,12 @@ async function joinRoom(code){
 function guestCount(){
   if(!NET.room)return 1;
   const h=NET.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.lb>0);   // the host puts the head count in its lobby
-  return h?Math.max(1,Math.min(4,+h.presence.lb||1)):2;
+  return h?Math.max(1,Math.min(MAXP,+h.presence.lb||1)):2;
 }
 function guestLocalOv(kind){
   NET.localOv=kind;NET.mirror=false;NET.shownOv=-1;
   const body=kind==='conn'?`<p>部屋に接続しています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
-    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/4人</span></p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
+    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/${MAXP}人</span></p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
     :kind==='late'?`<p>このゲームはもう始まっています。次のゲームから参加してください。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`
     :`<p>ホストが部屋を閉じたか、通信が途切れました。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`;
   paintOv(`<div class="box"><h2>${kind==='lost'?'接続が切れました':NET.peer?'部屋':'部屋 '+NET.code}</h2>${body}</div>`);
@@ -5425,11 +5454,11 @@ function applySnap(d){
   const n=v=>+v||0;
   // a guest remembers the animal it played once the select screen is over
   if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
-  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);
+  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(TX_FOR(S.np)!==TX){applyTruck(TX_FOR(S.np));S.map=buildMap()}
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;S.pupI=n(d.pi)>=0?n(d.pi):null;
   S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
   S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;
-  S.waitN=Math.max(0,Math.min(3,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
+  S.waitN=Math.max(0,Math.min(MAXP-1,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>2)}):null;
   S.town=town(d.tw);S.next=town(d.nx);
@@ -5439,7 +5468,7 @@ function applySnap(d){
   S.gatherLeft=Array.isArray(d.gl)?d.gl.map(n):[0,0];
   S.dirtyDrops=(Array.isArray(d.dd)?d.dd:[]).slice(0,12).map(a=>({tx:n(a[0]),ty:n(a[1]),n:Math.max(1,Math.min(9,n(a[2])||1))}));
   let k=0;
-  for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
     S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10,nbT:e[12]?1:0};
   }  syncDoor();
@@ -5449,7 +5478,7 @@ function applySnap(d){
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}
   S.cleanPlates=Math.max(0,Math.min(9,n(d.cp)));
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
-  S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,4).map((a,i)=>{
+  S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,MAXP).map((a,i)=>{
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
@@ -5715,7 +5744,7 @@ function auState(dt){
   const L=AU.loop,c0=AU.ctx,now=c0.currentTime;
   let siz=0,bl=0,chop=false,warn=false,eng=0;
   const live=S&&!S.paused&&['drive','stop','layout'].includes(S.phase);
-  if(live)for(let y=2;y<=6;y++)for(let x=2;x<=13;x++){
+  if(live)for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x];if(!c||!PROC_OF[c.t]){AU.st.delete(x+','+y);continue}
     const it=c.item&&c.item.kind==='ing'?c.item:null,key=x+','+y;
     const pv=AU.st.get(key)||{prog:0,proc:false,burnt:false,had:false,act:0};

@@ -3168,7 +3168,7 @@ function drawTruckBody(){
 }
 const WHEELS=[3.35,15.05], WHEEL_R=22;
 function drawWheels(){
-  const ang=S?S.roadOff*T/(WHEEL_R*1.0):0;
+  const ang=(S?S.roadOff:idleOff)*T/(WHEEL_R*1.0);
   for(const wx of WHEELS){
     const cx=wx*T,cy=7*T+4,R=WHEEL_R;
     // dark wheel arch cut into the skirt
@@ -3244,13 +3244,13 @@ function drawPassingTown(ro){
   ctx.strokeStyle='rgba(50,50,50,.35)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(0,0.62*T);ctx.lineTo(GW*T,0.62*T);ctx.stroke();
 }
 function drawRoad(){
-  drawPassingTown(S?S.roadOff:0);
+  drawPassingTown(S?S.roadOff:idleOff);   // (the title screen has no run: its own slow roll)
   // road band behind truck bottom
   {const g=ctx.createLinearGradient(0,6.6*T,0,7.2*T);g.addColorStop(0,'#2e353a');g.addColorStop(1,'#454e55');ctx.fillStyle=g;ctx.fillRect(0,6.6*T,GW*T,0.6*T)}
   cachedRect('roadside',0,7.2*T,GW*T,(GH-7.2)*T,g=>{
     patFill(g,'#7c8a82',0,7.2*T,GW*T,1.9*T);g.fillStyle='rgba(0,0,0,.18)';g.fillRect(0,7.2*T,GW*T,4);   // roadside
     patFill(g,'#4f7044',0,9.1*T,GW*T,(GH-9.1)*T)});
-  const ro=S?S.roadOff:0, wrapX=(x,span)=>((x%span)+span)%span;
+  const ro=S?S.roadOff:idleOff, wrapX=(x,span)=>((x%span)+span)%span;
   // road dashes, curb blocks, grass tufts, trees: nearer things slide faster
   ctx.fillStyle='#e8e2c8';
   for(let x=-2;x<GW+2;x+=2)ctx.fillRect((x-(ro*2.5)%2)*T,6.85*T,T*0.9,4);
@@ -4808,10 +4808,7 @@ function drawSidePanel(px,py,pw,phh){
 }
 let idleOff=0;
 function drawRoadIdle(){
-  ctx.fillStyle='#24333a';ctx.fillRect(0,0,GW*T,GH*T);
-  ctx.fillStyle='#3a4248';ctx.fillRect(0,6.6*T,GW*T,0.6*T);
-  ctx.fillStyle='#4f7044';ctx.fillRect(0,7.2*T,GW*T,(GH-7.2)*T);
-  ctx.fillStyle='#e8e2c8';const off=idleOff%2;for(let x=-2;x<GW+2;x+=2)ctx.fillRect((x-off)*T,6.85*T,T*0.9,4);
+  drawRoad();   // the same passing town, road and wheels as the drive phase
   // title screen only: a cuter truck that bobs along, with pop lettering on its side
   const tt=performance.now()/1000,bob=Math.abs(Math.sin(tt*5))*-3;
   ctx.save();ctx.translate(0,bob);
@@ -4857,8 +4854,8 @@ function drawTitleText(tt,bob){
       ctx.fillStyle='rgba(255,255,255,.45)';ctx.save();ctx.beginPath();ctx.rect(-w,-sz/2,w*2,sz*0.38);ctx.clip();ctx.fillText(c,0,0);ctx.restore();
       ctx.restore();x+=w});
   };
-  line('ドコドコ',9*T,3.35*T,58,0);
-  line('キッチンカー',9*T,4.85*T,44,4);
+  line('ドコドコ',7.9*T,3.35*T,58,0);   // centred on the polka-dot panel (2T..13.8T)
+  line('キッチンカー',7.9*T,4.85*T,44,4);
 }
 
 // ---------- DOM HUD ----------

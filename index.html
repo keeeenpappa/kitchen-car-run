@@ -1173,8 +1173,11 @@ function AL(p,k,label,hold){
 const ovkText=()=>isTouch?'長押し':BTN_N.act+'（'+keyName(0,'act')+'）長押し';   // overlay cards / buttons: every long press is 作業
 // in overlay HTML the key name is a marked span, so an online guest can show its own buttons on the host's screens
 const OVK=()=>`<span class="kn" data-v="hold">${ovkText()}</span>`;
+// a plain press of 作業 (buttons that are not long-press cards): gacha screens
+const pressText=()=>isTouch?'タップ':BTN_N.act+'（'+keyName(0,'act')+'）';
+const OVP=()=>`<span class="kn" data-v="press">${pressText()}</span>`;
 function localizeOv(){
-  for(const el of ov.querySelectorAll('.kn'))el.textContent=el.dataset.v==='menu'?keyName(0,'menu'):ovkText();
+  for(const el of ov.querySelectorAll('.kn'))el.textContent=el.dataset.v==='menu'?keyName(0,'menu'):el.dataset.v==='press'?pressText():ovkText();
   // the rows lose their id in the copy: find them by their buttons, give the id back, show this device's settings
   for(const [act,id,inner] of [['dev','devRow',devRowInner],['snd','sndRow',sndRowInner]]){
     const b=ov.querySelector(`[data-act="${act}"]`);if(!b)continue;const row=b.parentElement;row.id=id;row.innerHTML=emoHtml(inner());fillFood(row)}
@@ -2321,7 +2324,7 @@ function showChoose(){
     <div class="cards">${cards}</div>
     <p class="mut">${isTouch?'カードを長押しで決定':`←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定`}</p></div>`);
 }
-let OVSTICK=0,OVSTICKY=0;
+let OVSTICK=0,OVSTICKY=0,ovVyHeld=false;
 function overlayInput(){
   const b=ovButtons(); if(!b.length)return;
   if(guestLocked()){   // the host decides; a guest only shows which one it would pick
@@ -2342,7 +2345,12 @@ function overlayInput(){
   if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
   const sy=p0?p0.ay:0,vsd=sy>0.6?1:sy<-0.6?-1:0;if(Math.abs(sy)<0.3)OVSTICKY=0;let vy=vsd&&vsd!==OVSTICKY?vsd:0;if(vsd)OVSTICKY=vsd;
   if(pressed.has('ArrowDown')||pressed.has('KeyS'))vy=1;if(pressed.has('ArrowUp')||pressed.has('KeyW'))vy=-1;
-  if(vy){const t0=b[0].offsetTop;let cols=0;while(cols<b.length&&b[cols].offsetTop===t0)cols++;const ni=ovSel+vy*Math.max(1,cols);if(ni>=0&&ni<b.length){ovSel=ni;markSel();play('tick')}}
+  if(vy&&!ovVyHeld){   // up / down: the nearest button in the row above / below (nearest by horizontal position), one step per press
+    const R=b.map(x=>x.getBoundingClientRect()),cur=R[ovSel]||R[0],cx=cur.left+cur.width/2,cyc=cur.top+cur.height/2;
+    let best=-1,bd=1e9;
+    R.forEach((r,i)=>{if(i===ovSel)return;const dy=(r.top+r.height/2)-cyc;if(vy>0?dy<=cur.height*0.5:dy>=-cur.height*0.5)return;const d=Math.abs(dy)*4+Math.abs(r.left+r.width/2-cx);if(d<bd){bd=d;best=i}});
+    if(best>=0){ovSel=best;markSel();play('tick')}}
+  ovVyHeld=!!vy;
   if(ok){const x=b[ovSel];if(x&&!x.classList.contains('hold')){ovHoldLock=true;doOv(x.dataset.act,x.dataset.v)}}
 }
 
@@ -4242,6 +4250,7 @@ function gachaHtml(){
     <p class="gcount">チケット <b>${SV.t}</b>枚　　かけら <b>${SV.sh}</b>/${SHARDS_PER}</p>
     <p class="mut">持っているスキンがまた出ると、かけらになります（どのスキンでも共通）。かけら${SHARDS_PER}つでチケット1枚。</p>
     <div class="row"><button class="ovbtn${SV.t?' autofocus':''}" data-act="gpull">${SV.t?'ガチャを回す（チケット1枚）':'チケットがない'}</button><button class="ovbtn" data-act="title">もどる</button></div>
+    <p class="mut">${isTouch?'タップで決定':`<b>←→↑↓</b> で選んで <b>${OVP()}</b> で決定`}（ガチャを回す・もどる・キャラ選択はすべて同じ操作）</p>
     <p class="mut">着せ替え：キャラを選んでください（手に入れたスキン ${SV.own.length}/${SKIN_K.length}）</p>
     <div class="gchars">${chars}</div></div>`;
 }
@@ -4259,7 +4268,8 @@ function gachaPull(){
       <div class="gburst"></div>
       <div class="gprize"><img src="${skinPreview(R.sk,[k],200)}" alt=""><b>${R.n}</b><span>${SKILLS[R.sk].e} ${SKILLS[R.sk].n}用・${SLOTN[R.slot]}</span>
         ${dup?`<span class="ng">もう持っている → かけら +1${conv?'<br>かけら4つでチケット1枚になった！':''}</span>`:'<span class="perf">NEW!</span>'}</div></div>
-    <div class="row gok"><button class="ovbtn autofocus" data-act="gacha">終わる</button>${SV.t?'<button class="ovbtn" data-act="gpull">もう1回</button>':''}<span class="gleft">チケット <b>${SV.t}</b>枚　かけら <b>${SV.sh}</b>/${SHARDS_PER}</span></div></div>`);
+    <div class="row gok"><button class="ovbtn autofocus" data-act="gacha">終わる</button>${SV.t?'<button class="ovbtn" data-act="gpull">もう1回</button>':''}<span class="gleft">チケット <b>${SV.t}</b>枚　かけら <b>${SV.sh}</b>/${SHARDS_PER}</span></div>
+    <p class="mut">${isTouch?'タップで決定':`<b>←→</b> で選んで <b>${OVP()}</b> で決定（終わる／もう1回）`}</p></div>`);
 }
 // dressing room for one chef: try skins on, 確定 keeps them, もどる throws the try-on away
 let DRESS=null;

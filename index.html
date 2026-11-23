@@ -757,7 +757,9 @@ function showEquipShop(){
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${pr}G</span><span class="sub">${o.sold?'売り切れ':done?'これ以上買えません':S.money>=pr?'買うと残り '+(S.money-pr)+'G':'お金が足りない'}</span>
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
-    <p>買えるのは最大<b>3つ</b>まで（${S.eqBuys||0}/3）。買うたびに値段が上がります（買った物は売り切れ）（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
+    ${(()=>{const n=Math.min(3,S.eqBuys||0),left=3-n,dot=i=>`<span style="display:inline-block;width:24px;height:24px;border-radius:50%;margin:0 4px;vertical-align:middle;box-sizing:border-box;border:3px solid #ffd84a;background:${i<n?'#ffd84a':'transparent'}"></span>`;
+      return `<div style="display:inline-block;margin:4px 0 6px;padding:8px 18px;border-radius:14px;background:${left?'rgba(255,216,74,.16)':'rgba(255,120,120,.18)'};border:2px solid ${left?'#ffd84a':'#ff9c9c'}"><b style="font-size:1.15em">買えるのは3つまで</b>　${dot(0)}${dot(1)}${dot(2)}　<b style="font-size:1.15em;color:${left?'#ffd84a':'#ff9c9c'}">${left?'あと'+left+'つ':'上限です'}</b></div>`})()}
+    <p>買うたびに値段が上がります（買った物は売り切れ）（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
     <div class="cards">${cards}</div>
     <div class="row">${S.eqRerolled||(S.eqBuys||0)>0?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${(S.eqBuys||0)>0?' autofocus':''}" data-act="eqdone">${(S.eqBuys||0)>0?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }

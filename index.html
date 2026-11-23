@@ -1341,7 +1341,7 @@ function doPick(p,c,tx,ty){
       else say(p,'種を持ってくる');
       return;
     case 'queue':{
-      if(S.phase!=='stop'||S.sub!=='service')return;
+      if(S.phase!=='stop'||(S.sub!=='service'&&S.sub!=='boss'))return;
       const w=waiting()[c.slot];if(!w)return;
       if(w.type==='takeout'){
         autoPlate(p);
@@ -1360,7 +1360,7 @@ function doPick(p,c,tx,ty){
           say(p,f?'先に汚れた皿を片付ける':'手を空けて汚れた皿を持つ');return}
         if(p.hold&&p.hold.kind==='dirty'&&!f){c.item=p.hold;p.hold=null;sfx('put');return}
         if(f){f.st='seat';f.tx=tx;f.ty=ty;f.pat=f.max;f.by=-1;float(tx+.5,ty,pendingOrders(f).map(o=>RECIPES[o].e).join('')+' ご注文','#fff');sfx('seat')}
-        else say(p,S.sub==='service'?'並んでいるお客さんを案内してくる':'まだ営業前');
+        else say(p,S.sub==='service'||S.sub==='boss'?'並んでいるお客さんを案内してくる':'まだ営業前');
         return}
       // a dirty plate beside a customer who is still there (a big eater's first dish): it can be taken too
       if(c.item&&c.item.kind==='dirty'&&(!p.hold||p.hold.kind==='dirty')){
@@ -3808,7 +3808,7 @@ function drawPlayers(){
     const c=tile(p.tx,p.ty);
     const furnSpot=c&&(((c.t==='floor'||c.t==='gap')&&holdsFurn(p)&&p.hold.st!=='table'&&inTruck(p.tx,p.ty))||(c.t==='floor'&&p.hold&&p.hold.kind==='ext'&&inTruck(p.tx,p.ty))||(c.t==='ground'&&!c.item&&p.hold&&p.hold.kind==='station'&&p.hold.st==='table'&&inTblZone(p.tx,p.ty)));
     if(c&&(furnSpot||(c.t!=='floor'&&c.t!=='gap'&&(c.t!=='ground'||c.item)&&c.t!=='wall'&&c.t!=='out'&&c.t!=='queue'))){ctx.strokeStyle=PCOL[p.i];ctx.lineWidth=2;ctx.setLineDash([4,3]);rr(p.tx*T+3,p.ty*T+3,T-6,T-6,6);ctx.stroke();ctx.setLineDash([])}
-    if(c&&c.t==='queue'&&S.phase==='stop'&&S.sub==='service'&&waiting()[c.slot]&&(waiting()[c.slot].type==='takeout'||!follower(p))){
+    if(c&&c.t==='queue'&&S.phase==='stop'&&(S.sub==='service'||S.sub==='boss')&&waiting()[c.slot]&&(waiting()[c.slot].type==='takeout'||!follower(p))){
       const QXc=qCX(c.slot)*T;ctx.strokeStyle='#fff';ctx.lineWidth=6;rr(QXc-T/2+2,p.ty*T-T*0.55,T-4,T*1.5,9);ctx.stroke();ctx.strokeStyle='#1e7bf0';ctx.lineWidth=3.5;ctx.stroke();
       const me=NET.role==='off'||NET.mySlot===p.i;
       if(me){const m=AL(p,'pick',waiting()[c.slot].type==='takeout'?'渡す':'案内');ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;ctx.fillStyle=PCOL[p.i];rr(QXc-w/2,p.ty*T-T*0.55-20,w,17,8);ctx.fill();text(m,QXc,p.ty*T-T*0.55-11.5,11,'#fff',800)}}

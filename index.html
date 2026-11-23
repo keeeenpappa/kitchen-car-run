@@ -1663,8 +1663,8 @@ const TUT=[
   {t:p=>'実った！ 菜園に向かって '+AL(p,'act','作業',1)+'（収穫。じょうろを持ったままでOK）→ 冷蔵庫の材料が増える',tg:()=>tutPlanted(),enter:()=>{S.tut.l0=S.stock.lettuce||0},ok:p=>(S.stock.lettuce||0)>S.tut.l0},
   // ---- layout: a counter waits outside; set it down in the truck, then 準備完了 ----
   {t:p=>'次は「配置」。外に置いてあるカウンターに向かって '+BL(p,'pick')+'（持つ）',tg:()=>tutOutsideItem(),enter:()=>tutToLayout(),ok:p=>holdsFurn(p)},
-  {t:p=>'トラックの空いている床に向かって '+BL(p,'pick')+'（置く）。ドアの前はあけておく',tg:()=>tutFreeFloor(),ok:p=>!holdsFurn(p)&&tutCounters()>S.tut.cnt0},
-  {t:p=>'配置ができたら '+AL(p,'act','作業',1)+'を長押しして「準備完了」（出発！）',tg:()=>null,ok:p=>S.phase==='drive'},
+  {t:p=>'トラックの空いている床に向かって '+BL(p,'pick')+'（置く）。ドアの前はあけておく',tg:()=>tutFreeFloor(),ok:p=>!holdsFurn(p)&&tutCounters()>S.tut.cnt0,back:p=>!holdsFurn(p)&&tutCounters()<=S.tut.cnt0},   // set it down outside / lost it: back to picking it up
+  {t:p=>'配置ができたら '+AL(p,'act','作業',1)+'を長押しして「準備完了」（出発！）',tg:()=>null,ok:p=>S.phase==='drive',back:p=>S.phase==='layout'&&tutCounters()<=S.tut.cnt0},   // picked the counter up again
   // ---- drive: the driver's seat and the lever, then stand at the front window, a shop passes, buy something ----
   {t:p=>'走行中！ 運転席へ行こう。緑の床（レバーの手前）で右向きに '+BL(p,'pick')+'（座る）',tg:()=>LEVER_FRONT,enter:()=>{S.speed=1},ok:p=>!!p.seat},
   {t:p=>AL(p,'act','スピード切替',1)+'で「急ぐ」に。急ぐと早く着くが燃料（⛽）を多く使う',tg:()=>null,ok:p=>S.speed===2},
@@ -1718,6 +1718,7 @@ function tutUpdate(dt){
   if(st&&st.grow)for(const c of S.stations)if(c.t==='planter'&&c.plant&&c.plant.watered)c.plant.t+=dt*12;   // the garden step: plants grow fast
   if(!st){T0.done=true;tutFinish();return}
   if(!T0.en){T0.en=true;if(st.enter)st.enter()}
+  if(st.back&&st.back(p)){T0.i--;T0.en=true;return}   // en stays true: the layout setup (tutToLayout) must not run again
   if(st.ok(p)){T0.i++;T0.en=false;sfx('confirm')}
 }
 function tutFinish(){

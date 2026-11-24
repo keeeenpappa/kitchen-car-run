@@ -4518,23 +4518,32 @@ function drawSelect(){
   S.players.forEach((p,i)=>{if(!p.sel)return;const {x,y}=selCell(p.sel.cur),d=i*4;
     ctx.strokeStyle=PCOL[i];ctx.lineWidth=p.sel.ok?5:3;rr(x+4+d,y+2+d,SELG.cw-8-2*d,SELG.ch-4-2*d,14);ctx.stroke();
     const bw=S.players.length>4?19:26,bs=S.players.length>4?15:28;ctx.fillStyle=PCOL[i];rr(x+6+i*bs,y-6,bw,16,8);ctx.fill();text('P'+(i+1),x+6+i*bs+bw/2,y+2,10,'#fff',800)});
-  // one panel per player
-  const n=S.players.length,compact=n>4,gap=compact?8:12,pw=compact?Math.floor((W-40)/n)-gap:Math.min(268,(W-60)/n-12),py=366,ph=H-py-14,tot=n*pw+(n-1)*gap,px0=(W-tot)/2;
-  S.players.forEach((p,i)=>{const x=px0+i*(pw+gap),K=SKILLS[p.skill]||SKILLS.knife,an=SKILL_ANIMAL[p.skill]||'beaver',ok=p.sel&&p.sel.ok;
-    ctx.fillStyle='rgba(16,26,30,.88)';rr(x,py,pw,ph,16);ctx.fill();ctx.strokeStyle=ok?'#ffd84a':PCOL[i];ctx.lineWidth=ok?3:2;ctx.stroke();
-    ctx.fillStyle=PCOL[i];rr(x,py,pw,28,[16,16,0,0]);ctx.fill();
-    const me=NET.role!=='off'&&NET.mySlot===i;text('P'+(i+1)+(me?(compact?'★':'　あなた'):''),x+14,py+14,14,'#fff',800,'left');
-    text(ok?'OK!':'えらび中…',x+pw-14,py+14,13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
-    if(compact){   // 5+ players: just the chef and the animal's name (the description is in the cursor's cell)
-      drawChefBig(an,PCOL[i],x+pw/2,py+ph-62,110,S.t+i,skinsOf(p));
-      text(K.n,x+pw/2,py+ph-34,14,'#fff',800);text(SKILLS[p.skill]?SKILLS[p.skill].e:'',x+pw/2,py+ph-14,14,'#fff',800)}
+  // one panel per player: up to 4 = all full size; 5+ = your own stays full size, the others become small cards beside it
+  const n=S.players.length,many=n>4,py=366,ph=H-py-14;
+  const panel=(p,i,x,y,pw,ph,mini)=>{const K=SKILLS[p.skill]||SKILLS.knife,an=SKILL_ANIMAL[p.skill]||'beaver',ok=p.sel&&p.sel.ok;
+    const hh=mini?22:28,me=NET.role!=='off'&&NET.mySlot===i;
+    ctx.fillStyle='rgba(16,26,30,.88)';rr(x,y,pw,ph,mini?12:16);ctx.fill();ctx.strokeStyle=ok?'#ffd84a':PCOL[i];ctx.lineWidth=ok?3:2;ctx.stroke();
+    ctx.fillStyle=PCOL[i];rr(x,y,pw,hh,mini?[12,12,0,0]:[16,16,0,0]);ctx.fill();
+    text('P'+(i+1)+(me?'　あなた':''),x+(mini?10:14),y+hh/2,mini?12:14,'#fff',800,'left');
+    text(ok?'OK!':'えらび中…',x+pw-(mini?10:14),y+hh/2,mini?11:13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
+    if(mini){
+      drawChefBig(an,PCOL[i],x+38,y+hh+54,84,S.t+i,skinsOf(p));
+      text(K.n,x+80,y+hh+16,13,'#fff',800,'left');
+      wrapText(K.d,x+80,y+hh+36,pw-88,14,10.5,'#d8e6e7',600,Math.max(2,Math.floor((ph-hh-36-22)/14)+1));
+      text(selSkillLine(K),x+80,y+ph-14,10,'#ffe08a',700,'left')}
     else{
-    drawChefBig(an,PCOL[i],x+70,py+176,150,S.t+i,skinsOf(p));
-    text(K.n,x+136,py+52,17,'#fff',800,'left');
-    wrapText(K.d,x+136,py+80,pw-148,19,12.5,'#d8e6e7',600,Math.max(5,Math.floor((ph-26-16-80)/19)+1));   // down to just above the effect / wait line
-    text(selSkillLine(K),x+136,py+ph-26,11.5,'#ffe08a',700,'left')}
-    if(ok&&!compact){ctx.save();ctx.translate(x+pw-48,py+ph-60);ctx.rotate(-0.18);ctx.strokeStyle='#ffd84a';ctx.lineWidth=3;rr(-34,-16,68,32,8);ctx.stroke();text('OK!',0,1,20,'#ffd84a',900);ctx.restore()}
-  });
+    drawChefBig(an,PCOL[i],x+70,y+176,150,S.t+i,skinsOf(p));
+    text(K.n,x+136,y+52,17,'#fff',800,'left');
+    wrapText(K.d,x+136,y+80,pw-148,19,12.5,'#d8e6e7',600,Math.max(5,Math.floor((ph-26-16-80)/19)+1));   // down to just above the effect / wait line
+    text(selSkillLine(K),x+136,y+ph-26,11.5,'#ffe08a',700,'left');
+    if(ok){ctx.save();ctx.translate(x+pw-48,y+ph-60);ctx.rotate(-0.18);ctx.strokeStyle='#ffd84a';ctx.lineWidth=3;rr(-34,-16,68,32,8);ctx.stroke();text('OK!',0,1,20,'#ffd84a',900);ctx.restore()}}};
+  if(!many){const gap=12,pw=Math.min(268,(W-60)/n-12),tot=n*pw+(n-1)*gap,px0=(W-tot)/2;
+    S.players.forEach((p,i)=>panel(p,i,px0+i*(pw+gap),py,pw,ph,false))}
+  else{const me=NET.role!=='off'&&NET.mySlot>=0&&NET.mySlot<n?NET.mySlot:0,gap=10,fw=268,others=S.players.map((p,i)=>i).filter(i=>i!==me),m=others.length,
+      cols=Math.ceil(m/2),avail=W-40-fw-gap,cw=Math.min(216,Math.floor((avail-gap*(cols-1))/cols)),rows=m>cols?2:1,rh=Math.floor((ph-gap*(rows-1))/rows),
+      tot=fw+gap+cols*cw+(cols-1)*gap,px0=(W-tot)/2;
+    panel(S.players[me],me,px0,py,fw,ph,false);
+    others.forEach((i,k)=>{const c=k%cols,r=Math.floor(k/cols);panel(S.players[i],i,px0+fw+gap+c*(cw+gap),py+r*(rh+gap),cw,rh,true)})}
   // footer: what starts the run
   const host=NET.role!=='guest';
   let foot=NET.role==='off'?(n>1?'みんな選んだら、P1が'+AL(S.players[0],'act','出発',1):'選んだら '+AL(S.players[0],'act','出発',1))

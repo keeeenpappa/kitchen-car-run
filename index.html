@@ -2423,10 +2423,10 @@ function showTitle(){
   showOv(`<div class="box tbox">
     <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><button class="ovbtn" data-act="tchar">${(()=>{const k=SKILLS[PSKILL[0]]?PSKILL[0]:'knife',an=SKILL_ANIMAL[k],src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_icon']:null;return (src?`<img src="${src}" alt="" style="width:26px;height:26px;vertical-align:middle"> `:SKILLS[k].e+' ')+SKILLS[k].n})()}（変える）</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><select id="tmode" class="tsel"><option value="casual" ${MODE==='casual'?'selected':''}>カジュアル（4町）</option><option value="tour" ${MODE==='tour'?'selected':''}>グランドツアー（全8町）</option></select></div>
-    <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><select id="tkit" class="tsel"><option value="layout">自分で並べる</option><option value="preset" selected>初期配置済み</option></select></div>
-    <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><select id="tbot" class="tsel"><option value="0" selected>なし（1人）</option>${[2,3,4,5,6,7].map(n=>`<option value="${n}">${n}人</option>`).join('')}</select>
+    <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><select id="tkit" class="tsel"><option value="layout">自分で並べる</option><option value="preset" selected>初期配置済み</option></select>
+      <span style="align-self:center">bot人数</span><select id="tbot" class="tsel"><option value="0" selected>なし（1人）</option>${[2,3,4,5,6,7].map(n=>`<option value="${n}">${n}人</option>`).join('')}</select>
       <button class="ovbtn" data-act="tstart">はじめる</button></div>
-    <div class="row"><button class="ovbtn" data-act="ghelp">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button>${/[?&]lang=1/.test(location.search)?`<button class="ovbtn" data-act="lang">🌐 ${langName()}</button>`:''}</div>
+    <div class="row"><button class="ovbtn" data-act="ghelp" style="width:180px">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button>${/[?&]lang=1/.test(location.search)?`<button class="ovbtn" data-act="lang">🌐 ${langName()}</button>`:''}</div>
     <div class="row"><button class="ovbtn" data-act="tut">📘 チュートリアル（1人・約5分）</button></div>
     ${GIFT_MSG?`<p class="good">${GIFT_MSG}</p>`:''}
     ${bestLine()}

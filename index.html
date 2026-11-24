@@ -1237,10 +1237,10 @@ function cycleDev(i){
   try{localStorage.setItem('kcr-dev',JSON.stringify(DEVPREF))}catch(_){}
 }
 function devRowInner(){
-  const n=NET.role!=='off'?1:(S&&S.np?S.np:4);
+  const n=1;   // each player sets their own button display
   return '<span style="align-self:center;min-width:9em">ボタンの表示</span>'+Array.from({length:n},(_,i)=>{
     const pr=DEVPREF[i],cur=devOf(i);
-    return `<button class="ovbtn" data-act="dev" data-v="${i}">${NET.role!=='off'?'この端末':'P'+(i+1)}：${pr==='auto'?'自動（'+DEVN[cur==='kb'?'kb':cur]+'）':DEVN[pr]}</button>`}).join('');
+    return `<button class="ovbtn" data-act="dev" data-v="${i}">${'この端末'}：${pr==='auto'?'自動（'+DEVN[cur==='kb'?'kb':cur]+'）':DEVN[pr]}</button>`}).join('');
 }
 const devRow=()=>`<div class="row" id="devRow">${devRowInner()}</div>`;
 const BTN_N={pick:'持つ',act:'作業',sw:'切替',sk:'スキル'};
@@ -2234,6 +2234,33 @@ function fitOv(){
   if(r.height>0)z=Math.min(z,(H-24)/r.height);
   b.style.setProperty('--ovz',Math.max(0.6,z).toFixed(3));
 }
+// the title's "キャラ": the usual character-select screen, just for you. LTS is a one-player stand-in state that only the
+// select screen's drawing looks at; nothing is sent anywhere. OK (press the animal again) or back returns to the title.
+let LSEL=null,LTS=null;
+function titlePickOpen(){
+  const k=Math.max(0,SKILL_K.indexOf(PSKILL[0]));
+  LSEL={cur:k,ok:false,last:'0,0',rep:0,done:0};
+  LTS={phase:'select',t:0,selT:0,selHold:0,lobby:true,players:[{i:0,skill:SKILL_K[k],skn:skinList(SV.eq,SKILL_K[k]),sel:LSEL}]};
+  hideOv();
+}
+function titlePickClose(k){
+  if(k&&SKILLS[k]){PSKILL[0]=k;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
+  LSEL=null;LTS=null;showTitle();
+}
+function lobbySelMove(k){const s=LSEL;k=wrap(k,SKILL_K.length);if(k!==s.cur){s.cur=k;s.ok=false;s.done=0;const p=LTS.players[0];p.skill=SKILL_K[k];p.skn=skinList(SV.eq,p.skill);sfx('tick')}}
+function lobbySelTap(k){const s=LSEL;if(!s||!(k>=0&&k<SKILL_K.length))return;if(s.cur===k){if(!s.ok){s.ok=true;s.done=0.5;sfx('ready')}}else lobbySelMove(k)}
+function lobbySelUpdate(dt){
+  const s=LSEL,inp=deviceInput();LTS.t+=dt;
+  const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,key=dx+','+dy;
+  let mv=false;if(key!=='0,0'){if(key!==s.last){mv=true;s.rep=0.32}else{s.rep-=dt;if(s.rep<=0){mv=true;s.rep=0.13}}}
+  s.last=key;
+  if(mv&&!s.ok){const n=SKILL_K.length,rows=Math.ceil(n/SEL_COLS);let c=s.cur%SEL_COLS,r=Math.floor(s.cur/SEL_COLS);
+    if(dx)c=wrap(c+dx,SEL_COLS);else if(dy)r=wrap(r+dy,rows);lobbySelMove(Math.min(n-1,r*SEL_COLS+c))}
+  if(inp.pick&&!s.ok){s.ok=true;s.done=0.5;sfx('ready')}
+  else if(inp.sw&&s.ok){s.ok=false;s.done=0;sfx('put')}
+  else if((inp.sw||pressed.has('Escape'))&&!s.ok){titlePickClose(null);return}   // back without changing
+  if(s.ok){s.done-=dt;if(s.done<=0)titlePickClose(SKILL_K[s.cur])}                // OK: back to the title
+}
 function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
 function ovButtons(){return [...ov.querySelectorAll('.ovbtn')]}
 function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel))}
@@ -2247,13 +2274,6 @@ function ovDots(arr){
     el.innerHTML=who.map(j=>{const an=SKILL_ANIMAL[S.players[j]&&S.players[j].skill]||'beaver',src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_head_front']:null;return `<i style="border-color:${PCOL[j]}">${src?`<img src="${src}" alt="">`:''}</i>`}).join('')});
   if(!ov.hidden)fitOv();   // the face row adds height to the cards, so re-fit the box to the screen
 }
-// the title's character pick is saved on this device (it is also what you bring into an online room)
-ov.addEventListener('change',e=>{const t=e.target;
-  if(t&&t.id==='lchar'&&SKILLS[t.value]){   // in the lobby: change the chef after joining; the host tells everyone
-    PSKILL[0]=t.value;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}
-    if(NET.role==='guest'&&NET.room)NET.room.presence({skill:PSKILL[0]}).catch(()=>{});
-    else if(NET.role==='host'&&!S)showHostLobby();
-    return}if(t&&t.id==='tchar'&&SKILLS[t.value]){PSKILL[0]=t.value;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}const d=document.getElementById('tcharD');if(d){d.textContent=SKILLS[t.value].d;d.title=SKILLS[t.value].d}}});
 ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&guestLocked()){GSEL=Math.max(0,ovButtons().indexOf(b));return}if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
 const HOLD=0.6, READY_HOLD=0.8;
 let ovHold={btn:null,t:0,src:null},ovHoldLock=false;
@@ -2295,6 +2315,7 @@ function readyTick(dt){
 ov.addEventListener('keydown',e=>{if(e.target.id==='joinCode'&&e.key==='Enter'){e.preventDefault();doOv('pjoin')}});
 // a guest's choices on the host's (mirrored) screens go to the host
 function doOv(a,v){
+  if(a==='tchar'&&!S){titlePickOpen();play('confirm');return}
   if(a==='ctypes'){paintOv(ctypesHtml());play('confirm');return}
   if(a==='gacha'&&!S){paintOv(gachaHtml());play('confirm');return}
   if(a==='gpull'&&!S){gachaPull();return}
@@ -2400,7 +2421,7 @@ function showTitle(){
   S=null;
   // the title truck is drawn behind: keep this box low and short so it stays in view
   showOv(`<div class="box tbox">
-    <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><select id="tchar" class="tsel">${SKILL_K.map(k=>`<option value="${k}" ${PSKILL[0]===k?'selected':''}>${SKILLS[k].e} ${SKILLS[k].n}</option>`).join('')}</select><span id="tcharD" class="mut" style="align-self:center;font-size:13px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${SKILLS[PSKILL[0]]?SKILLS[PSKILL[0]].d:''}</span></div>
+    <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><button class="ovbtn" data-act="tchar">${(()=>{const k=SKILLS[PSKILL[0]]?PSKILL[0]:'knife',an=SKILL_ANIMAL[k],src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_icon']:null;return (src?`<img src="${src}" alt="" style="width:26px;height:26px;vertical-align:middle"> `:SKILLS[k].e+' ')+SKILLS[k].n})()}（変える）</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><select id="tmode" class="tsel"><option value="casual" ${MODE==='casual'?'selected':''}>カジュアル（4町）</option><option value="tour" ${MODE==='tour'?'selected':''}>グランドツアー（全8町）</option></select></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><select id="tkit" class="tsel"><option value="layout">自分で並べる</option><option value="preset" selected>初期配置済み</option></select></div>
     <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><select id="tbot" class="tsel"><option value="0" selected>なし（1人）</option>${[2,3,4,5,6,7].map(n=>`<option value="${n}">${n}人</option>`).join('')}</select>
@@ -4485,6 +4506,7 @@ function drawSelect(){
   const host=NET.role!=='guest';
   let foot=NET.role==='off'?(n>1?'みんな選んだら、P1が'+AL(S.players[0],'act','出発',1):'選んだら '+AL(S.players[0],'act','出発',1))
     :host?'みんな選んだら、ホストが'+AL(S.players[0],'act','出発',1):'ホストが出発するのを待っています';
+  if(S.lobby)foot=isTouch?'動物をタップ（もう一度タップでOK）':'選んで '+AL(S.players[0],'pick','決定')+' でOK　'+AL(S.players[0],'sw','もどる');
   if(S.selT>0)foot='まもなく出発！';
   ctx.font=`800 13px ${FNT}`;const fw=ctx.measureText(foot).width+28;ctx.fillStyle='rgba(16,26,30,.85)';rr(W/2-fw/2,py-36,fw,26,13);ctx.fill();
   text(foot,W/2,py-23,13,S.selT>0?'#ffd84a':'#cfe0e2',800);
@@ -4492,6 +4514,8 @@ function drawSelect(){
 }
 // tapping / clicking an animal on the canvas
 cv.addEventListener('pointerdown',e=>{
+  if(LSEL&&!S&&ov.hidden){const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*GW*T,y=(e.clientY-r.top)/r.height*VH*T;
+    for(let k=0;k<SKILL_K.length;k++){const c=selCell(k);if(x>=c.x&&x<c.x+SELG.cw&&y>=c.y&&y<c.y+SELG.ch){lobbySelTap(k);e.preventDefault();return}}return}
   if(!S||S.phase!=='select'||!ov.hidden)return;
   const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*GW*T,y=(e.clientY-r.top)/r.height*VH*T;
   for(let k=0;k<SKILL_K.length;k++){const c=selCell(k);if(x>=c.x&&x<c.x+SELG.cw&&y>=c.y&&y<c.y+SELG.ch){
@@ -4855,7 +4879,7 @@ function drawMenus(){
 }
 function draw(){
   ctx.clearRect(0,0,GW*T,GH*T);
-  if(!S){drawRoadIdle();return}
+  if(!S){if(LTS){const sv=S;S=LTS;try{drawSelect()}finally{S=sv}}else drawRoadIdle();return}
   if(S.phase==='select'){drawSelect();return}
   const arr=S.view==='town'&&S.town&&S.arrT!=null&&S.arrT<ARRIVE_T;
   // phone view: the world is drawn 1.5x around the camera; the bars and panels stay on the screen
@@ -5946,6 +5970,7 @@ let last=performance.now();
 function frame(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   pollPads();
+  if(LSEL&&!S)lobbySelUpdate(dt);
   if(!ov.hidden)ovHoldTick(dt);
   if(S&&!ov.hidden&&NET.role!=='guest')ovTimerTick(dt);
   if(S)readyTick(dt);

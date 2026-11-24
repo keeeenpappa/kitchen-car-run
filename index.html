@@ -4515,9 +4515,9 @@ function drawSelect(){
     if(im&&im.naturalWidth){const z=SEL_ICON_ZOOM[SKILL_ANIMAL[k]]||1,sz=SELG.icon*z;ctx.drawImage(im,x+SELG.cw/2-sz/2,y+10+SELG.icon/2-sz/2,sz,sz)}else emoji(K.e,x+SELG.cw/2,y+56,48);
     text(K.n,x+SELG.cw/2,y+SELG.ch-18,14,'#fff',800)});
   // cursors: each player's colour, nudged so several on one animal stay visible
-  S.players.forEach((p,i)=>{if(!p.sel)return;const {x,y}=selCell(p.sel.cur),d=i*4;
-    ctx.strokeStyle=PCOL[i];ctx.lineWidth=p.sel.ok?5:3;rr(x+4+d,y+2+d,SELG.cw-8-2*d,SELG.ch-4-2*d,14);ctx.stroke();
-    const bw=S.players.length>4?19:26,bs=S.players.length>4?15:28;ctx.fillStyle=PCOL[i];rr(x+6+i*bs,y-6,bw,16,8);ctx.fill();text('P'+(i+1),x+6+i*bs+bw/2,y+2,10,'#fff',800)});
+  S.players.forEach((p,i)=>{if(!p.sel)return;const {x,y}=selCell(p.sel.cur);
+    ctx.strokeStyle=PCOL[i];ctx.lineWidth=p.sel.ok?5:3;rr(x+4,y+2,SELG.cw-8,SELG.ch-4,14);ctx.stroke();
+    const bw=S.players.length>4?19:26,bs=S.players.length>4?15:28;ctx.fillStyle=PCOL[i];rr(x+6+i*bs,y-11,bw,15,7);ctx.fill();text('P'+(i+1),x+6+i*bs+bw/2,y-3,10,'#fff',800)});
   // one panel per player: up to 4 = all full size; 5+ = your own stays full size, the others become small cards beside it
   const n=S.players.length,many=n>4,py=366,ph=H-py-14;
   const panel=(p,i,x,y,pw,ph,mini)=>{const K=SKILLS[p.skill]||SKILLS.knife,an=SKILL_ANIMAL[p.skill]||'beaver',ok=p.sel&&p.sel.ok;
@@ -4527,7 +4527,7 @@ function drawSelect(){
     text('P'+(i+1)+(me?'　あなた':''),x+(mini?10:14),y+hh/2,mini?12:14,'#fff',800,'left');
     text(ok?'OK!':'えらび中…',x+pw-(mini?10:14),y+hh/2,mini?11:13,ok?'#fff8c8':'rgba(255,255,255,.85)',800,'right');
     if(mini){
-      drawChefBig(an,PCOL[i],x+38,y+hh+54,84,S.t+i,skinsOf(p));
+      drawChefBig(an,PCOL[i],x+38,y+hh+93,84,S.t+i,skinsOf(p));
       text(K.n,x+80,y+hh+16,13,'#fff',800,'left');
       wrapText(K.d,x+80,y+hh+36,pw-88,14,10.5,'#d8e6e7',600,Math.max(2,Math.floor((ph-hh-36-22)/14)+1));
       text(selSkillLine(K),x+80,y+ph-14,10,'#ffe08a',700,'left')}

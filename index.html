@@ -1642,11 +1642,11 @@ const TUT=[
   {t:p=>(isTouch?'左下のスティック':'WASDキー（ゲームパッドはスティック）')+'で、冷蔵庫の前まで歩こう',tg:()=>tileOf('fridge'),ok:p=>nearTile(p,tileOf('fridge'),1.7)},
   {t:p=>'冷蔵庫に向かって '+BL(p,'pick')+' → 「りんご」を選んで決定',tg:()=>tileOf('fridge'),ok:p=>!!p.hold&&p.hold.kind==='ing'&&p.hold.id==='apple'},
   {t:p=>'まな板に向かって '+BL(p,'pick')+'（りんごを置く）',tg:()=>tileOf('board'),ok:p=>{const i=tileItem('board');return !!i&&i.id==='apple'}},
-  {t:p=>AL(p,'act','作業',1)+'を長押しして、りんごを切ろう',tg:()=>tileOf('board'),ok:p=>{const i=tileItem('board');return !!i&&i.id==='apple'&&i.step>=1}},
+  {t:p=>AL(p,'act','作業',1)+'を長押しして、りんごを切ろう',legend:1,tg:()=>tileOf('board'),ok:p=>{const i=tileItem('board');return !!i&&i.id==='apple'&&i.step>=1}},
   {t:p=>'切れたら '+BL(p,'pick')+'（りんごを持つ）',tg:()=>tileOf('board'),ok:p=>!!p.hold&&p.hold.kind==='ing'&&p.hold.id==='apple'&&p.hold.step>=1},
-  {t:p=>'コンロに向かって '+BL(p,'pick')+'（置いて焼く）',tg:()=>tileOf('stove'),ok:p=>{const i=tileItem('stove');return !!i&&i.id==='apple'}},
+  {t:p=>'コンロに向かって '+BL(p,'pick')+'（置いて焼く）',legend:1,tg:()=>tileOf('stove'),ok:p=>{const i=tileItem('stove');return !!i&&i.id==='apple'}},
   {t:p=>'焼けるまでの間に、皿置き場で '+BL(p,'pick')+'（皿を1枚取る）',tg:()=>tileOf('plates'),ok:p=>!!p.hold&&p.hold.kind==='plate'},
-  {t:p=>'皿を持ったまま、コンロで '+BL(p,'pick')+'（焼けたら皿にすくう。焼けるまで待つ）',tg:()=>tileOf('stove'),ok:p=>isDish(p.hold)},
+  {t:p=>'皿を持ったまま、コンロで '+BL(p,'pick')+'（焼けたら皿にすくう。焼けるまで待つ）',legend:1,tg:()=>tileOf('stove'),ok:p=>isDish(p.hold)},
   {t:p=>'お客さんが来た！ 列の先頭で '+BL(p,'pick')+'（席へ案内する）',tg:()=>[Math.floor(qCX(0)),QY],enter:()=>{S.cust.push({type:'normal',order:'bakedapple',pat:999,max:999,hue:rnd(360),an:pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0});sfx('bell')},
     ok:p=>{const c=tutCust();return !!c&&c.st!=='wait'}},
   {t:p=>'空いているテーブルで '+BL(p,'pick')+'（お客さんを座らせる）',tg:()=>tablesList()[0]||null,ok:p=>{const c=tutCust();return !!c&&(c.st==='seat'||c.st==='eat'||c.st==='leave')}},
@@ -1742,6 +1742,20 @@ function drawTutorial(){
   ctx.fillStyle='rgba(16,26,30,.92)';rr(x,y,w,40,20);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=2.5;ctx.stroke();
   ctx.fillStyle='#ffd84a';rr(x+8,y+7,58,26,13);ctx.fill();text((T0.i+1)+'/'+TUT.length,x+37,y+20,14,'#3a2a00',900);
   text(msg,x+74,y+20,16,'#fff',800,'left');
+  if(st.legend)drawCookLegend(x,y);
+}
+// the recipe in use and what the cooking marks mean, shown above the tutorial message while cooking
+function drawCookLegend(x,y){
+  const R=RECIPES.bakedapple,rows=[
+    {ic:null,t:'レシピ「'+R.n+'」：りんご → 切る → 焼く'},
+    {ic:'stp_chop',t:'ナイフのマーク ＝ 切る（作業ボタンを長押し）'},
+    {ic:'stp_cook',t:'炎のマーク ＝ 焼く（コンロに置いて待つ。焼けたら皿にすくう）'}];
+  ctx.font=`800 14px ${FNT}`;
+  const w=Math.min(GW*T-30,Math.max(...rows.map(r=>ctx.measureText(r.t).width))+84),h=rows.length*26+14,px=x+(0),py=y-h-8;
+  ctx.fillStyle='rgba(16,26,30,.92)';rr(px,py,w,h,12);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=2;ctx.stroke();
+  rows.forEach((r,i)=>{const cy=py+7+i*26+13;
+    if(r.ic){const im=FOOD.img[r.ic];if(im&&im.complete&&im.naturalWidth)ctx.drawImage(im,px+12,cy-9,18,18)}
+    text(r.t,px+(r.ic?38:12),cy,14,i===0?'#ffd84a':'#fff',800,'left')});
 }
 // ---------- phases ----------
 function startDrive(){

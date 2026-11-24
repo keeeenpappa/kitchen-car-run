@@ -103,12 +103,13 @@ body.touch #infoBtn{position:fixed;left:auto;top:auto;right:calc(14px + env(safe
 #infoBtn[hidden]{display:none}
 body.touch #pauseBtn{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:760px;width:100%;display:flex;flex-direction:column;gap:12px}
-.box.big{zoom:var(--ovz,1)}
+.box.big{zoom:var(--ovz,1);max-width:1040px}
 .box h2{font-family:var(--display);font-weight:400;margin:0;font-size:clamp(18px,2.6vw,26px);color:var(--truck);text-wrap:balance}
 .box p{margin:0;line-height:1.7;color:var(--ink)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
-.pdots{position:absolute;top:4px;right:4px;display:flex;gap:4px;pointer-events:none}
-.pdots i{width:33px;height:33px;border-radius:50%;border:4px solid #fff;background:#fff;display:block;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.45)}
+.pdots{position:absolute;left:6px;bottom:6px;top:auto;right:auto;display:flex;flex-wrap:wrap;gap:3px;max-width:calc(100% - 12px);pointer-events:none}
+.ovbtn:has(.pdots):not(.pupnext){padding-bottom:36px}
+.pdots i{width:23px;height:23px;flex:0 0 auto;border-radius:50%;border:3px solid #fff;background:#fff;display:block;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.45)}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .ovbtn{position:relative;font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
@@ -124,8 +125,9 @@ body.touch #pauseBtn{display:none}
 .dsk img.skp{width:2.2em;height:2.2em;vertical-align:middle}
 .tn img.upic,b img.upic{width:1.3em;height:1.3em;vertical-align:-.3em}
 .money .mv img.coin{width:1.15em;height:1.15em;vertical-align:-.2em}
-.bonusbadge{white-space:nowrap;font-size:12px;letter-spacing:.02em;padding:3px 10px;background:linear-gradient(90deg,#2fb8a6,#3b82f6);box-shadow:0 0 0 2px #fff3,0 0 14px #2fb8a688}
-.rarebadge{display:inline-block;align-self:flex-start;background:linear-gradient(90deg,#ff4fa3,#9b5cff);color:#fff;font-weight:800;font-size:15px;letter-spacing:.12em;padding:3px 12px;border-radius:999px;box-shadow:0 0 0 2px #fff3,0 0 14px #ff4fa388}
+.bonusbadge{white-space:nowrap;font-size:8.4px;letter-spacing:.02em;padding:2px 7px;background:linear-gradient(90deg,#2fb8a6,#3b82f6);box-shadow:0 0 0 2px #fff3,0 0 14px #2fb8a688}
+.badges{display:flex;flex-wrap:wrap;gap:4px;align-self:flex-start;max-width:100%}
+.rarebadge{display:inline-block;align-self:flex-start;background:linear-gradient(90deg,#ff4fa3,#9b5cff);color:#fff;font-weight:800;font-size:10.5px;letter-spacing:.12em;padding:2px 8px;border-radius:999px;box-shadow:0 0 0 2px #fff3,0 0 14px #ff4fa388}
 .box .mut{color:var(--muted)} .box .good{color:var(--good)}
 .netrow{align-items:center} .netrow .lab{min-width:9em}
 .codein{font:inherit;font-weight:800;font-size:18px;letter-spacing:.2em;text-transform:uppercase;width:7em;padding:8px 10px;border-radius:10px;border:2px solid var(--line);background:#132026;color:var(--ink)}
@@ -518,7 +520,7 @@ const EQUIP={
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
 };
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,sink:0.4};
-const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=40, PUP_TIME=15; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
+const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=40, PUP_TIME=20; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
 function equipOffer(id,priceMul,proChance){
   const L=proList(id),pro=L.length&&Math.random()<proChance?1+rnd(L.length):0;
   return {type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*priceMul*(pro?1.8:1))};
@@ -773,8 +775,8 @@ function showEquipShop(){
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=(S.eqBuys||0)>=3||!!o.sold,pr=eqPrice(o);
     const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done?' dim':''}" data-act="eqbuy" data-v="${i}">
-      ${o.pro?'<span class="rarebadge">★ レア</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}
-      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="menu">${pr}G</span><span class="sub">${o.sold?'売り切れ':done?'これ以上買えません':S.money>=pr?'買うと残り '+(S.money-pr)+'G':'お金が足りない'}</span>
+      ${o.pro||o.bonus?`<span class="badges">${o.pro?'<span class="rarebadge">★ レア</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}</span>`:''}
+      <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="tn">${pr}G</span>${o.sold||done||S.money<pr?`<span class="sub">${o.sold?'売り切れ':done?'これ以上買えません':'お金が足りない'}</span>`:''}
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
     ${(()=>{const n=Math.min(3,S.eqBuys||0),left=3-n,dot=i=>`<span style="display:inline-block;width:24px;height:24px;border-radius:50%;margin:0 4px;vertical-align:middle;box-sizing:border-box;border:3px solid #ffd84a;background:${i<n?'#ffd84a':'transparent'}"></span>`;
@@ -2041,30 +2043,42 @@ const PUPS=[
 ];
 const pupN=(p,id)=>(p&&p.pup&&p.pup[id])||0;
 const pupSp=(p,id,per)=>Math.pow(1/(1-per),pupN(p,id));
+// everyone picks at once from the same 3 cards (PUP_TIME for all). Each player takes one card (several may take the same one);
+// a player who has picked moves their face to the wide 次へ frame and stops
+function openPersonal(){
+  S.phase='pup';S.pupI=0;S.ovT=PUP_TIME;
+  // only cards that every player can still take, so a pick never fails after the cursor has moved
+  S.pupOffers=pickN(PUPS.filter(u=>S.players.every(p=>pupN(p,u.id)<u.max)),3);
+  S.pupDone=S.players.map(()=>false);
+  if(!S.pupOffers.length){finishPersonal();return}
+  showPersonal();
+}
 function showPersonal(){
-  S.phase='pup';const p=S.players[S.pupI];
-  if(!p){S.pupI=null;S.ovT=UP_TIME;showUpgrade();return}
-  const pool=PUPS.filter(u=>pupN(p,u.id)<u.max);
-  S.pupOffers=pickN(pool,3);
-  if(!S.pupOffers.length){S.pupI++;showPersonal();return}
-  const cards=S.pupOffers.map((u,i)=>`<button class="ovbtn town hold" data-act="pup" data-v="${i}">
-      <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span>
-      <span class="needs"><span class="sub pupc">${pupN(p,u.id)?'もらった数 '+pupN(p,u.id)+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
-  showOv(`<div class="box big"><h2>P${p.i+1} の個人パワーアップ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
-    <p>P${p.i+1} が無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>
-    <div class="cards">${cards}</div></div>`);
+  S.phase='pup';
+  const cards=S.pupOffers.map((u,j)=>`<button class="ovbtn town hold" data-act="pup" data-v="${j}">
+      <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span></button>`).join('');
+  const n=S.pupDone.filter(Boolean).length;
+  showOv(`<div class="box big"><h2>個人パワーアップ（全員いっせい）</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
+    <p>${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}　選んだ人は下の枠に移ります（${n}/${S.players.length}人）</p>
+    <div class="cards" style="min-height:40vh">${cards}</div>
+    <button class="ovbtn hold pupnext" data-act="pupnext" data-v="" style="display:block;width:100%;margin-top:10px;min-height:56px">次へ</button></div>`);
 }
-function takePersonal(i){
-  const p=S.players[S.pupI],u=S.pupOffers&&S.pupOffers[i];if(!p||!u)return;
-  p.pup=p.pup||{};p.pup[u.id]=(p.pup[u.id]||0)+1;S.pupI++;S.ovT=PUP_TIME;showPersonal();
+// slot = the player who picked, j = the card's number (0..2)
+function takePersonal(slot,j){
+  if(!S||S.phase!=='pup'||slot==null||slot<0||S.pupDone[slot])return;
+  const p=S.players[slot],u=S.pupOffers[+j];
+  if(!p||!u||pupN(p,u.id)>=u.max)return;
+  p.pup=p.pup||{};p.pup[u.id]=(p.pup[u.id]||0)+1;S.pupDone[slot]=true;
+  if(S.pupDone.every(Boolean))finishPersonal();else showPersonal();
 }
+function finishPersonal(){S.pupI=null;S.pupOffers=null;S.ovT=UP_TIME;showUpgrade()}
 function showUpgrade(){
   S.phase='upgrade';S.rerollUsed=false;
   const pool=UPS.filter(u=>(S.upCount[u.id]||0)<u.max&&(!u.cond||u.cond()));
   S.offers=pickN(pool,3+(S.extraOffer?1:0)).map((u,i)=>i===3&&S.extraOffer?Object.assign({},u,{bonus:1}):u);
   const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
   const cards=S.offers.map((u,i)=>`<button class="ovbtn town hold" data-act="up" data-v="${i}">
-      ${u.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}
+      ${u.bonus?'<span class="badges"><span class="rarebadge bonusbadge">🎯 ミッションボーナス</span></span>':''}
       <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}</span>
       <span class="needs">${u.tgt?`<span class="pay">↑ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
@@ -2148,8 +2162,10 @@ function showEnd(){
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
 function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
-function pupMask(){if(!S||S.phase!=='pup'||NET.role==='off')return;const mine=NET.role==='guest'?NET.mySlot:0;if(S.pupI!==mine)for(const el of ov.querySelectorAll('.pupc'))el.style.visibility='hidden'}
-function paintOv(html){ov.innerHTML=emoHtml(html);pupMask();fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();ovSel=Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
+function paintOv(html){const wasPup=!!ov.querySelector('.pupnext');ov.innerHTML=emoHtml(html);fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();
+  // while everyone picks, a repaint (someone else picked) keeps your own cursor; the first paint of the screen starts at the top
+  ovSel=S&&S.phase==='pup'&&wasPup?Math.max(0,Math.min(ovSel,ovButtons().length-1)):Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));
+  markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
 // 1.5x on a full-HD screen (game area about 1815 px wide), smaller windows scale down, never taller than the game area
 function fitOv(){
   const b=ov.querySelector('.box.big');if(!b)return;
@@ -2170,6 +2186,7 @@ function ovDots(arr){
     let el=b.querySelector('.pdots');if(!who.length){if(el)el.remove();return}
     if(!el){el=document.createElement('span');el.className='pdots';b.appendChild(el)}
     el.innerHTML=who.map(j=>{const an=SKILL_ANIMAL[S.players[j]&&S.players[j].skill]||'beaver',src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_head_front']:null;return `<i style="border-color:${PCOL[j]}">${src?`<img src="${src}" alt="">`:''}</i>`}).join('')});
+  if(!ov.hidden)fitOv();   // the face row adds height to the cards, so re-fit the box to the screen
 }
 ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&guestLocked()){GSEL=Math.max(0,ovButtons().indexOf(b));return}if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
 const HOLD=0.6, READY_HOLD=0.8;
@@ -2178,7 +2195,7 @@ const setP=(b,f)=>{if(b)b.style.setProperty('--p',Math.round(Math.min(1,f)*100)+
 const holdReset=()=>{setP(ovHold.btn,0);ovHold={btn:null,t:0,src:null}};
 // online: town / upgrade / shop / result screens are the host's to choose. Guests see the host's cursor and can't move it
 // (only the pause screen is shared: anyone can press つづける there)
-const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused)&&!(S&&S.phase==='pup'&&S.pupI===NET.mySlot);
+const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused)&&!(S&&S.phase==='pup');
 ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if(!b||guestLocked())return;e.preventDefault();
   holdReset();ovHold={btn:b,t:0,src:'ptr'};ovSel=Math.max(0,ovButtons().indexOf(b));markSel();try{b.setPointerCapture(e.pointerId)}catch(_){}});
 for(const ev of ['pointerup','pointercancel'])ov.addEventListener(ev,()=>{if(ovHold.src==='ptr')holdReset()});
@@ -2226,6 +2243,8 @@ function doOv(a,v){
   if(a==='tutgo'){newRun(1,'preset');return}
   if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
   if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
+  // a pick moves your face to the 次へ frame at once (the host repaints without moving it back)
+  if(a==='pup'&&S&&S.phase==='pup'){const nx=ovButtons().findIndex(x=>x.classList.contains('pupnext'));if(nx>=0&&ovSel!==nx){ovSel=nx;markSel()}}
   if(a!=='dev'&&a!=='title'&&guestLocked())return;   // the host's choice screens: a guest only watches
   if(a!=='ready'&&a!=='pause')play('confirm');
   if(a==='dev'){cycleDev(+v);const r=document.getElementById('devRow');if(r){r.innerHTML=devRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='dev'&&b.dataset.v===String(v)));markSel()}return}
@@ -2249,8 +2268,8 @@ function ovAction(a,v){
   }
   else if(a==='eqdone')showChoose();
   else if(a==='next')showChoose();
-  else if(a==='upg'){S.ovT=PUP_TIME;S.pupI=0;showPersonal()}
-  else if(a==='pup'){if(NET.role==='off'||S.pupI===0)takePersonal(+v)}
+  else if(a==='upg')openPersonal();
+  else if(a==='pup')takePersonal(0,+v);
   else if(a==='up')takeUpgrade(+v);
   else if(a==='reroll'){
     if(S.money<S.rerollCost){const b=ov.querySelector('[data-act=reroll]');if(b)b.textContent='お金が足りない（'+S.rerollCost+'G）';return}
@@ -2270,7 +2289,7 @@ function ovTimerTick(dt){
   const v=String(Math.max(0,Math.ceil(S.ovT)));
   for(const el of ov.querySelectorAll('.ovtime'))if(el.textContent!==v)el.textContent=v;
   if(S.ovT>0)return;
-  if(S.phase==='pup'){S.pupI++;S.ovT=PUP_TIME;showPersonal()}
+  if(S.phase==='pup')finishPersonal();   // time's up: whoever has not picked gets nothing
   else if(S.phase==='upgrade'){S.ovT=EQ_TIME;showEquipShop()}  // time's up: no upgrade this time
   else showChoose();                                                      // time's up: leave the shop
 }
@@ -2394,11 +2413,19 @@ function overlayInput(){
   if(pressed.has('ArrowLeft')||pressed.has('KeyA')||(p0&&p0.edge('l'))||st===-1)mv=-1;
   if(pressed.has('Space')||pressed.has('Enter')||pressed.has('KeyF')||pressed.has('Period')||(p0&&(p0.edge('a')||p0.edge('x'))))ok=true;
   if(p0&&(p0.edge('a')||p0.edge('l')||p0.edge('r')||st))LASTIN[0]='pad';else if(mv||ok)LASTIN[0]='kb';
-  for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
-  if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
+  const pupNow=!!S&&S.phase==='pup';
+  if(pupNow){   // everyone picks at once: move along the shared cards; once you have picked, the cursor rests on 次へ
+    const nx=b.findIndex(x=>x.classList.contains('pupnext')),cards=b.map((x,i)=>i).filter(i=>b[i].dataset.act==='pup');
+    const mine=ovSel===nx?[nx]:cards;
+    if(!mine.includes(ovSel))ovSel=mine[0];
+    if(mv&&mine.length>1){ovSel=mine[wrap(mine.indexOf(ovSel)+mv,mine.length)];markSel();play('tick')}
+  }else{
+    for(let d=1;d<=4;d++)if(pressed.has('Digit'+d)&&b[d-1]){ovSel=d-1;markSel();if(!b[d-1].classList.contains('hold'))ok=true}
+    if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
+  }
   const sy=p0?p0.ay:0,vsd=sy>0.6?1:sy<-0.6?-1:0;if(Math.abs(sy)<0.3)OVSTICKY=0;let vy=vsd&&vsd!==OVSTICKY?vsd:0;if(vsd)OVSTICKY=vsd;
   if(pressed.has('ArrowDown')||pressed.has('KeyS'))vy=1;if(pressed.has('ArrowUp')||pressed.has('KeyW'))vy=-1;
-  if(vy&&!ovVyHeld){   // up / down: the nearest button in the row above / below (nearest by horizontal position), one step per press
+  if(vy&&!ovVyHeld&&!pupNow){   // up / down: the nearest button in the row above / below (nearest by horizontal position), one step per press
     const R=b.map(x=>x.getBoundingClientRect()),cur=R[ovSel]||R[0],cx=cur.left+cur.width/2,cyc=cur.top+cur.height/2;
     let best=-1,bd=1e9;
     R.forEach((r,i)=>{if(i===ovSel)return;const dy=(r.top+r.height/2)-cyc;if(vy>0?dy<=cur.height*0.5:dy>=-cur.height*0.5)return;const d=Math.abs(dy)*4+Math.abs(r.left+r.width/2-cx);if(d<bd){bd=d;best=i}});
@@ -5279,7 +5306,7 @@ function guestAction(a,v,slot){
   if(a==='selpick'){if(S&&S.phase==='select'&&slot!=null)selectTap(slot,+v);return}   // a guest tapped an animal
   if(a==='ready'){if(ov.hidden)finishLayout();return}
   if(a==='pause'){pauseGame();return}
-  if(a==='pup'){if(S&&S.phase==='pup'&&slot===S.pupI)takePersonal(+v);return}
+  if(a==='pup'){if(slot!=null)takePersonal(slot,+v);return}
   if(!GUEST_OK.has(a)||ov.hidden)return;
   // only a button that is on the host's screen right now counts
   const vs=v==null?'':String(v);
@@ -5416,7 +5443,7 @@ function guestFrame(dt){
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
   const gq=S?localP():null,gv=gq&&gq.g&&GOBJ[gq.g.obj]&&GOBJ[gq.g.obj].act==='timing'?Math.round(gq.g.v*100)/100:-1;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,guestLocked()?GSEL:-1,gv];
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,S&&S.phase==='pup'?ovSel:guestLocked()?GSEL:-1,gv];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state
@@ -5434,7 +5461,7 @@ function guestFrame(dt){
       // follow the host's cursor (and its long-press bar) on the host's screens
       if(guestLocked()&&Array.isArray(d.os)){const bs=ovButtons(),k=Math.max(0,Math.min(bs.length-1,+d.os[0]||0));
         if(k!==ovSel){ovSel=k;markSel()}bs.forEach((b,i)=>setP(b,i===k?(+d.os[1]||0)/100:0))}
-      if(guestLocked()){GSEL=Math.max(0,Math.min(ovButtons().length-1,GSEL));const oc=Array.isArray(d.oc)?d.oc.slice():[];if(NET.mySlot>=0)oc[NET.mySlot]=GSEL;ovDots(oc)}
+      if(guestLocked()||(S&&S.phase==='pup')){GSEL=Math.max(0,Math.min(ovButtons().length-1,GSEL));const oc=Array.isArray(d.oc)?d.oc.slice():[];if(NET.mySlot>=0)oc[NET.mySlot]=guestLocked()?GSEL:ovSel;ovDots(oc)}   // everyone's cursor shows as a face on the card it is on
     }
   }
   if(!host&&S&&peers.some(p=>!p.sameTab&&p.presence&&p.presence.lb>0)){S=null;NET.seenSnap=-1;guestLocalOv('wait')}

@@ -91,6 +91,11 @@ table.score{margin:.3em auto;border-collapse:collapse;min-width:16em}table.score
 @keyframes gburst{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(30)}}
 @keyframes gpop{to{opacity:1;transform:none}}
 @keyframes gin{to{opacity:1}}
+.lslots{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0}
+.lslot{width:66px;display:flex;flex-direction:column;align-items:center;gap:2px;border:3px dashed var(--line);border-radius:12px;padding:6px 2px;opacity:.55}
+.lslot.on{border-style:solid;opacity:1;background:rgba(255,255,255,.06)}
+.lslot em{font-style:normal;font-size:11px;font-weight:800;line-height:1.2;text-align:center}.lslot em.ok{color:var(--good)}.lslot em.wt{color:#ffd84a}
+.lslot i{width:46px;height:46px;display:block}.lslot img{width:100%;height:100%;object-fit:contain;display:block}.lslot b{font-size:12px}
 .tsel{font:inherit;padding:6px 10px;border-radius:8px;background:#2c4650;color:var(--ink);border:2px solid var(--line);margin-right:8px}
 .ovbtn.hold{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(255,216,74,.42) var(--p,0%),transparent var(--p,0%));touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .ovbtn.hold::after{content:'';position:absolute;left:0;bottom:0;height:7px;width:var(--p,0%);background:#ffd84a;box-shadow:0 0 8px #ffd84a}
@@ -2242,6 +2247,13 @@ function ovDots(arr){
     el.innerHTML=who.map(j=>{const an=SKILL_ANIMAL[S.players[j]&&S.players[j].skill]||'beaver',src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_head_front']:null;return `<i style="border-color:${PCOL[j]}">${src?`<img src="${src}" alt="">`:''}</i>`}).join('')});
   if(!ov.hidden)fitOv();   // the face row adds height to the cards, so re-fit the box to the screen
 }
+// the title's character pick is saved on this device (it is also what you bring into an online room)
+ov.addEventListener('change',e=>{const t=e.target;
+  if(t&&t.id==='lchar'&&SKILLS[t.value]){   // in the lobby: change the chef after joining; the host tells everyone
+    PSKILL[0]=t.value;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}
+    if(NET.role==='guest'&&NET.room)NET.room.presence({skill:PSKILL[0]}).catch(()=>{});
+    else if(NET.role==='host'&&!S)showHostLobby();
+    return}if(t&&t.id==='tchar'&&SKILLS[t.value]){PSKILL[0]=t.value;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}const d=document.getElementById('tcharD');if(d){d.textContent=SKILLS[t.value].d;d.title=SKILLS[t.value].d}}});
 ov.addEventListener('click',e=>{const b=e.target.closest('.ovbtn');if(b&&guestLocked()){GSEL=Math.max(0,ovButtons().indexOf(b));return}if(b&&!b.classList.contains('hold'))doOv(b.dataset.act,b.dataset.v)});
 const HOLD=0.6, READY_HOLD=0.8;
 let ovHold={btn:null,t:0,src:null},ovHoldLock=false;
@@ -2388,6 +2400,7 @@ function showTitle(){
   S=null;
   // the title truck is drawn behind: keep this box low and short so it stays in view
   showOv(`<div class="box tbox">
+    <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><select id="tchar" class="tsel">${SKILL_K.map(k=>`<option value="${k}" ${PSKILL[0]===k?'selected':''}>${SKILLS[k].e} ${SKILLS[k].n}</option>`).join('')}</select><span id="tcharD" class="mut" style="align-self:center;font-size:13px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${SKILLS[PSKILL[0]]?SKILLS[PSKILL[0]].d:''}</span></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><select id="tmode" class="tsel"><option value="casual" ${MODE==='casual'?'selected':''}>カジュアル（4町）</option><option value="tour" ${MODE==='tour'?'selected':''}>グランドツアー（全8町）</option></select></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><select id="tkit" class="tsel"><option value="layout">自分で並べる</option><option value="preset" selected>初期配置済み</option></select></div>
     <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><select id="tbot" class="tsel"><option value="0" selected>なし（1人）</option>${[2,3,4,5,6,7].map(n=>`<option value="${n}">${n}人</option>`).join('')}</select>
@@ -5147,6 +5160,8 @@ function netAction(a,v){
   if(a==='join'){joinRoom(String(v||''));return true}
   if(a==='pjoin'){const el=document.getElementById('joinCode');joinRoom(String(el?el.value:'').toUpperCase());return true}
   if(a==='hstart'){hostStart(v);return true}
+  if(a==='hgo'){hostStart(NET.kit==='layout'?'layout':'preset');return true}
+  if(a==='rkit'){NET.kit=v==='layout'?'layout':'preset';showRoomSetup();return true}
   if(a==='hcancel'){showTitle();return true}
   return false;
 }
@@ -5191,6 +5206,7 @@ function showRoomSetup(){
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
     <div class="row"><span style="align-self:center;min-width:6em">最大人数</span>${[4,6,8].map(n=>`<button class="ovbtn${(NET.cap||8)===n?' autofocus':''}" data-act="cap" data-v="${n}">${(NET.cap||8)===n?'✔ ':''}${n}人</button>`).join('')}</div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn${(NET.mode||'casual')==='casual'?' autofocus':''}" data-act="rmode" data-v="casual">${(NET.mode||'casual')==='casual'?'✔ ':''}カジュアル</button><button class="ovbtn${NET.mode==='tour'?' autofocus':''}" data-act="rmode" data-v="tour">${NET.mode==='tour'?'✔ ':''}グランドツアー</button></div>
+    <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn${NET.kit==='layout'?'':' autofocus'}" data-act="rkit" data-v="preset">${NET.kit==='layout'?'':'✔ '}初期配置済み</button><button class="ovbtn${NET.kit==='layout'?' autofocus':''}" data-act="rkit" data-v="layout">${NET.kit==='layout'?'✔ ':''}自分で並べる</button></div>
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);
 }
 const PHASE_N={pup:'個人強化',choose:'町選び',select:'キャラ選び',layout:'配置',drive:'走行中',upgrade:'買い物',equip:'買い物',end:'結果',over:'結果'};
@@ -5296,15 +5312,29 @@ function hostGuests(){
   const ps=NET.room.peers().filter(p=>!p.sameTab&&p.kind==='viewer'&&p.presence&&p.presence.g===1);
   return ps.sort((a,b)=>NET.order.indexOf(a.peer)-NET.order.indexOf(b.peer));
 }
+// the lobby shows every seat of the room: a chef icon where someone is in, an empty frame where not, and who is still choosing
+const lobbyList=()=>[SKILL_ANIMAL[PSKILL[0]]].concat(hostGuests().slice(0,ROOM_CAP-1).map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'));
+function lobbySlots(list,cap){
+  const icon=an=>{const src=typeof CHEF_IMG_SRC==='object'&&an?CHEF_IMG_SRC[an+'_icon']:null;return src?`<img src="${src}" alt="">`:''};
+  const full=list.length>=cap;
+  return `<div class="lslots">${Array.from({length:cap},(_,i)=>{const an=list[i];return `<span class="lslot${an?' on':''}" style="${an?'border-color:'+PCOL[i]:''}"><i>${an?icon(String(an).replace(/[^a-z]/g,'')):''}</i><b>P${i+1}</b></span>`}).join('')}</div>${full?'<p class="good" style="text-align:center">全員そろいました！</p>':''}`;
+}
+// keep the host's seat icons in step while it waits (a guest may change its chef without anyone joining or leaving)
+setInterval(()=>{
+  if(NET.role!=='host'||S||!NET.room)return;
+  const el=document.getElementById('hostSlots');if(!el)return;
+  const list=lobbyList(),h=lobbySlots(list,ROOM_CAP);
+  if(el._h!==h){el._h=h;el.innerHTML=h;NET.room.presence({s:null,lb:list.length,cap:ROOM_CAP,lc:list}).catch(()=>{})}
+},1000);
 function showHostLobby(){
   if(NET.role!=='host'||S)return;
-  const g=hostGuests();
+  const g=hostGuests(),list=lobbyList();
   NET.lobby.presence({host:{code:NET.code,n:1+Math.min(ROOM_CAP-1,g.length),open:true,cap:ROOM_CAP}}).catch(()=>{});
-  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(ROOM_CAP-1,g.length)}).catch(()=>{});
+  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(ROOM_CAP-1,g.length),cap:ROOM_CAP,lc:list}).catch(()=>{});
   paintOv(`<div class="box"><h2>${NET.peer?'部屋'+(NET.pw?' 🔒':''):'部屋 '+NET.code}</h2>
-    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,ROOM_CAP-1).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大${ROOM_CAP}人・${MODE==='tour'?'グランドツアー':'カジュアル'}）</p>
+    <p>あなたは P1（ホスト）です。（最大${ROOM_CAP}人・${MODE==='tour'?'グランドツアー':'カジュアル'}・${NET.kit==='layout'?'自分で並べる':'初期配置済み'}）</p><div id="hostSlots">${lobbySlots(list,ROOM_CAP)}</div>
     <p class="mut">${NET.peer?(NET.beaconSlot!=null?`ロビーに部屋を出しました。フレンドはタイトルの「ロビーへ入る」から参加できます。${NET.pw?'パスワード：<b>'+NET.pw.replace(/[<>&"]/g,'')+'</b>':'パスワードなし'}`:'ロビーに部屋を出しています…'):`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
-    <div class="row"><button class="ovbtn" data-act="hstart" data-v="layout">キッチンを自分で並べて開始</button><button class="ovbtn" data-act="hstart" data-v="preset">初期配置済みで開始</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
+    <div class="row"><button class="ovbtn autofocus" data-act="hgo">キャラ選択へ（みんなで選ぶ）</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
 }
 function hostStart(mode){
   const g=hostGuests().slice(0,ROOM_CAP-1);
@@ -5314,7 +5344,7 @@ function hostStart(mode){
   // the room stays open: friends can still join (they watch, and come in once the town's service is over)
   NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true,cap:ROOM_CAP}}).catch(()=>{});
   newRun(1+g.length,mode==='layout'?'layout':'preset');
-  // online: P1 is this device's pick, each guest brings its own
+  // online: P1 is this device's pick, each guest brings its own; everyone then chooses together on the character-select screen
   g.forEach((p,i)=>{const pl=S.players[i+1];if(pl){pl.skill=guestSkill(p);if(pl.sel)pl.sel.cur=Math.max(0,SKILL_K.indexOf(pl.skill))}});
 }
 const guestSkill=p=>{const k=p&&p.presence&&p.presence.skill;return SKILLS[k]?k:'knife'};
@@ -5345,7 +5375,7 @@ function hostRoster(){
   // someone who left: their chef stands still (no stuck keys)
   for(const peer in NET.slots)if(!live.has(peer)){NET.inputs[NET.slots[peer]]=null}
   NET.waiting=NET.waiting.filter(peer=>live.has(peer)&&!NET.slots[peer]);
-  const canIn=S.phase==='choose';
+  const canIn=S.phase==='choose'||S.phase==='select';
   while(canIn&&NET.waiting.length&&S.players.length<ROOM_CAP){
     const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
     const k=S.players.length,[x,y]=spawnSpot(k);
@@ -5479,12 +5509,19 @@ async function joinRoom(code){
 function guestCount(){
   if(!NET.room)return 1;
   const h=NET.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.lb>0);   // the host puts the head count in its lobby
+  if(h&&+h.presence.cap)ROOM_CAP=+h.presence.cap;
   return h?Math.max(1,Math.min(ROOM_CAP,+h.presence.lb||1)):2;
+}
+// the host's seats (chef icons) as it reports them, for the waiting screen
+function guestSlots(){
+  if(!NET.room)return '';
+  const h=NET.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.lb>0),lc=h&&Array.isArray(h.presence.lc)?h.presence.lc.map(String):[];
+  return lobbySlots(lc,ROOM_CAP);
 }
 function guestLocalOv(kind){
   NET.localOv=kind;NET.mirror=false;NET.shownOv=-1;
   const body=kind==='conn'?`<p>部屋に接続しています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
-    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/${ROOM_CAP}人</span></p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
+    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/${ROOM_CAP}人</span></p><div id="waitSlots">${guestSlots()}</div><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
     :kind==='late'?`<p>このゲームはもう始まっています。次のゲームから参加してください。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`
     :`<p>ホストが部屋を閉じたか、通信が途切れました。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`;
   paintOv(`<div class="box"><h2>${kind==='lost'?'接続が切れました':NET.peer?'部屋':'部屋 '+NET.code}</h2>${body}</div>`);
@@ -5529,7 +5566,8 @@ function guestFrame(dt){
     }
   }
   if(!host&&S&&peers.some(p=>!p.sameTab&&p.presence&&p.presence.lb>0)){S=null;NET.seenSnap=-1;guestLocalOv('wait')}
-  if(NET.localOv==='wait'){const el=document.getElementById('waitN'),n=String(guestCount());if(el&&el.firstChild&&el.firstChild.nodeValue!==n)el.firstChild.nodeValue=n}
+  if(NET.localOv==='wait'){const el=document.getElementById('waitN'),n=String(guestCount());if(el&&el.firstChild&&el.firstChild.nodeValue!==n)el.firstChild.nodeValue=n;
+    const sl=document.getElementById('waitSlots'),h=guestSlots();if(sl&&sl._h!==h){sl._h=h;sl.innerHTML=h}}
   if(S&&NET.localOv!=='lost'&&performance.now()-NET.lastSnapAt>4000)guestLocalOv('lost');
   if(S){
     S.t+=dt;

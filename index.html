@@ -624,6 +624,22 @@ function buildMap(){
 // ---------- state ----------
 let S=null;
 const START_POS=[[4.5,3.5],[11.5,3.5],[4.5,5.5],[11.5,5.5],[6.5,3.5],[9.5,3.5],[6.5,5.5],[9.5,5.5]];
+// the ready-made kitchen: add whatever is missing to match the self-made counts (setupLayout uses the same numbers)
+function presetExtras(np){
+  const T=np>=7?{c:9,p:3,b:2,k:2,t:4}:np>=5?{c:7,p:2,b:2,k:1,t:3}:{c:6,p:2,b:1,k:1,t:3};
+  const cnt=f=>{let n=0;for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)if(f(S.map[y][x]))n++;return n};
+  const pick=a=>a.length?a[rnd(a.length)]:null;
+  const freeIn=ys=>{const a=[];for(const y of ys)for(let x=2;x<=IX1;x++){const c=S.map[y][x];if(c.t==='floor'&&!c.item)a.push([x,y])}return a};
+  const put=([x,y],t,ex)=>{S.map[y][x]=Object.assign({t,item:null,prog:0,burn:0},ex||{})};
+  let n=cnt(c=>c.t==='counter');while(n<T.c){const p=pick(freeIn([2,3,4]));if(!p)break;put(p,'counter');n++}
+  n=cnt(c=>c.t==='planter');while(n<T.p){const p=pick(freeIn([2,3,4]));if(!p)break;put(p,'planter',{plant:null});n++}
+  n=cnt(c=>c.t==='board');while(n<T.b){const p=pick(freeIn([2,3,4]));if(!p)break;put(p,'board');n++}
+  // baskets sit on an empty counter
+  let k=cnt(c=>c.item&&c.item.kind==='basket');
+  while(k<T.k){const a=[];for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='counter'&&!c.item)a.push([x,y])}const p=pick(a);if(!p)break;S.map[p[1]][p[0]].item={kind:'basket',items:[]};k++}
+  n=cnt(c=>c.t==='table');
+  while(n<T.t){const a=[];for(let y=8;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&!c.item)a.push([x,y])}const p=pick(a);if(!p)break;put(p,'table');n++}
+}
 function newRun(np,mode,test){
   LASTRUN=[np,mode];applyTruck(TX_FOR(np));
   S={np,money:40,hearts:HEART_MAX,fuel:FUEL_MAX,speed:1,dist:0,route:1,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
@@ -634,6 +650,8 @@ function newRun(np,mode,test){
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],townIds:[],reg:null};
   S.map[4][8].item={kind:'can',water:3};
   S.map[2][7].item={kind:'basket',items:[]};
+  // the ready-made kitchen gets the same equipment counts as a self-made one (2+ players; the 1-player tutorial stays as it is)
+  if(np>=2&&mode!=='layout')presetExtras(np);
   extStand();   // the extinguisher stands on its own on the floor (not on a counter)
   planTicket();
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
@@ -641,7 +659,7 @@ function newRun(np,mode,test){
     ...[1,2,3,4,5].map(pro=>({kind:'station',st:'counter',pro}))]);
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
-  S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=PLATES_TOTAL;
+  S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=np>=7?7:np>=5?6:PLATES_TOTAL;   // more players, more plates
   // everyone picks an animal (= skill) first; then the layout or the first town choice
   // test mode: player 1 is real, everyone else is a bot (random animal, never moves or picks by hand)
   S.bots=test?Array.from({length:np-1},(_,k)=>k+1):[];

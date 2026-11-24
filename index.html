@@ -713,7 +713,11 @@ function toolsOnCounters(objs){
   }
 }
 function setupLayout(){
-  const objs=[{kind:'station',st:'counter',n:COUNTERS_GIVEN},{kind:'station',st:'planter',n:PLANTERS_GIVEN}];
+  // how many of each the self-made kitchen gets, by player count (5+ and 7+ get more)
+  const mid=S.np>=5,big=S.np>=7;
+  const objs=[{kind:'station',st:'counter',n:big?9:mid?7:COUNTERS_GIVEN},{kind:'station',st:'planter',n:big?3:PLANTERS_GIVEN}];
+  if(mid)objs.push({kind:'station',st:'board',pro:0,ups:null,dirty:0,clean:0,top:null});   // 2nd cutting board
+  if(big){objs.push({kind:'basket',items:[]});objs.push({kind:'station',st:'table',n:1})}   // 2nd basket, 4th table
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x];
     if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,top:c.item||null});

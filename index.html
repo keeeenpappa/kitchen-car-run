@@ -4212,8 +4212,9 @@ function selectUpdate(dt){
   S.players.forEach((p,i)=>{
     NET.quietFx=NET.role==='host'&&i>0;
     const inp=readInput(i),s=p.sel;if(!s)return;
-    const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,key=dx+','+dy;
-    let mv=false;if(key!=='0,0'){if(key!==s.last){mv=true;s.rep=0.32}else{s.rep-=dt;if(s.rep<=0){mv=true;s.rep=0.13}}}
+    const th=isTouch?0.6:0.5,ax=Math.abs(inp.mx)>=Math.abs(inp.my);   // one axis at a time: a slightly diagonal thumb does not jump
+    const dx=ax&&inp.mx>th?1:ax&&inp.mx<-th?-1:0,dy=!ax&&inp.my>th?1:!ax&&inp.my<-th?-1:0,key=dx+','+dy;
+    let mv=false;if(key!=='0,0'){if(key!==s.last){mv=true;s.rep=isTouch?0.6:0.32}else{s.rep-=dt;if(s.rep<=0){mv=true;s.rep=isTouch?0.38:0.13}}}
     s.last=key;
     if(mv&&!s.ok){const n=SKILL_K.length,rows=Math.ceil(n/SEL_COLS);let c=s.cur%SEL_COLS,r=Math.floor(s.cur/SEL_COLS);
       if(dx)c=wrap(c+dx,SEL_COLS);else if(dy)r=wrap(r+dy,rows);selMove(p,Math.min(n-1,r*SEL_COLS+c))}

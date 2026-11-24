@@ -295,8 +295,9 @@ const langName=()=>(LANGS.find(l=>l[0]===LANG)||LANGS[0])[1];
 const T=48, GW=24, GH=14, VH=13.5; // VH: rows shown (24 x 13.5 = 16:9); the last row is only a border // 16:9-ish field: truck top-left, town below and to the right
 const MKT=[2,12], GROW=12;  // market spot and the row of gathering spots
 // customers: they line up on the right, a player leads one to a free table, then carries the dish out to that table
-const QX=18, QY=10, QMAX=5, QGAP=1.2, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
-const QSPAN=Math.ceil((QMAX-1)*QGAP)+1;         // tiles the line covers (each tile belongs to the nearest spot)
+let QX=18, QMAX=5, QGAP=1.2;   // the waiting line grows with the player count (see applyTruck)
+const QY=10, EAT_T=4;    // waiting line on row 8, x17..22: a customer every 1.2 tiles; eating time at the table
+let QSPAN=Math.ceil((QMAX-1)*QGAP)+1;         // tiles the line covers (each tile belongs to the nearest spot)
 const qCX=k=>QX+k*QGAP+0.5;                      // centre x of spot k
 const TBL_ZONE={x0:1,x1:17,y0:10,y1:11};          // where tables can stand (the plaza under the truck)
 const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1;
@@ -507,6 +508,8 @@ let LEVER=[14,4], LEVER_FRONT=[13,4];
 let TX=0, IX1=13;   // IX1: last floor column
 const TX_FOR=np=>np>=7?6:np>=5?3:0;
 function applyTruck(tx){
+  // the waiting line: 5 customers up to 4 players, 6 for 5-6, 7 for 7-8 (closer together, so it still fits on the right)
+  {const Q=tx>=6?{x:17,m:7,g:1.0}:tx>=3?{x:18,m:6,g:1.0}:{x:18,m:5,g:1.2};QX=Q.x;QMAX=Q.m;QGAP=Q.g;QSPAN=Math.ceil((QMAX-1)*QGAP)+1}
   TX=tx;IX1=13+tx;LEVER=[14+tx,4];LEVER_FRONT=[13+tx,4];SEAT=[15.5+tx,2.8];EXT_HOME=[[13+tx,5],[12+tx,5],[3,5],[2,5]];
   WHEELS=[3.35,15.05+tx];SHOP_GAP=10+tx;FIRST_SHOP_X=17+2.7+tx;DOOR_XS=[2,4,5,6,7,8,9,10,11].concat(Array.from({length:tx},(_,i)=>12+i));
 }
@@ -691,6 +694,8 @@ function growTruck(nt,reroll){
   for(let x=2;x<=IX1;x++)if(m[6][x].t==='door')m[6][x]={t:'gap',item:null,prog:0,burn:0};
   for(let y=2;y<=5;y++)for(let x=2;x<=13+o;x++)m[y][x]=old[y][x];
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)m[y][x]=old[y][x];
+  for(let x=0;x<GW;x++)if(m[QY][x].t==='queue')m[QY][x]={t:'ground',item:null,prog:0,burn:0};   // the line may have changed length
+  for(let x=0;x<QSPAN;x++)m[QY][QX+x]={t:'queue',item:null,prog:0,burn:0,slot:Math.round(x/QGAP)};
   if(reroll){   // the first town choice: the door may move anywhere on the bottom row, the new columns included
     const dx=DOOR_XS[rnd(DOOR_XS.length)];m[6][dx]={t:'door',item:null,prog:0,burn:0};DOOR_FRONT=[dx,5];
   }else{
@@ -2583,6 +2588,16 @@ function sinkNear(p,c){
   for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0){const d=Math.hypot(p.x-(x+.5),p.y-(y+.5));if(d<bd){bd=d;best=[x,y]}}}
   return best;
 }
+// a finished dish in hand, facing open ground right next to a table whose customer is waiting for it: serve that table instead of setting it down
+function tableNear(p,c,tx,ty){
+  const h=p.hold;if(!h||p.seat||S.phase!=='stop'||!c||c.t!=='ground'||c.item)return null;
+  if(!(h.kind==='plate'&&!h.bare&&h.items.length))return null;
+  const rid=matchRecipe(h.items);if(!rid)return null;
+  let best=null,bd=1.5;   // a table within 1.5 tiles of the tile you face (the tiles right next to it and the diagonal ones count)
+  for(const g of S.cust){if(g.st!=='seat'||!pendingOrders(g).includes(rid))continue;
+    const d=Math.hypot(tx-g.tx,ty-g.ty);if(d<bd){bd=d;best=[g.tx,g.ty]}}
+  return best;
+}
 // ---------- update ----------
 const NOINP={mx:0,my:0,pick:false,act:false,sw:false,sk:false};
 function update(dt){
@@ -2662,7 +2677,8 @@ function update(dt){
     if(!inp.act){p.lock=false;p.actT=0}
     if(c){
       if(inp.pick){const h0=p.hold,m0=p.msgT,n0=AU.n,mn0=!!(p.menu||p.mk||p.g),sn=sinkNear(p,c);
-        if(sn)doPick(p,S.map[sn[1]][sn[0]],sn[0],sn[1]);else doPick(p,c,tx,ty);pickSnd(p,h0,m0,n0,mn0)}
+        const tn=sn?null:tableNear(p,c,tx,ty);
+        if(sn)doPick(p,S.map[sn[1]][sn[0]],sn[0],sn[1]);else if(tn)doPick(p,S.map[tn[1]][tn[0]],tn[0],tn[1]);else doPick(p,c,tx,ty);pickSnd(p,h0,m0,n0,mn0)}
       if(inp.act)doAct(p,c,tx,ty,dt);
     }
     if(p.skill==='tray'&&(p.skT||0)>0&&S.phase==='stop'){   // ゴリラ: a plated dish flies to the customer by itself
@@ -4834,7 +4850,9 @@ function drawCustBoard(y0,h){
   const W=GW*T,top=y0+6,ch=h-12;
   ctx.fillStyle='#2a3a40';ctx.fillRect(0,y0,W,h);
   ctx.fillStyle='#1a2a30';ctx.fillRect(0,y0,W,2);
-  const cw=60,gap=6,seats=S.cust.filter(c=>c.st==='seat'||c.st==='eat').slice(0,9),wait=waiting().slice(0,5);
+  // left: customers at the tables, right: the waiting line (one card per spot); each group has a small label
+  const cw=60,gap=6,NS=Math.min(9,Math.floor((W-52+gap)/(cw+gap))-QMAX),xs=24,xq=xs+NS*(cw+gap)+22;
+  const seats=S.cust.filter(c=>c.st==='seat'||c.st==='eat').slice(0,NS),wait=waiting().slice(0,QMAX);
   const card=(x,c,takeout,seat)=>{
     const cx=x+cw/2,by=y0+3,bh=h-6;
     ctx.fillStyle=takeout?'#34484f':'#4a6269';rr(x,by,cw,bh,6);ctx.fill();
@@ -4847,8 +4865,9 @@ function drawCustBoard(y0,h){
     ctx.fillStyle=r>0.35?'#f6d36a':'#d63b3b';rr(x+6,by+38,(cw-12)*r,6,3);ctx.fill();
     const oid=c.type==='boss'?pendingOrders(c)[0]:c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(dishIc(oid),cx,by+bh-15,28);
   };
-  for(let i=0;i<9;i++)card(12+i*(cw+gap),seats[i]||null,false,true);
-  for(let i=0;i<5;i++){const c=wait[i]||null;card(630+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}
+  for(let i=0;i<NS;i++)card(xs+i*(cw+gap),seats[i]||null,false,true);
+  for(let i=0;i<QMAX;i++){const c=wait[i]||null;card(xq+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}
+  for(const [lx,lab] of [[13,'テーブル席'],[xq-12,'待ち列']]){const ch=[...lab],lh=12,top0=y0+h/2-(ch.length-1)*lh/2;ch.forEach((c2,i)=>text(c2==='ー'?'｜':c2,lx,top0+i*lh,11,'#cfe0e2',800))   /* vertical writing: the long-vowel mark stands upright */}
 }
 function drawMenus(){
   for(const p of S.players)if(p.g&&isMine(p))drawGather(p);

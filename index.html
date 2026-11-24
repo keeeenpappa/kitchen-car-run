@@ -836,7 +836,7 @@ function showEquipShop(){
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=(S.eqBuys||0)>=3||!!o.sold,pr=eqPrice(o);
     const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材が出てくる（今の町の食材が出やすい・はずれもある／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
     return `<button class="ovbtn town hold${done?' dim':''}" data-act="eqbuy" data-v="${i}">
-      ${o.pro||o.bonus?`<span class="badges">${o.pro?'<span class="rarebadge">★ レア</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}</span>`:''}
+      ${o.pro||o.bonus?`<span class="badges">${o.pro?'<span class="rarebadge">★ 特殊</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}</span>`:''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="tn">${pr}G</span>${o.sold||done||S.money<pr?`<span class="sub">${o.sold?'売り切れ':done?'これ以上買えません':'お金が足りない'}</span>`:''}
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
   showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
@@ -5109,7 +5109,7 @@ function upInfo(){
   const t=upsText(o),rare=o.pro?proInfo(id,o.pro):o.bonus?proInfo(id,1):null;
   if(!t&&!rare)return '';
   return `<br><span class="dim">${held?'持っている':'この'}${TGTN[id]||(EQUIP[id]&&EQUIP[id].n)||'器具'}：</span>`+
-    (rare?`<b style="color:#ff79b8">★レア ${rare.n}</b>（${rare.d}）　`:'')+(t?'<b style="color:#ffd84a">↑</b> '+t:'');
+    (rare?`<b style="color:#ff79b8">★特殊 ${rare.n}</b>（${rare.d}）　`:'')+(t?'<b style="color:#ffd84a">↑</b> '+t:'');
 }
 const readyBtn=document.getElementById('readyBtn');
 const pauseBtn=document.getElementById('pauseBtn');

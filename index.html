@@ -307,6 +307,7 @@ const WAIT_PAT=1.2, SMILE_MUL=0.8, SIGN_MUL=0.85, SIGN_P=0.08;   // patience in 
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
 const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=1.2;
 const MAXP=8;   // most players in one room (more than 4 only online)
+let ROOM_CAP=MAXP;   // this room's player limit (4 / 6 / 8, chosen by the host when the room is made)
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff','#ffb13b','#2fd0c8','#ff8ad1','#c3d84a'];
 const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FNT='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Meiryo",sans-serif';
@@ -659,7 +660,7 @@ function newRun(np,mode,test){
     ...[1,2,3,4,5].map(pro=>({kind:'station',st:'counter',pro}))]);
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
-  S.bonus=0;S.pendingEquip=[];S.stored=[];S.cleanPlates=np>=7?7:np>=5?6:PLATES_TOTAL;   // more players, more plates
+  S.bonus=0;S.pendingEquip=[];S.stored=[];S.supply=[];S.tierNp=np;S.cleanPlates=TIER(np).plate;   // more players, more plates
   // everyone picks an animal (= skill) first; then the layout or the first town choice
   // test mode: player 1 is real, everyone else is a bot (random animal, never moves or picks by hand)
   S.bots=test?Array.from({length:np-1},(_,k)=>k+1):[];
@@ -673,16 +674,37 @@ function extStand(){
   return false;
 }
 // a player joined and the truck needs to be longer: keep the kitchen and the town as they are, add floor columns before the cab
-function growTruck(nt){
+function growTruck(nt,reroll){
   if(!S||!S.map||nt<=TX)return;
   const o=TX,old=S.map,df=DOOR_FRONT;
   applyTruck(nt);
   const m=buildMap();
   for(let x=2;x<=IX1;x++)if(m[6][x].t==='door')m[6][x]={t:'gap',item:null,prog:0,burn:0};
   for(let y=2;y<=5;y++)for(let x=2;x<=13+o;x++)m[y][x]=old[y][x];
-  for(let x=2;x<=13+o;x++)if(old[6][x].t==='door')m[6][x]=old[6][x];
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)m[y][x]=old[y][x];
-  DOOR_FRONT=df;S.map=m;rebuildStations();CAM.ok=false;
+  if(reroll){   // the first town choice: the door may move anywhere on the bottom row, the new columns included
+    const dx=DOOR_XS[rnd(DOOR_XS.length)];m[6][dx]={t:'door',item:null,prog:0,burn:0};DOOR_FRONT=[dx,5];
+  }else{
+    for(let x=2;x<=13+o;x++)if(old[6][x].t==='door')m[6][x]=old[6][x];
+    DOOR_FRONT=df;
+  }
+  S.map=m;rebuildStations();CAM.ok=false;
+}
+// the same equipment counts for a given player count (the ready-made kitchen and the self-made layout both use these)
+const TIER=np=>np>=7?{c:9,p:3,b:2,k:2,t:4,plate:7}:np>=5?{c:7,p:2,b:2,k:1,t:3,plate:6}:{c:6,p:2,b:1,k:1,t:3,plate:PLATES_TOTAL};
+// the truck grows when the next town is chosen; the equipment for the new seats goes outside at the next 配置
+function confirmSeats(){
+  if(!S||!S.map)return;
+  const from=S.tierNp||1,to=S.players.length;
+  if(to<=from)return;
+  const a=TIER(from),b=TIER(to);
+  const want=TX_FOR(to);
+  if(want>TX)growTruck(want,S.stop===0);
+  const add=(st,n,ex)=>{for(let i=0;i<n;i++)S.supply.push(Object.assign({kind:'station',st},ex||{}))};
+  add('counter',b.c-a.c);add('planter',b.p-a.p,{plant:null});add('board',b.b-a.b);add('table',b.t-a.t,{n:1});
+  for(let i=0;i<b.k-a.k;i++)S.supply.push({kind:'basket',items:[]});
+  S.cleanPlates=(S.cleanPlates||0)+(b.plate-a.plate);
+  S.tierNp=to;
 }
 function rebuildStations(){
   S.stations=[];
@@ -812,8 +834,8 @@ function showEquipShop(){
 }
 function startDayLayout(){
   unseatAll();
-  const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)));
-  S.stored=[];S.pendingEquip=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
+  const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)),S.supply||[]);
+  S.stored=[];S.pendingEquip=[];S.supply=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
   S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
@@ -2283,7 +2305,7 @@ function ovAction(a,v){
   if(netAction(a,v))return;
   if(a==='np'){const [n,m]=String(v).split('|');newRun(+n,m||'preset')}
   if(a==='tstart'){const k=document.getElementById('tkit').value,b=+document.getElementById('tbot').value;newRun(1+b,k,b>0)}   // player 1 + the chosen number of bots
-  else if(a==='town'){S.next=chooseOpts[+v];if(S.stop===0)startDrive();else startDayLayout()}
+  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
     if((S.eqBuys||0)>=3)return;
     const o=S.eqOffers[+v];if(!o||o.sold)return;const pr=eqPrice(o);o.sold=1;   /* bought: sold out, no second copy of the same card */
@@ -5108,6 +5130,7 @@ function refreshNetTitle(){const el=document.getElementById('netTitle');if(el&&!
 function netAction(a,v){
   if(a==='mkroom'){NET.pwOn=false;showRoomSetup();return true}
   if(a==='pwmode'){NET.pwOn=v==='1';showRoomSetup();return true}
+  if(a==='cap'){NET.cap=+v||8;showRoomSetup();return true}
   if(a==='host'){const el=document.getElementById('roomPw');NET.pw=NET.pwOn&&el?el.value.trim().slice(0,8):'';
     if(NET.pwOn&&!NET.pw){const e=document.getElementById('pwErr');if(e)e.textContent='パスワードを入れてください';return true}
     startHosting();return true}
@@ -5123,7 +5146,7 @@ function netAction(a,v){
 }
 function leaveOnline(){
   beaconStop();scanStop();
-  const r=NET.room;NET.room=null;
+  const r=NET.room;NET.room=null;ROOM_CAP=MAXP;
   if(r)r.leave().catch(()=>{});
   if(NET.lobby&&NET.role==='host')NET.lobby.presence({host:null}).catch(()=>{});
   Object.assign(NET,{role:'off',mirror:false,localOv:null,slots:{},mySlot:0,inputs:[],hostPeer:null});
@@ -5140,6 +5163,7 @@ function myUid(){
 async function startHosting(){
   if(!NET.lobby)return;
   const code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rnd(32)]).join('');
+  ROOM_CAP=NET.cap||MAXP;
   Object.assign(NET,{role:'host',code,order:[],slots:{},inputs:[],lastPk:[],lastSw:[],lastOc:{},mySlot:0,ovId:0,ovHtml:'',err:''});
   if(NET.peer)paintOv(`<div class="box"><h2>部屋を作っています…</h2></div>`);
   try{
@@ -5159,13 +5183,14 @@ function showRoomSetup(){
   paintOv(`<div class="box"><h2>部屋を作る</h2>
     <div class="row"><span style="align-self:center;min-width:6em">パスワード</span><button class="ovbtn${NET.pwOn?'':' autofocus'}" data-act="pwmode" data-v="0">${NET.pwOn?'':'✔ '}なし</button><button class="ovbtn${NET.pwOn?' autofocus':''}" data-act="pwmode" data-v="1">${NET.pwOn?'✔ ':''}あり</button></div>
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
+    <div class="row"><span style="align-self:center;min-width:6em">最大人数</span>${[4,6,8].map(n=>`<button class="ovbtn${(NET.cap||8)===n?' autofocus':''}" data-act="cap" data-v="${n}">${(NET.cap||8)===n?'✔ ':''}${n}人</button>`).join('')}</div>
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);
 }
 const PHASE_N={pup:'個人強化',choose:'町選び',select:'キャラ選び',layout:'配置',drive:'走行中',upgrade:'買い物',equip:'買い物',end:'結果',over:'結果'};
 function roomInfo(){
   let n,ch,where='',ph='メンバー待ち';
   if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,STOPS)}/${STOPS}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
-  else{const g=hostGuests().slice(0,MAXP-1);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
+  else{const g=hostGuests().slice(0,ROOM_CAP-1);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
   return {pw:!!NET.pw,n,ch,where,ph};
 }
 function beaconStart(){
@@ -5179,7 +5204,7 @@ function beaconStart(){
       conn.on('data',m=>{if(!m||typeof m!=='object')return;
         if(m.t==='info')conn.send({t:'info',r:roomInfo()});
         else if(m.t==='join'){const r=roomInfo();
-          if(r.n>=MAXP&&!S)conn.send({t:'full'});
+          if(r.n>=ROOM_CAP&&!S)conn.send({t:'full'});
           else if(NET.pw&&String(m.pw||'')!==NET.pw)conn.send({t:'ng'});
           else conn.send({t:'ok',code:NET.code})}});
       setTimeout(()=>{try{conn.close()}catch(_){}},8000)});
@@ -5225,9 +5250,9 @@ function renderRooms(force){
   const ks=Object.keys(NET.rooms||{}).map(Number).sort((a,b)=>a-b);
   const icon=an=>{const src=typeof CHEF_IMG_SRC==='object'&&an?CHEF_IMG_SRC[an+'_icon']:null;return src?`<img src="${src}" alt="">`:''};
   const h=ks.length?ks.map(i=>{const r=NET.rooms[i],n=Math.max(1,Math.min(4,+r.n||1));
-    return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' <small>（パスワード付き）</small>':''}</span><span class="rp">${n}/${MAXP}人</span>
+    return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' <small>（パスワード付き）</small>':''}</span><span class="rp">${n}/${+r.cap||MAXP}人</span>
       <span class="rs">${[r.where,r.ph].filter(Boolean).map(x=>String(x).replace(/[<>&"]/g,'')).join('・')}</span>
-      <span class="rc">${(Array.isArray(r.ch)?r.ch:[]).slice(0,MAXP).map(a=>icon(String(a).replace(/[^a-z]/g,''))).join('')}</span>
+      <span class="rc">${(Array.isArray(r.ch)?r.ch:[]).slice(0,+r.cap||MAXP).map(a=>icon(String(a).replace(/[^a-z]/g,''))).join('')}</span>
       <button class="ovbtn hold" data-act="ljoin" data-v="${i}">参加（${ovkText()}）</button></div>`}).join('')
     :'<p class="mut">今は部屋がありません。ホストが「部屋を作る」と、ここに出ます。</p>';
   if(!force&&el._h===h)return;
@@ -5267,20 +5292,20 @@ function hostGuests(){
 function showHostLobby(){
   if(NET.role!=='host'||S)return;
   const g=hostGuests();
-  NET.lobby.presence({host:{code:NET.code,n:1+Math.min(MAXP-1,g.length),open:true}}).catch(()=>{});
-  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(MAXP-1,g.length)}).catch(()=>{});
+  NET.lobby.presence({host:{code:NET.code,n:1+Math.min(ROOM_CAP-1,g.length),open:true,cap:ROOM_CAP}}).catch(()=>{});
+  if(NET.room)NET.room.presence({s:null,lb:1+Math.min(ROOM_CAP-1,g.length)}).catch(()=>{});
   paintOv(`<div class="box"><h2>${NET.peer?'部屋'+(NET.pw?' 🔒':''):'部屋 '+NET.code}</h2>
-    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,MAXP-1).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大${MAXP}人）</p>
+    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,ROOM_CAP-1).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大${ROOM_CAP}人）</p>
     <p class="mut">${NET.peer?(NET.beaconSlot!=null?`ロビーに部屋を出しました。フレンドはタイトルの「ロビーへ入る」から参加できます。${NET.pw?'パスワード：<b>'+NET.pw.replace(/[<>&"]/g,'')+'</b>':'パスワードなし'}`:'ロビーに部屋を出しています…'):`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
     <div class="row"><button class="ovbtn" data-act="hstart" data-v="layout">キッチンを自分で並べて開始</button><button class="ovbtn" data-act="hstart" data-v="preset">初期配置済みで開始</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
 }
 function hostStart(mode){
-  const g=hostGuests().slice(0,MAXP-1);
+  const g=hostGuests().slice(0,ROOM_CAP-1);
   NET.slots={};NET.uidSlot={};NET.waiting=[];
   if(NET.room)NET.room.presence({lb:0}).catch(()=>{});
   g.forEach((p,i)=>bindSlot(p,i+1));
   // the room stays open: friends can still join (they watch, and come in once the town's service is over)
-  NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true}}).catch(()=>{});
+  NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true,cap:ROOM_CAP}}).catch(()=>{});
   newRun(1+g.length,mode==='layout'?'layout':'preset');
   // online: P1 is this device's pick, each guest brings its own
   g.forEach((p,i)=>{const pl=S.players[i+1];if(pl){pl.skill=guestSkill(p);if(pl.sel)pl.sel.cur=Math.max(0,SKILL_K.indexOf(pl.skill))}});
@@ -5314,16 +5339,16 @@ function hostRoster(){
   for(const peer in NET.slots)if(!live.has(peer)){NET.inputs[NET.slots[peer]]=null}
   NET.waiting=NET.waiting.filter(peer=>live.has(peer)&&!NET.slots[peer]);
   const canIn=S.phase==='choose';
-  while(canIn&&NET.waiting.length&&S.players.length<MAXP){
+  while(canIn&&NET.waiting.length&&S.players.length<ROOM_CAP){
     const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
     const k=S.players.length,[x,y]=spawnSpot(k);
     S.players.push({i:k,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:guestSkill(p)});
-    S.np=S.players.length;growTruck(TX_FOR(S.np));bindSlot(p,k);
+    S.np=S.players.length;bindSlot(p,k);   // the truck grows when the next town is chosen (confirmSeats), not here
     {const q=S.players[k];if(S.phase==='select')q.sel={cur:Math.max(0,SKILL_K.indexOf(q.skill)),ok:false,last:'0,0',rep:0}}
     S.toast={text:'P'+(k+1)+' が参加しました！',t:0,life:3};sfx('ready');
-    NET.lobby.presence({host:{code:NET.code,n:S.np,open:true}}).catch(()=>{});
+    NET.lobby.presence({host:{code:NET.code,n:S.np,open:true,cap:ROOM_CAP}}).catch(()=>{});
   }
-  S.waitN=Math.min(NET.waiting.length,MAXP-S.players.length);
+  S.waitN=Math.min(NET.waiting.length,ROOM_CAP-S.players.length);
 }
 function remoteInput(i){
   const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false,sk:false};
@@ -5418,7 +5443,7 @@ function sendSnap(){
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
   d.gp=S.grp?[S.grp.st,Math.round(S.grp.ann*10),S.grp.orders.map(o=>REC_K.indexOf(o))]:0;
   d.ms=S.msn?[S.msn.k,S.msn.d,S.msn.ok?1:0]:0;
-  d.wt=S.waitN||0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
+  d.wt=S.waitN||0;d.tx=TX;d.cap=ROOM_CAP;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   d.oc=ov.hidden||S.players.length<2?0:S.players.map((p,i)=>i===0?ovSel:(NET.inputs[i]&&NET.inputs[i][7]!=null?+NET.inputs[i][7]:-1));ovDots(d.oc||[]);
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
@@ -5447,12 +5472,12 @@ async function joinRoom(code){
 function guestCount(){
   if(!NET.room)return 1;
   const h=NET.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.lb>0);   // the host puts the head count in its lobby
-  return h?Math.max(1,Math.min(MAXP,+h.presence.lb||1)):2;
+  return h?Math.max(1,Math.min(ROOM_CAP,+h.presence.lb||1)):2;
 }
 function guestLocalOv(kind){
   NET.localOv=kind;NET.mirror=false;NET.shownOv=-1;
   const body=kind==='conn'?`<p>部屋に接続しています…</p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
-    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/${MAXP}人</span></p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
+    :kind==='wait'?`<p>ホストが始めるのを待っています…</p><p class="bigscore" id="waitN">${guestCount()}<span>/${ROOM_CAP}人</span></p><div class="row"><button class="ovbtn" data-act="title">やめる</button></div>`
     :kind==='late'?`<p>このゲームはもう始まっています。次のゲームから参加してください。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`
     :`<p>ホストが部屋を閉じたか、通信が途切れました。</p><div class="row"><button class="ovbtn" data-act="title">タイトルへ</button></div>`;
   paintOv(`<div class="box"><h2>${kind==='lost'?'接続が切れました':NET.peer?'部屋':'部屋 '+NET.code}</h2>${body}</div>`);
@@ -5544,11 +5569,11 @@ function applySnap(d){
   const n=v=>+v||0;
   // a guest remembers the animal it played once the select screen is over
   if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
-  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(TX_FOR(S.np)!==TX){applyTruck(TX_FOR(S.np));S.map=buildMap()}
+  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(d.cap)ROOM_CAP=n(d.cap);{const ntx=d.tx!=null?n(d.tx):TX_FOR(S.np);if(ntx!==TX){applyTruck(ntx);S.map=buildMap()}}
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;S.pupI=n(d.pi)>=0?n(d.pi):null;
   S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
   S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;
-  S.waitN=Math.max(0,Math.min(MAXP-1,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
+  S.waitN=Math.max(0,Math.min(ROOM_CAP-1,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
   const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>2)}):null;
   S.town=town(d.tw);S.next=town(d.nx);
@@ -5568,7 +5593,7 @@ function applySnap(d){
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}
   S.cleanPlates=Math.max(0,Math.min(9,n(d.cp)));
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
-  S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,MAXP).map((a,i)=>{
+  S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,ROOM_CAP).map((a,i)=>{
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),

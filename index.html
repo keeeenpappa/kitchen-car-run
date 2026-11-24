@@ -5198,7 +5198,7 @@ function roomInfo(){
   let n,ch,where='',ph='メンバー待ち';
   if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,stopsN())}/${stopsN()}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
   else{const g=hostGuests().slice(0,ROOM_CAP-1);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
-  return {pw:!!NET.pw,n,ch,where,ph};
+  return {pw:!!NET.pw,n,ch,where,ph,cap:ROOM_CAP,md:MODE==='tour'?'グランドツアー':'カジュアル'};
 }
 function beaconStart(){
   beaconStop();const my=NET.beaconRun=(NET.beaconRun||0)+1;
@@ -5256,9 +5256,9 @@ function renderRooms(force){
   const el=document.getElementById('roomList');if(!el||!NET.listOpen)return;
   const ks=Object.keys(NET.rooms||{}).map(Number).sort((a,b)=>a-b);
   const icon=an=>{const src=typeof CHEF_IMG_SRC==='object'&&an?CHEF_IMG_SRC[an+'_icon']:null;return src?`<img src="${src}" alt="">`:''};
-  const h=ks.length?ks.map(i=>{const r=NET.rooms[i],n=Math.max(1,Math.min(4,+r.n||1));
+  const h=ks.length?ks.map(i=>{const r=NET.rooms[i],n=Math.max(1,Math.min(MAXP,+r.n||1));
     return `<div class="room"><span class="rn">部屋 ${i+1}${r.pw?' <small>（パスワード付き）</small>':''}</span><span class="rp">${n}/${+r.cap||MAXP}人</span>
-      <span class="rs">${[r.where,r.ph].filter(Boolean).map(x=>String(x).replace(/[<>&"]/g,'')).join('・')}</span>
+      <span class="rs">${[r.md,r.where,r.ph].filter(Boolean).map(x=>String(x).replace(/[<>&"]/g,'')).join('・')}</span>
       <span class="rc">${(Array.isArray(r.ch)?r.ch:[]).slice(0,+r.cap||MAXP).map(a=>icon(String(a).replace(/[^a-z]/g,''))).join('')}</span>
       <button class="ovbtn hold" data-act="ljoin" data-v="${i}">参加（${ovkText()}）</button></div>`}).join('')
     :'<p class="mut">今は部屋がありません。ホストが「部屋を作る」と、ここに出ます。</p>';
@@ -5302,7 +5302,7 @@ function showHostLobby(){
   NET.lobby.presence({host:{code:NET.code,n:1+Math.min(ROOM_CAP-1,g.length),open:true,cap:ROOM_CAP}}).catch(()=>{});
   if(NET.room)NET.room.presence({s:null,lb:1+Math.min(ROOM_CAP-1,g.length)}).catch(()=>{});
   paintOv(`<div class="box"><h2>${NET.peer?'部屋'+(NET.pw?' 🔒':''):'部屋 '+NET.code}</h2>
-    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,ROOM_CAP-1).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大${ROOM_CAP}人）</p>
+    <p>あなたは P1（ホスト）です。参加した人：<b>${g.length?g.slice(0,ROOM_CAP-1).map((p,i)=>'P'+(i+2)).join('、'):'まだいません'}</b>（最大${ROOM_CAP}人・${MODE==='tour'?'グランドツアー':'カジュアル'}）</p>
     <p class="mut">${NET.peer?(NET.beaconSlot!=null?`ロビーに部屋を出しました。フレンドはタイトルの「ロビーへ入る」から参加できます。${NET.pw?'パスワード：<b>'+NET.pw.replace(/[<>&"]/g,'')+'</b>':'パスワードなし'}`:'ロビーに部屋を出しています…'):`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
     <div class="row"><button class="ovbtn" data-act="hstart" data-v="layout">キッチンを自分で並べて開始</button><button class="ovbtn" data-act="hstart" data-v="preset">初期配置済みで開始</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
 }

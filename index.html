@@ -306,6 +306,9 @@ const PLATES_TOTAL=5, WASH=2.0;   // the truck owns 5 plates; washing one at the
 const WAIT_PAT=1.2, SMILE_MUL=0.8, SIGN_MUL=0.85, SIGN_P=0.08;   // patience in the waiting line (before being led to a table) lasts 1.2x as long
 const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
 const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=1.2;
+// game modes: カジュアル (a trip of STOPS towns) and グランドツアー (every town once, then the trip ends)
+let MODE='casual';
+const stopsN=()=>MODE==='tour'?Object.keys(TOWNS).length:STOPS;
 const MAXP=8;   // most players in one room (more than 4 only online)
 let ROOM_CAP=MAXP;   // this room's player limit (4 / 6 / 8, chosen by the host when the room is made)
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff','#ffb13b','#2fd0c8','#ff8ad1','#c3d84a'];
@@ -461,7 +464,8 @@ const RECIPES={
   montblanc:{n:'モンブラン',e:'🧁',ings:['batter','chestnut'],price:36},
 };
 // sell price (pay) and crowd (rate) are rolled each time a town is offered: see showChoose
-const EXTRA_FROM=2;   // from the 3rd town of the trip, each town's menu has its extra dish too
+const EXTRA_FROM=2;   // casual: from the 3rd town of the trip, each town's menu has its extra dish too
+const extraFrom=()=>MODE==='tour'?4:EXTRA_FROM;   // grand tour (8 towns): from the 5th town
 const townMenuOn=(k,withExtra)=>withExtra&&TOWNS[k].extra?TOWNS[k].menu.concat([TOWNS[k].extra]):TOWNS[k].menu.slice();
 const TOWNS={
   port:{n:'港町',e:'⚓',menu:['fishset','soup'],extra:'kaisendon',ground:'#cdb886',deco:'#4f97b8'},
@@ -2031,7 +2035,7 @@ function endStop(){
   bringInside();
   stashOutside(); // equipment set down outside in town stays behind, and is back outside at the next layout
   const lost=clearKitchen();
-  const last=S.stop>=STOPS;
+  const last=S.stop>=stopsN();
   S.extraOffer=!!S.msnGift&&!last;S.msnGift=false;
   showOv(`<div class="box"><h2>${S.town.e} ${S.town.n} 営業おわり</h2>
     <div class="stars big" style="text-align:center">${starsHtml(tst)}</div>
@@ -2163,9 +2167,9 @@ function runScore(clear){
   return {rows,total:rows.reduce((a,r)=>a+r[1],0)};
 }
 // trip stars from the score: the bar is roughly what a run serving every customer scores
-function tripBars(){const e=STOPS*expCust()*(22+8+SERVE_PT)+CLEAR_PT+HEART_MAX*HEART_PT;return [0.3,0.5,0.7,0.9].map(f=>Math.round(e*f/10)*10)}
+function tripBars(){const e=stopsN()*expCust()*(22+8+SERVE_PT)+CLEAR_PT+HEART_MAX*HEART_PT;return [0.3,0.5,0.7,0.9].map(f=>Math.round(e*f/10)*10)}
 // the trip's stars: the average of the towns' stars (a town not reached counts 0), in half steps
-function tripStars(){const a=S.townStars||[];return Math.max(0.5,Math.round(a.reduce((x,y)=>x+y,0)/STOPS*2)/2)}
+function tripStars(){const a=S.townStars||[];return Math.max(0.5,Math.round(a.reduce((x,y)=>x+y,0)/stopsN()*2)/2)}
 function starsHtml(v){let h='';for(let i=1;i<=5;i++)h+=`<span class="st${v>=i?' on':v>=i-0.5?' half':''}">★</span>`;return h}
 let BEST={};
 try{const v=JSON.parse(localStorage.getItem('kcr-best')||'null');if(v&&typeof v==='object')BEST=v}catch(_){}
@@ -2205,7 +2209,7 @@ function gameOver(){
 function showEnd(){
   ticketGameEnd();
   S.phase='end';sfx('finish');
-  resultScreen('旅の終わり',`${STOPS}つの町を回りきりました。`,true);
+  resultScreen('旅の終わり',`${stopsN()}つの町を回りきりました。`,true);
 }
 
 // ---------- overlays ----------
@@ -2289,8 +2293,8 @@ function doOv(a,v){
   if(a==='pback'){paintOv(pauseHtml());if(NET.role==='guest')localizeOv();play('confirm');return}
   if(a==='skl'){cycleSkill(+v||0);const r=document.getElementById('skillRow');if(r){r.innerHTML=skillRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='skl'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   if(a==='lang'){nextLang();return}
-  if(a==='tut'){newRun(1,'preset');S.tut={i:0,en:false,done:false};return}
-  if(a==='tutgo'){newRun(1,'preset');return}
+  if(a==='tut'){MODE='casual';newRun(1,'preset');S.tut={i:0,en:false,done:false};return}
+  if(a==='tutgo'){MODE='casual';newRun(1,'preset');return}
   if(a==='view'){cycleView();const r=document.getElementById('viewRow');if(r){r.innerHTML=viewRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='view'));markSel()}play('confirm');return}
   if(a==='snd'){auInit();cycleSnd(v);const r=document.getElementById('sndRow');if(r){r.innerHTML=sndRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='snd'&&b.dataset.v===String(v)));markSel()}play('confirm');return}
   // a pick moves your face to the 次へ frame at once (the host repaints without moving it back)
@@ -2304,7 +2308,7 @@ function doOv(a,v){
 function ovAction(a,v){
   if(netAction(a,v))return;
   if(a==='np'){const [n,m]=String(v).split('|');newRun(+n,m||'preset')}
-  if(a==='tstart'){const k=document.getElementById('tkit').value,b=+document.getElementById('tbot').value;newRun(1+b,k,b>0)}   // player 1 + the chosen number of bots
+  if(a==='tstart'){const k=document.getElementById('tkit').value,b=+document.getElementById('tbot').value;MODE=document.getElementById('tmode').value;newRun(1+b,k,b>0)}   // player 1 + the chosen number of bots
   else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
     if((S.eqBuys||0)>=3)return;
@@ -2384,6 +2388,7 @@ function showTitle(){
   S=null;
   // the title truck is drawn behind: keep this box low and short so it stays in view
   showOv(`<div class="box tbox">
+    <div class="row"><span style="align-self:center;min-width:6em">モード</span><select id="tmode" class="tsel"><option value="casual" ${MODE==='casual'?'selected':''}>カジュアル（4町）</option><option value="tour" ${MODE==='tour'?'selected':''}>グランドツアー（全8町）</option></select></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><select id="tkit" class="tsel"><option value="layout">自分で並べる</option><option value="preset" selected>初期配置済み</option></select></div>
     <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><select id="tbot" class="tsel"><option value="0" selected>なし（1人）</option>${[2,3,4,5,6,7].map(n=>`<option value="${n}">${n}人</option>`).join('')}</select>
       <button class="ovbtn" data-act="tstart">はじめる</button></div>
@@ -2434,13 +2439,13 @@ function showChoose(){
     const early=S.stop<2;
     const roll=TOWNS[k].lively?(early?[1,1.1,1.1,1.2,1.2,1.3,1.3]:[1.1,1.2,1.2,1.3,1.3,1.3]):(early?[0.9,0.9,1,1,1.1,1.1,1.2,1.3]:[1,1.1,1.1,1.2,1.2,1.3]);
     const pay=roll[rnd(roll.length)];
-    return Object.assign({},TOWNS[k],{id:k,pay,rate:crowdOf(pay),menu:townMenuOn(k,S.stop>=EXTRA_FROM)})});
+    return Object.assign({},TOWNS[k],{id:k,pay,rate:crowdOf(pay),menu:townMenuOn(k,S.stop>=extraFrom())})});
   const cards=chooseOpts.map((t,i)=>`<button class="ovbtn town hold" data-act="town" data-v="${i}">
       <span class="tn">${t.e} ${t.n}</span>
       <span class="menu">${t.menu.map(r=>dishOv(r)+' '+RECIPES[r].n).join('<br>')}</span>
       <span class="needs">${townNeeds(t).map(id=>needLine(id,t)).join('')}</span>
       <span class="pay">${MOOD[Math.round((t.pay-1)*100)]||""}<br>${payLabel(t.pay,true).replace(/^[^（]*/,"")}</span>${t.lively?'<span class="sub">駅前なので、にぎわいやすい</span>':''}</button>`).join('');
-  showOv(`<div class="box big"><h2>${S.stop+1}つ目の町を選ぶ（全${STOPS}町）</h2>
+  showOv(`<div class="box big"><h2>${S.stop+1}つ目の町を選ぶ（全${stopsN()}町）</h2>
     <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。</p>${moneyBig()}
     ${regDish()?`<p>常連：${dishOv(regDish())} ${RECIPES[regDish()].n}</p>`:''}
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
@@ -2693,7 +2698,7 @@ function update(dt){
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
       if(S.sub==='service'&&S.timer<=0){S.sub='last';S.timer=0;S.grp=null;sfx('close');S.toast={text:'ラストオーダー！',t:0,life:2};for(const c of S.cust)if(c.st==='wait')startLeave(c,false);if(S.served>0)ticketCheck(null)}
-      if(S.sub==='last'&&S.cust.length===0){if(S.stop+1>=STOPS&&!S.bossDone)spawnBoss();else{S.sub='closing';S.closeT=2}}
+      if(S.sub==='last'&&S.cust.length===0){if(S.stop+1>=stopsN()&&!S.bossDone)spawnBoss();else{S.sub='closing';S.closeT=2}}
       else if(S.sub==='boss'&&S.cust.length===0){S.sub='closing';S.closeT=2}
     }
   }
@@ -4336,7 +4341,7 @@ function skinsOf(p){
 function planTicket(){
   S.tkGot=false;S.tkPlan=null;
   if(NET.role==='guest')return;
-  if(SV.dry>=PITY||Math.random()<TICKET_P)S.tkPlan={stop:rnd(STOPS),at:0.2+Math.random()*0.6};
+  if(SV.dry>=PITY||Math.random()<TICKET_P)S.tkPlan={stop:rnd(stopsN()),at:0.2+Math.random()*0.6};
 }
 function ticketCheck(x,y){
   const P=S.tkPlan;if(!P||S.tkGot||S.stop!==P.stop||!(S.sub==='service'||(x==null&&S.sub==='closing')))return;
@@ -4741,7 +4746,7 @@ function drawTopBar(){
   emoji(stIc('status_tip','🪙'),30,y,21);text(S.money+'G',48,y,20,'#ffe08a',800,'left');
   let hx=150;for(let k=0;k<HEART_MAX;k++)text('♥',hx+k*20,y,18,k<S.hearts?'#ff6d6d':'#3b5059',800);
   text('チップ×'+tipRate().toFixed(2).replace(/0$/,''),hx+HEART_MAX*20+2,y,12,'#ffcfcf',800,'left');
-  text('町 '+Math.min(S.stop+1,STOPS)+'/'+STOPS,345,y,15,'#f4eedf',800,'left');
+  text('町 '+Math.min(S.stop+1,stopsN())+'/'+stopsN(),345,y,15,'#f4eedf',800,'left');
   {const mw=drawMission(12,6+T*0.8+6,1.2);drawCombo(mw?Math.max(150,12+mw+12):150,6+T*0.8+4,1.5)}
   let ph='';
   if(S.phase==='layout')ph=S.timer>0?'レイアウト '+fmtT(S.timer):'時間切れ';
@@ -5043,7 +5048,7 @@ function renderHud(){
   else if(S.phase==='stop')phase=(S.sub==='prep'?'準備 ':'営業 ')+fmtT(S.timer);
   else if(S.phase==='choose')phase='町を選ぶ';
   else phase='—';
-  hudEl.innerHTML=`<span><span class="k">町</span>${Math.min(S.stop+1,STOPS)}/${STOPS}</span><span><span class="k">所持金</span>${S.money}G</span><span><span class="k">評判</span><span style="color:var(--bad)">${'♥'.repeat(Math.max(0,S.hearts))}</span><span style="color:var(--line)">${'♥'.repeat(Math.max(0,HEART_MAX-S.hearts))}</span></span><span>${phase}</span>${S.paused?'<span>一時停止中</span>':''}`;
+  hudEl.innerHTML=`<span><span class="k">町</span>${Math.min(S.stop+1,stopsN())}/${stopsN()}</span><span><span class="k">所持金</span>${S.money}G</span><span><span class="k">評判</span><span style="color:var(--bad)">${'♥'.repeat(Math.max(0,S.hearts))}</span><span style="color:var(--line)">${'♥'.repeat(Math.max(0,HEART_MAX-S.hearts))}</span></span><span>${phase}</span>${S.paused?'<span>一時停止中</span>':''}`;
   const tw=S.phase==='drive'?S.next:S.town;
   let info='';
   if(tw&&(S.phase==='drive'||S.phase==='stop')){
@@ -5131,6 +5136,7 @@ function netAction(a,v){
   if(a==='mkroom'){NET.pwOn=false;showRoomSetup();return true}
   if(a==='pwmode'){NET.pwOn=v==='1';showRoomSetup();return true}
   if(a==='cap'){NET.cap=+v||8;showRoomSetup();return true}
+  if(a==='rmode'){NET.mode=v==='tour'?'tour':'casual';showRoomSetup();return true}
   if(a==='host'){const el=document.getElementById('roomPw');NET.pw=NET.pwOn&&el?el.value.trim().slice(0,8):'';
     if(NET.pwOn&&!NET.pw){const e=document.getElementById('pwErr');if(e)e.textContent='パスワードを入れてください';return true}
     startHosting();return true}
@@ -5163,7 +5169,7 @@ function myUid(){
 async function startHosting(){
   if(!NET.lobby)return;
   const code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rnd(32)]).join('');
-  ROOM_CAP=NET.cap||MAXP;
+  ROOM_CAP=NET.cap||MAXP;MODE=NET.mode==='tour'?'tour':'casual';
   Object.assign(NET,{role:'host',code,order:[],slots:{},inputs:[],lastPk:[],lastSw:[],lastOc:{},mySlot:0,ovId:0,ovHtml:'',err:''});
   if(NET.peer)paintOv(`<div class="box"><h2>部屋を作っています…</h2></div>`);
   try{
@@ -5184,12 +5190,13 @@ function showRoomSetup(){
     <div class="row"><span style="align-self:center;min-width:6em">パスワード</span><button class="ovbtn${NET.pwOn?'':' autofocus'}" data-act="pwmode" data-v="0">${NET.pwOn?'':'✔ '}なし</button><button class="ovbtn${NET.pwOn?' autofocus':''}" data-act="pwmode" data-v="1">${NET.pwOn?'✔ ':''}あり</button></div>
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
     <div class="row"><span style="align-self:center;min-width:6em">最大人数</span>${[4,6,8].map(n=>`<button class="ovbtn${(NET.cap||8)===n?' autofocus':''}" data-act="cap" data-v="${n}">${(NET.cap||8)===n?'✔ ':''}${n}人</button>`).join('')}</div>
+    <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn${(NET.mode||'casual')==='casual'?' autofocus':''}" data-act="rmode" data-v="casual">${(NET.mode||'casual')==='casual'?'✔ ':''}カジュアル</button><button class="ovbtn${NET.mode==='tour'?' autofocus':''}" data-act="rmode" data-v="tour">${NET.mode==='tour'?'✔ ':''}グランドツアー</button></div>
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);
 }
 const PHASE_N={pup:'個人強化',choose:'町選び',select:'キャラ選び',layout:'配置',drive:'走行中',upgrade:'買い物',equip:'買い物',end:'結果',over:'結果'};
 function roomInfo(){
   let n,ch,where='',ph='メンバー待ち';
-  if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,STOPS)}/${STOPS}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
+  if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,stopsN())}/${stopsN()}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
   else{const g=hostGuests().slice(0,ROOM_CAP-1);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
   return {pw:!!NET.pw,n,ch,where,ph};
 }
@@ -5443,7 +5450,7 @@ function sendSnap(){
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
   d.gp=S.grp?[S.grp.st,Math.round(S.grp.ann*10),S.grp.orders.map(o=>REC_K.indexOf(o))]:0;
   d.ms=S.msn?[S.msn.k,S.msn.d,S.msn.ok?1:0]:0;
-  d.wt=S.waitN||0;d.tx=TX;d.cap=ROOM_CAP;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
+  d.wt=S.waitN||0;d.tx=TX;d.cap=ROOM_CAP;d.md=MODE==='tour'?1:0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
   d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   d.oc=ov.hidden||S.players.length<2?0:S.players.map((p,i)=>i===0?ovSel:(NET.inputs[i]&&NET.inputs[i][7]!=null?+NET.inputs[i][7]:-1));ovDots(d.oc||[]);
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
@@ -5569,7 +5576,7 @@ function applySnap(d){
   const n=v=>+v||0;
   // a guest remembers the animal it played once the select screen is over
   if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
-  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(d.cap)ROOM_CAP=n(d.cap);{const ntx=d.tx!=null?n(d.tx):TX_FOR(S.np);if(ntx!==TX){applyTruck(ntx);S.map=buildMap()}}
+  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(d.cap)ROOM_CAP=n(d.cap);MODE=n(d.md)?'tour':'casual';{const ntx=d.tx!=null?n(d.tx):TX_FOR(S.np);if(ntx!==TX){applyTruck(ntx);S.map=buildMap()}}
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;S.pupI=n(d.pi)>=0?n(d.pi):null;
   S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
   S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;

@@ -4684,7 +4684,7 @@ function drawArrive(){
 // ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
 // and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
 // does not move the picture -----
-const PZ=1.5, UZ=1.45, PCZ=1.5, BOARD_H=1.8;   // phone 1.5x, PC 1.25x close-up; the customer board takes the bottom rows
+const PZ=1.6, UZ=1.45, PCZ=1.5, BOARD_H=1.8;   // phone 1.6x, PC 1.5x close-up; the customer board takes the bottom rows
 const CAM={x:0,y:0,ok:false};
 let VIEW='auto', PHONE_INFO=false;
 try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}
@@ -4934,14 +4934,14 @@ function draw(){
   if(!S){if(LTS){const sv=S;S=LTS;try{drawSelect()}finally{S=sv}}else drawRoadIdle();return}
   if(S.phase==='select'){drawSelect();return}
   const arr=S.view==='town'&&S.town&&S.arrT!=null&&S.arrT<ARRIVE_T;
-  // phone view: the world is drawn 1.5x around the camera; the bars and panels stay on the screen
+  // phone view: the world is drawn 1.6x around the camera; the bars and panels stay on the screen
   const ph=phoneView(),z=camZoom(),bh=boardH();
   ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();
   if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}
   drawWorld(arr);
   ctx.restore();
   if(bh)drawCustBoard((VH-bh)*T,bh*T);
-  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawUpcomingPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
+  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();if(!TX){ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
     // the customers waiting in line stay in front of the info panel (it can cover them when the camera is zoomed)
     if(S.view==='town'&&S.cust.some(c=>c.st==='wait')){ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawCustomers(true);ctx.restore()}}

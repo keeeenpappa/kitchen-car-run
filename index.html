@@ -501,7 +501,7 @@ const ALLSHOPS=[...SHOPTYPES,MYSTERY_SHOP,GAS_SHOP];
 // between shops it runs at the lever's speed. Arriving earlier/later than at ふつう changes the service time.
 const WIN_SPEED=0.7, SPEEDS=[0.45,0.9,2.0], SPEED_N=['ゆっくり','ふつう','急ぐ'], FUEL_USE_TXT=['','⛽約2','⛽約6'];
 let FIRST_SHOP_X=17+2.7; // ≈3 s more of road (at ふつう) before the first shop reaches the front window
-let SHOP_GAP=10; const KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (13.5)
+let SHOP_GAP=9; const KM_PER_TILE=0.4, MYSTERY_CHANCE=0.35; // = back window (3.5) to front window (12.5): each shop lines up with the windows the same way
 const FUEL_MAX=10, FUEL_RATE=[0,2/38,6/38]; // per tile run between shops: ふつう ≈2 / 急ぐ ≈6 per trip
 let LEVER=[14,4], LEVER_FRONT=[13,4];
 // 5+ players get a longer truck: TX extra floor columns between the kitchen and the cab (the world stays 24 wide)
@@ -511,7 +511,7 @@ function applyTruck(tx){
   // the waiting line: 5 customers up to 4 players, 6 for 5-6, 7 for 7-8 (closer together, so it still fits on the right)
   {const Q=tx>=6?{x:17,m:7,g:1.0}:tx>=3?{x:18,m:6,g:1.0}:{x:18,m:5,g:1.2};QX=Q.x;QMAX=Q.m;QGAP=Q.g;QSPAN=Math.ceil((QMAX-1)*QGAP)+1}
   TX=tx;IX1=13+tx;LEVER=[14+tx,4];LEVER_FRONT=[13+tx,4];SEAT=[15.5+tx,2.8];EXT_HOME=[[13+tx,5],[12+tx,5],[3,5],[2,5]];
-  WHEELS=[3.35,15.05+tx];SHOP_GAP=10+tx;FIRST_SHOP_X=17+2.7+tx;DOOR_XS=[2,4,5,6,7,8,9,10,11].concat(Array.from({length:tx},(_,i)=>12+i));
+  WHEELS=[3.35,15.05+tx];SHOP_GAP=9+tx;FIRST_SHOP_X=17+2.7+tx;DOOR_XS=[2,4,5,6,7,8,9,10,11].concat(Array.from({length:tx},(_,i)=>12+i));
 }
 const inWindowZone=s=>[3.5,12.5+TX].some(wc=>wc>=s.x-WMARGIN&&wc<=s.x+2+WMARGIN);
 const kmTxt=t=>(t*KM_PER_TILE).toFixed(0);

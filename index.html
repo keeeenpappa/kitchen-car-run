@@ -4941,7 +4941,7 @@ function draw(){
   drawWorld(arr);
   ctx.restore();
   if(bh)drawCustBoard((VH-bh)*T,bh*T);
-  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();drawShopPanelPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
+  if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();if(!TX){ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
     // the customers waiting in line stay in front of the info panel (it can cover them when the camera is zoomed)
     if(S.view==='town'&&S.cust.some(c=>c.st==='wait')){ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawCustomers(true);ctx.restore()}}

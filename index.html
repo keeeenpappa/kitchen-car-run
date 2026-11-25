@@ -963,7 +963,7 @@ function pollPads(){
   for(let i=0;i<4;i++){
     const gp=PADGP[i]; if(!gp){pads[i]=null;continue}
     const b=k=>!!(gp.buttons[k]&&gp.buttons[k].pressed);
-    const now={a:b(0),x:b(2)||b(1),sw:b(4)||b(5),sk:b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8)};
+    const now={a:b(0),x:b(2),sw:b(4)||b(5),sk:b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8),bk:b(1)};   // bk = B: back on the character picker
     const prev=padPrev[gp.index]||{};
     pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0,gp};
     padPrev[gp.index]=now;
@@ -2263,7 +2263,7 @@ function lobbySelUpdate(dt){
     if(dx)c=wrap(c+dx,SEL_COLS);else if(dy)r=wrap(r+dy,rows);lobbySelMove(Math.min(n-1,r*SEL_COLS+c))}
   if(inp.pick&&!s.ok){s.ok=true;s.done=0.5;sfx('ready')}
   else if(inp.sw&&s.ok){s.ok=false;s.done=0;sfx('put')}
-  else if((inp.sw||pressed.has('Escape'))&&!s.ok){titlePickClose(null);return}   // back without changing
+  else if((inp.sw||pressed.has('Escape')||(pads[0]&&pads[0].edge('bk')))&&!s.ok){titlePickClose(null);return}   // back without changing
   if(s.ok){s.done-=dt;if(s.done<=0)titlePickClose(SKILL_K[s.cur])}                // OK: back to the title
 }
 function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
@@ -2434,7 +2434,7 @@ function showTitle(){
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn" data-act="tcyc" data-v="mode">${MODE==='tour'?'グランドツアー（全8町）':'カジュアル（4町）'}</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn" data-act="tcyc" data-v="kit">${TSET.kit==='layout'?'自分で並べる':'初期配置済み'}</button>
       <button class="ovbtn" data-act="tcyc" data-v="bot">bot人数：${TSET.bot?TSET.bot+'人':'なし（1人）'}</button>
-      <button class="ovbtn" data-act="tstart">はじめる</button></div>
+      <button class="ovbtn" data-act="tstart" style="min-width:150px">はじめる</button></div>
     <div class="row"><button class="ovbtn" data-act="ghelp" style="width:180px">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button>${/[?&]lang=1/.test(location.search)?`<button class="ovbtn" data-act="lang">🌐 ${langName()}</button>`:''}</div>
     <div class="row"><button class="ovbtn" data-act="tut">📘 チュートリアル（1人・約5分）</button></div>
     ${GIFT_MSG?`<p class="good">${GIFT_MSG}</p>`:''}

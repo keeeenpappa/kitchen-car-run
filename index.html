@@ -740,7 +740,7 @@ const emptyT=y=>y===6?'gap':'floor';
 const blankTile=y=>({t:emptyT(y),item:null,prog:0,burn:0,plant:null,pro:false});
 // spots outside for things handed over at layout time: first the row just outside the door (the door's own column stays free;
 // row 7 is reached from the walkway under it), then further out. Kept off the table plaza (rows 8-10, x1-17) and the waiting line
-const TABLE_SPOT=[19,9];   // the table pile waits under the queue
+const TABLE_SPOT=[19,11];   // the table pile waits below the queue
 const TESTGEAR=(()=>{try{return new URLSearchParams(location.search).has('testgear')}catch(_){return false}})();
 const GROUND_SPOTS=[[19,9],[5,7],[7,7],[5,9],[7,9],[9,7],[3,9],[9,9],[11,7],[11,9],[13,7],[13,9],[1,9],[15,7],[15,9],[17,9],[5,11],[7,11],[3,11],[9,11],[1,11],[11,11],[13,11],[15,11],[17,11],[19,11],[21,11],[21,9],[19,10],[21,10]];
 const storable=it=>!!it&&['station','can','basket','power','ext','dirty','plate'].includes(it.kind);
@@ -759,6 +759,8 @@ function putOutside(objs){
 // whatever was left outside is not taken along, but kept for the next layout
 function stashOutside(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];
+    // a signboard left standing on the plaza stays where it is (it becomes a sign tile)
+    if(c.t==='ground'&&c.item&&c.item.kind==='station'&&c.item.st==='sign'){S.map[y][x]={t:'sign',item:null,prog:0,burn:0};continue}
     if(c.t==='ground'&&c.item){if(storable(c.item))S.stored.push(c.item);c.item=null}}
 }
 // a watering can / basket comes out already standing on a plain counter: they move together anyway
@@ -787,7 +789,7 @@ function setupLayout(){
   toolsOnCounters(objs);
   putOutside(objs);
   rebuildStations();
-  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;
+  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layLock=1;   // ignore 持つ/作業 for 1 s so the last long press does not carry over
   hideOv();
 }
 const REQUIRED=['sink','planter','can','seedbox','fridge','board','stove','blender','plates','trash','basket'];
@@ -843,7 +845,7 @@ function showEquipShop(){
     ${(()=>{const n=Math.min(3,S.eqBuys||0),left=3-n,dot=i=>`<span style="display:inline-block;width:24px;height:24px;border-radius:50%;margin:0 4px;vertical-align:middle;box-sizing:border-box;border:3px solid #ffd84a;background:${i<n?'#ffd84a':'transparent'}"></span>`;
       return `<div style="display:inline-block;margin:4px 0 6px;padding:8px 18px;border-radius:14px;background:${left?'rgba(255,216,74,.16)':'rgba(255,120,120,.18)'};border:2px solid ${left?'#ffd84a':'#ff9c9c'}"><b style="font-size:1.15em">買えるのは3つまで</b>　${dot(0)}${dot(1)}${dot(2)}　<b style="font-size:1.15em;color:${left?'#ffd84a':'#ff9c9c'}">${left?'あと'+left+'つ':'上限です'}</b></div>`})()}
     <p>買うたびに値段が上がります（買った物は売り切れ）（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
-    <div class="cards" style="min-height:40vh">${cards}</div>
+    <div class="cards" style="min-height:36vh">${cards}</div>
     <div class="row">${S.eqRerolled||(S.eqBuys||0)>0?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${(S.eqBuys||0)>0?' autofocus':''}" data-act="eqdone">${(S.eqBuys||0)>0?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
 function startDayLayout(){
@@ -852,7 +854,7 @@ function startDayLayout(){
   S.stored=[];S.pendingEquip=[];S.supply=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
-  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;
+  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;S.layLock=1;
   hideOv();
 }
 function layoutLeft(){
@@ -1009,26 +1011,26 @@ function readInput(i){
 }
 function deviceInput(){
   const a=baseInput(0),b=baseInput(1,true);
-  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw,sk:a.sk||b.sk,swH:a.swH||b.swH};
+  return {mx:a.mx+b.mx,my:a.my+b.my,pick:a.pick||b.pick,act:a.act||b.act,sw:a.sw||b.sw,bk:a.bk||b.bk,sk:a.sk||b.sk,swH:a.swH||b.swH};
 }
 function baseInput(i,keysOnly){
-  let mx=0,my=0,pick=false,act=false,sw=false,sk=false,swH=false;
+  let mx=0,my=0,pick=false,act=false,sw=false,sk=false,swH=false,bk=false;
   if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw;sk=touch.sk;swH=touch.swH}
   const k=KB[i];
   if(k){
     const h=a=>a.some(c=>held.has(c)), p=a=>a.some(c=>pressed.has(c));
     if(h(k.up))my-=1; if(h(k.down))my+=1; if(h(k.left))mx-=1; if(h(k.right))mx+=1;
-    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw); sk=sk||p(k.sk); swH=swH||h(k.sw);
+    pick=pick||p(k.pick); act=act||h(k.act); sw=sw||p(k.sw); bk=bk||p(k.sw); sk=sk||p(k.sk); swH=swH||h(k.sw);
     if(mx||my||pick||act||sw)LASTIN[i]='kb';
   }
   const ps=keysOnly?null:pads[i];
   if(ps){
     if(Math.abs(ps.ax)>0.3)mx+=ps.ax; if(Math.abs(ps.ay)>0.3)my+=ps.ay;
     if(ps.now.l)mx-=1; if(ps.now.r)mx+=1; if(ps.now.u)my-=1; if(ps.now.d)my+=1;
-    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw'); sk=sk||ps.edge('sk'); swH=swH||ps.now.sw;
+    pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw'); bk=bk||ps.edge('bk'); sk=sk||ps.edge('sk'); swH=swH||ps.now.sw;
     if(Math.abs(ps.ax)>0.3||Math.abs(ps.ay)>0.3||ps.now.a||ps.now.x||ps.now.sw||ps.now.l||ps.now.r||ps.now.u||ps.now.d)LASTIN[i]='pad';
   }
-  return {mx,my,pick,act,sw,sk,swH};
+  return {mx,my,pick,act,sw,sk,swH,bk};
 }
 
 // ---------- collision ----------
@@ -1485,8 +1487,8 @@ function takeSeat(p){p.seat={x:p.x,y:p.y,dx:p.dx,dy:p.dy};p.x=SEAT[0];p.y=SEAT[1
 function leaveSeat(p){if(!p.seat)return;Object.assign(p,{x:p.seat.x,y:p.seat.y,dx:p.seat.dx,dy:p.seat.dy});p.seat=null}
 function seatInput(p,inp){
   p.tx=-9;p.ty=-9;
-  // 持つ gets you in and out (切替 also gets you out); 作業 moves the lever
-  if(inp.pick||inp.sw||!(S.phase==='drive'||S.phase==='stop')){leaveSeat(p);return}
+  // 持つ or B gets you out; 作業 moves the lever
+  if(inp.pick||inp.bk||!(S.phase==='drive'||S.phase==='stop')){leaveSeat(p);return}
   if(inp.act&&!p.prevAct){S.speed=S.speed===2?1:2;sfx('lever');say(p,'スピード：'+SPEED_N[S.speed]+'（1回の走行で'+FUEL_USE_TXT[S.speed]+'）')}
 }
 const unseatAll=()=>{if(S)S.players.forEach(leaveSeat)};
@@ -1603,9 +1605,9 @@ function gatherInput(p,inp,dt){
   const g=p.g,O=GOBJ[g.obj],tap=inp.act&&!p.prevAct;
   if(g.st===2){ // a random catch: keep it or put it back
     if(inp.pick){addToBasket(p,Array(forageMul(p)).fill(g.item));p.g=null;sfx('put')}
-    else if(inp.sw){float(g.x+.5,g.y,'戻した','#cfe');p.g=null;sfx('put')}
+    else if(inp.bk){float(g.x+.5,g.y,'戻した','#cfe');p.g=null;sfx('put')}
     return}
-  if(inp.sw){p.g=null;return} // quit
+  if(inp.bk){p.g=null;return} // quit with B
   if(O.act==='fish'){
     g.t-=dt;
     if(g.st===0){if(tap){say(p,'早すぎた！');sfx('miss');p.g=null;return}if(g.t<=0){g.st=1;g.t=FISH_BITE;sfx('bite')}}
@@ -2122,7 +2124,7 @@ function showPersonal(){
   const n=S.pupDone.filter(Boolean).length;
   showOv(`<div class="box big"><h2>個人パワーアップ（全員いっせい）</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}　選んだ人は下の枠に移ります（${n}/${S.players.length}人）</p>
-    <div class="cards" style="min-height:40vh">${cards}</div>
+    <div class="cards" style="min-height:36vh">${cards}</div>
     <button class="ovbtn hold pupnext" data-act="pupnext" data-v="" style="display:block;width:100%;margin-top:10px;min-height:56px">次へ</button></div>`);
   // test bots pick a random card by themselves
   setTimeout(()=>{if(!S||S.phase!=='pup')return;S.players.forEach((p,i)=>{if(S.bots&&S.bots.includes(i)&&S.phase==='pup'&&!S.pupDone[i])takePersonal(i,Math.floor(Math.random()*S.pupOffers.length))})},600);
@@ -2147,7 +2149,7 @@ function showUpgrade(){
       <span class="needs">${u.tgt?`<span class="pay">↑ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>${moneyBig()}
-    <div class="cards" style="min-height:40vh">${cards}</div>
+    <div class="cards" style="min-height:36vh">${cards}</div>
     ${S.rerollUsed?'':`<div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G・1回だけ）</button></div>`}
     ${owned?`<p class="mut">持っている強化：${owned}</p>`:''}</div>`);
 }
@@ -2262,8 +2264,8 @@ function lobbySelUpdate(dt){
   if(mv&&!s.ok){const n=SKILL_K.length,rows=Math.ceil(n/SEL_COLS);let c=s.cur%SEL_COLS,r=Math.floor(s.cur/SEL_COLS);
     if(dx)c=wrap(c+dx,SEL_COLS);else if(dy)r=wrap(r+dy,rows);lobbySelMove(Math.min(n-1,r*SEL_COLS+c))}
   if(inp.pick&&!s.ok){s.ok=true;s.done=0.5;sfx('ready')}
-  else if(inp.sw&&s.ok){s.ok=false;s.done=0;sfx('put')}
-  else if((inp.sw||pressed.has('Escape')||(pads[0]&&pads[0].edge('bk')))&&!s.ok){titlePickClose(null);return}   // back without changing
+  else if(inp.bk&&s.ok){s.ok=false;s.done=0;sfx('put')}
+  else if((inp.bk||pressed.has('Escape'))&&!s.ok){titlePickClose(null);return}   // back without changing
   if(s.ok){s.done-=dt;if(s.done<=0)titlePickClose(SKILL_K[s.cur])}                // OK: back to the title
 }
 function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
@@ -2544,10 +2546,10 @@ function marketInput(p,inp,dt){
   if(S.phase!=='stop'||!c||c.t!=='market'){p.mk=false;p.prevAct=inp.act;p.actT=0;return}
   if(inp.pick){p.mk=false;p.prevAct=inp.act;p.actT=0;return}       // 持つ closes the list
   const dy=inp.my<-0.5?-1:0;
-  if(dy<0){p.mk=false;p.prevAct=inp.act;p.actT=0;return}           // step back up: close the list
-  // 切替 (LB / RB) picks the next item, the same as the road shops
-  const move=!!inp.sw;
-  if(move){p.cur=wrap(p.cur,S.market.length)+1;p.actT=0}
+  if(dy<0||inp.bk){p.mk=false;p.prevAct=inp.act;p.actT=0;return}   // step back up or B: close the list
+  // 十字キーの左右 picks the next / previous item (one step per press)
+  const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,move=dx!==0&&dx!==(p.mkDx||0);p.mkDx=dx;
+  if(move){p.cur=p.cur+dx;p.actT=0}
   // buying is a long press of 作業, like the road shops
   if(!inp.act){p.lock=false;p.actT=0}
   else if(!p.lock&&!move){p.actT+=dt;if(p.actT>=BUY){p.actT=0;p.lock=true;buy(S.market,p,null,p.tx,p.ty)}}
@@ -2579,7 +2581,7 @@ function menuInput(p,inp,dt){
     else{S.seeds[id]--;p.hold={kind:'seed',id}}
     p[M.key]=id;
     p.menu=null;
-  } else if(inp.sw||actEdge){p.menu=null}
+  } else if(inp.sw||inp.bk||actEdge){p.menu=null}   // L or B: close the fridge / seed box
 }
 
 // holding a finished dish (no plate yet) and a sink with washed plates is close by (front, side or behind, ~1.4 tiles): 持つ goes to that sink,
@@ -2638,7 +2640,7 @@ function update(dt){
   // players
   S.players.forEach((p,i)=>{
     NET.quietFx=NET.role==='host'&&i>0;
-    let inp=S.phase==='stop'&&S.sub==='closing'?NOINP:readInput(i);   // closing time: everyone stands still
+    let inp=(S.phase==='stop'&&S.sub==='closing')||(S.phase==='layout'&&(S.layLock||0)>0)?NOINP:readInput(i);   // closing time: everyone stands still; layout: 3 s lock after the last screen
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);
@@ -2694,7 +2696,7 @@ function update(dt){
   NET.quietFx=false;
   tickFlights();
   // phase
-  if(S.phase==='layout'){S.timer=S.tut?999:Math.max(0,S.timer-dt);if(S.tut)tutUpdate(dt)}
+  if(S.phase==='layout'){S.timer=S.tut?999:Math.max(0,S.timer-dt);S.layLock=Math.max(0,(S.layLock||0)-dt);if(S.tut)tutUpdate(dt)}
   else if(S.phase==='drive'){
     if(S.tut)tutUpdate(dt);
     const zone=S.shops.some(inWindowZone);
@@ -4223,7 +4225,7 @@ function selectUpdate(dt){
     if(mv&&!s.ok){const n=SKILL_K.length,rows=Math.ceil(n/SEL_COLS);let c=s.cur%SEL_COLS,r=Math.floor(s.cur/SEL_COLS);
       if(dx)c=wrap(c+dx,SEL_COLS);else if(dy)r=wrap(r+dy,rows);selMove(p,Math.min(n-1,r*SEL_COLS+c))}
     if(inp.pick&&!s.ok){s.ok=true;sfx('ready')}
-    else if(inp.sw&&s.ok){s.ok=false;sfx('put')}
+    else if(inp.bk&&s.ok){s.ok=false;sfx('put')}
   });
   NET.quietFx=false;
   // everyone OK → a short countdown (anyone taking it back stops it); the host (P1) can also hold 作業 to go at once

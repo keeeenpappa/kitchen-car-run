@@ -524,7 +524,7 @@ const EQUIP={
   board:{n:'まな板',e:'🔪',price:20,pros:[{n:'よく切れるまな板',d:'切る時間 -40%'},{n:'自動まな板',d:'置いておくと自動で切れる（人の6割の速さ）'}]},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
-  counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上の完成品は、次の町のメニューの料理に変わって持ち越せる（材料の数が近いものを優先）。未完成の食材はそのまま残る'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'増し増しカウンター',d:'生の食材を置くと自動で10個まで増えていく（1台で1種類。手で足せば最大15個）。置いてある数が多いほど増えるのが速い（最初の1個は30秒）。1個ずつ取れて、次の町へ持ち越せる'}]},
+  counter:{n:'カウンター',e:'🟫',price:8,rareOnly:true,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'（廃止）',gone:true},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'増し増しカウンター',d:'生の食材を置くと自動で10個まで増えていく（1台で1種類。手で足せば最大15個）。置いてある数が多いほど増えるのが速い（最初の1個は30秒）。1個ずつ取れて、次の町へ持ち越せる'}]},
   warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
   sign:{n:'呼び込み看板',e:'🪧',price:20,noShop:true},
   lucky:{n:'ラッキーボックス',e:'🎰',price:15,noShop:true},
@@ -533,7 +533,7 @@ const EQUIP={
   table:{n:'テーブル',e:'🪑',price:12,outside:true,pro:{n:'くつろぎテーブル',d:'このテーブルに座っているお客さんの我慢ゲージがゆっくり減る（×0.7）'}},
   teapot:{n:'癒しのティーポット',e:'🫖',price:20,noShop:true},
   bench:{n:'ひとやすみベンチ',e:'🛋️',price:20,noShop:true},
-  vault:{n:'保管庫ボックス',e:'🗄️',price:20,noShop:true},
+  vault:{n:'保管ボックス',e:'🗄️',price:20,noShop:true},
   can:{n:'じょうろ',e:'💧',price:12,tool:true,noShop:true,pro:{n:'大きなじょうろ',d:'水 +2回分'}},
   basket:{n:'カゴ',e:'🧺',price:12,tool:true,noShop:true,pro:{n:'大きなカゴ',d:'入る数 +2'}},
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
@@ -547,7 +547,7 @@ function equipOffer(id,priceMul,proChance){
 // a rare version is stored as a number: 1 = first variant, 2 = second (the planter has two)
 const proList=id=>EQUIP[id]?(EQUIP[id].pros||(EQUIP[id].pro?[EQUIP[id].pro]:[])):[];
 const proInfo=(id,pro)=>proList(id)[(pro||1)-1]||{n:'',d:''};
-const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n+(id==='counter'?' ×2個':'');
+const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n;
 function makeEquip(id,pro){
   if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
   if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
@@ -560,7 +560,7 @@ const upTotal=o=>o&&o.ups?Object.values(o.ups).reduce((a,b)=>a+b,0):0;
 const canCap=it=>S.up.canCap+(it.bonus||0)+2*upN(it,'can');
 const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
 const PRO_ONLY=['board','stove','planter'];
-const BENCH_P=0.1, BENCH_CD=3, VAULT_P=0.12, VAULT_MAX=3;   /* ひとやすみベンチ: 2 tiles outside, 2 chefs, skill cooldown x3 while sitting / 保管庫ボックス: 3 cooked foods or dishes, kept between towns */
+const BENCH_P=0.1, BENCH_CD=3, VAULT_P=0.12, VAULT_MAX=3;   /* ひとやすみベンチ: 2 tiles outside, 2 chefs, skill cooldown x3 while sitting / 保管ボックス: 3 cooked foods or dishes, kept between towns */
 const TEA_P=0.1, TEA_MUL=0.85, TEA_R=3, TBL_MUL=0.7;   /* 癒しのティーポット: seated customers within 3 tiles lose patience x0.85 / ★くつろぎテーブル: x0.7 at that table (both can add up) */
 const RARE_P=0.5, LUCKY_P=0.08, LUCKY_T=2, WARP_P=0.08, FAST_MUL=1.3, WARP_OUT=[QX-1,QY], WARP_CD=3, WARP_HOLD=1;   /* WARP_HOLD: seconds standing on the gate before it sends the chef */   /* ★足速カウンター speed; the warp gate's fixed exit (one tile left of the first spot of the line) and wait */
 const nearFast=p=>{const x0=Math.floor(p.x),y0=Math.floor(p.y);for(let y=y0-1;y<=y0+1;y++)for(let x=x0-1;x<=x0+1;x++){const c=tile(x,y);if(c&&c.t==='counter'&&c.pro===4)return true}return false};
@@ -720,19 +720,6 @@ const TIER=np=>np>=7?{c:9,p:3,b:2,k:2,t:4,plate:7}:np>=5?{c:7,p:2,b:2,k:1,t:3,pl
 function addCleanPlates(n){if(!S||!S.map||n<=0)return;for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'){k.clean=(k.clean||0)+n;return}}}
 // a finished dish left on a ★持ち越しカウンター (marked at the town's end) becomes one of the next town's dishes:
 // the same number of ingredients if the menu has one, otherwise the nearest count (fewer first); picked at random
-function carryDishes(){
-  if(!S||!S.map||!S.next||!S.next.menu)return;
-  const menu=S.next.menu.filter(k=>RECIPES[k]);
-  for(const r of S.map)for(const c of r){
-    const h=c.item;if(!h||!h.carryDish)continue;
-    delete h.carryDish;
-    const n=h.items.length,order=[];for(let m=n;m>=1;m--)order.push(m);for(let m=n+1;m<=8;m++)order.push(m);
-    let cand=[];for(const m of order){cand=menu.filter(k=>RECIPES[k].ings.length===m);if(cand.length)break}
-    if(!cand.length)continue;
-    const k=cand[rnd(cand.length)];
-    c.item={kind:'plate',bare:false,items:RECIPES[k].ings.map(x=>({kind:'ing',id:rid(x),step:rstep(x),burnt:false}))};
-  }
-}
 // the truck grows when the next town is chosen; the equipment for the new seats goes outside at the next 配置
 function confirmSeats(){
   if(!S||!S.map)return;
@@ -859,7 +846,7 @@ function showEquipShop(){
   // 3 plain items; about every other visit one of them is a rare, picked evenly from ALL rare versions (each ★ is as likely as any other)
   if(!S.eqOffers){
     S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly),3+(S.extraOffer?1:0)).map((id,i)=>{const o=equipOffer(id,1,PRO_ONLY.includes(id)?1:0);return i===3&&S.extraOffer?Object.assign(o,{bonus:1}):o});
-    if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((_,i)=>R.push([id,i+1]));
+    if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((p0,i)=>{if(!p0.gone)R.push([id,i+1])});
       const [id,pro]=R[rnd(R.length)];S.eqOffers[rnd(3)]={type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*1.8)}}
   }
   const addSpecial=o=>{const cap=3+(S.extraOffer?1:0);if(S.eqOffers.length>=cap)S.eqOffers.splice(S.eqOffers.length-1,1,o);else S.eqOffers.push(o)};
@@ -1527,11 +1514,11 @@ function doPick(p,c,tx,ty){
 // the driver's seat in the cab, next to the lever. Sit down by pressing 持つ while facing the lever from the tile in front of it.
 let SEAT=[15.5,2.8];
 const canSeat=p=>(S.phase==='drive'||(S.phase==='stop'&&S.sub!=='service'))&&p.tx===LEVER[0]&&p.ty===LEVER[1]&&!S.players.some(q=>q.seat);
-// ---------- 保管庫ボックス: up to VAULT_MAX cooked foods / finished dishes, taken out one at a time (切替 picks which) ----------
+// ---------- 保管ボックス: up to VAULT_MAX cooked foods / finished dishes, taken out one at a time (切替 picks which) ----------
 function vaultUse(p,c,tx,ty){
   const vs=c.vs||(c.vs=[]),h=p.hold;
   if(!h||emptyPlate(h)){   // empty hand (or an empty plate): open the list, like the fridge; left / right to choose
-    if(!vs.length){say(p,'保管庫は空（調理済みの物や完成品を入れる）');return}
+    if(!vs.length){say(p,'保管ボックスは空（調理済みの物や完成品を入れる）');return}
     p.menu={kind:'vault',sel:0,tx,ty};p.menuLast='0,0';p.menuRep=0;return}
   let item=null,rest=null;
   if(h.kind==='ing'&&h.step>0&&!h.burnt)item=h;
@@ -1539,7 +1526,7 @@ function vaultUse(p,c,tx,ty){
     item={kind:'plate',bare:true,items:h.items};
     if(!h.bare)rest={kind:'plate',bare:false,items:[]}}   // the plate stays in hand, only the food goes in
   if(!item){say(p,'入れられるのは調理済みの物と完成品だけ');return}
-  if(vs.length>=VAULT_MAX){say(p,'保管庫がいっぱい（'+VAULT_MAX+'個まで）');return}
+  if(vs.length>=VAULT_MAX){say(p,'保管ボックスがいっぱい（'+VAULT_MAX+'個まで）');return}
   vs.push(item);p.hold=rest;sfx('put');
 }
 // taking number i out of the open list: into the hands, or onto an empty plate that is in hand
@@ -2100,8 +2087,6 @@ function clearKitchen(){
     if(TOOL[c.item.kind]){if(c.item.kind==='basket'){lost+=c.item.items.length;c.item.items=[]}continue}
     if(c.item.kind==='station')continue; // bought equipment not installed yet is kept
     if(c.t==='counter'&&c.pro===5)continue;   // ★増やすカウンター keeps its stack
-    if(c.t==='counter'&&c.pro===2){ // ★持ち越しカウンター: a finished dish becomes a dish of the next town (carryDishes); other food stays as it is
-      if(c.item.kind==='plate'&&!c.item.bare&&c.item.items.length&&matchRecipe(c.item.items))c.item.carryDish=true;continue}
     // plates stay where they are: empty / dirty ones as they are, a dish loses its food and is left dirty
     if(emptyPlate(c.item)||c.item.kind==='dirty')continue;
     if(c.item.kind==='plate'&&!c.item.bare){lost++;c.item={kind:'dirty',cnt:1};continue}
@@ -2440,12 +2425,12 @@ function ovAction(a,v){
     if(v==='mode')MODE=MODE==='tour'?'casual':'tour';else if(v==='kit')TSET.kit=TSET.kit==='layout'?'preset':'layout';else if(v==='bot'){const L=[0,2,3,4,5,6,7];TSET.bot=L[(L.indexOf(TSET.bot)+1)%L.length]}
     showTitle();const i=ovButtons().findIndex(b=>b.dataset.act==='tcyc'&&b.dataset.v===v);ovSel=Math.max(0,i);markSel();play('confirm');return}
   if(a==='tstart'){newRun(1+TSET.bot,TSET.kit,TSET.bot>0)}   // player 1 + the chosen number of bots
-  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();carryDishes();if(S.stop===0)startDrive();else startDayLayout()}
+  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
     if((S.eqBuys||0)>=3)return;
     const o=S.eqOffers[+v];if(!o||o.sold)return;const pr=eqPrice(o);o.sold=1;   /* bought: sold out, no second copy of the same card */
     if(S.money<pr){o.sold=0;const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=pr+'G（お金が足りない）';return}
-    S.money-=pr;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */S.eqBuys=(S.eqBuys||0)+1;const left=S.ovT;sfx('coin');showEquipShop();S.ovT=left;
+    S.money-=pr;S.pendingEquip.push({id:o.id,pro:o.pro});S.eqBuys=(S.eqBuys||0)+1;const left=S.ovT;sfx('coin');showEquipShop();S.ovT=left;
   }
   else if(a==='eqreroll'){
     if(S.eqRerolled||(S.eqBuys||0)>0)return;
@@ -2623,7 +2608,7 @@ function overlayInput(){
 
 // ---------- fridge / seed box menu ----------
 const MENU={
-  vault:{title:'保管庫',cols:3,list:p=>{const c=p&&p.menu?tile(p.menu.tx,p.menu.ty):null;return c&&c.vs?c.vs:[]},count:()=>1,key:'lastV'},
+  vault:{title:'保管ボックス',cols:3,list:p=>{const c=p&&p.menu?tile(p.menu.tx,p.menu.ty):null;return c&&c.vs?c.vs:[]},count:()=>1,key:'lastV'},
   fridge:{title:'冷蔵庫',cols:5,list:()=>stockList(),count:id=>S.stock[id]||0,key:'lastF'},
   seedbox:{title:'種箱',cols:4,list:()=>seedList(),count:id=>S.seeds[id]||0,key:'lastS'},
 };
@@ -4023,7 +4008,7 @@ function drawVaultTile(c,X,Y){
     ctx.fillStyle='rgba(40,60,70,.28)';rr(sx-b.w*0.13,sy-b.th*0.3,b.w*0.26,b.th*0.6,4);ctx.fill();
     if(vs[k])drawItem(vs[k],sx,sy,b.w*0.3);
 }
-  frontLabel(b,'保管庫');
+  frontLabel(b,'保管ボックス');
 }
 function drawTeapot(X,Y){
   if(fimg('tool_teapot')){softShadow(X,Y+T*0.34,T*0.3,5,.35);toolImg('tool_teapot',X,Y-T*0.04,T,1.05);return}   /* a little teapot with steam (placeholder until the picture comes) */
@@ -4828,7 +4813,7 @@ function drawArrive(){
 // ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
 // and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
 // does not move the picture -----
-const PZ=1.6, UZ=1.45, PCZ=1.5, BOARD_H=1.8, STRIP_H=0.6;   // STRIP_H: on a phone, the strip of materials sits just above the customer board   // phone 1.6x, PC 1.5x close-up; the customer board takes the bottom rows
+const PZ=1.6, UZ=1.45, PCZ=1.5, BOARD_H=1.8, STRIP_H=0.9;   // STRIP_H: on a phone, the strip of materials sits just above the customer board   // phone 1.6x, PC 1.5x close-up; the customer board takes the bottom rows
 const CAM={x:0,y:0,ok:false};
 let VIEW='auto', PHONE_INFO=false;
 try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}
@@ -4844,7 +4829,7 @@ function updateCam(dt){
   if(!camFollow()){CAM.ok=false;return}
   const p=localP();if(!p)return;
   const z=camZoom(),vw=GW/z,vh=(VH-boardH())/z;
-  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2)),ty=Math.max(0,Math.min(VH-vh,p.y-vh/2+(S.phase==='drive'&&nearWindow(p)?0.9:0)));   // centred on the chef (a little lower at a window, so the shop's list and its key hint stay in view)
+  let tx=Math.max(0,Math.min(GW-vw,p.x-vw/2)),ty=Math.max(0,Math.min(VH-(phoneView()?0.5:0)-vh,p.y-vh/2+(S.phase==='drive'&&nearWindow(p)?0.9:0)));   // centred on the chef (a little lower at a window, so the shop's list and its key hint stay in view)
   if(!CAM.ok){CAM.x=tx;CAM.y=ty;CAM.ok=true;return}
   // a soft slide, no jumps, and never faster than the chef walks (4.2 tiles/s)
   const k=Math.min(1,dt*2.2),mx=4.2*(S.up.speed||1)*((p.skT||0)>0&&p.skill==='dash'?1.5:1)*(1+0.05*pupN(p,'spd'))*dt,cl=v=>Math.max(-mx,Math.min(mx,v));CAM.x+=cl((tx-CAM.x)*k);CAM.y+=cl((ty-CAM.y)*k);
@@ -5024,19 +5009,19 @@ function drawTopBar(){
 }
 const isMine=p=>NET.role==='off'||p.i===NET.mySlot;
 // phone: the materials this town needs and how many are in the fridge, in a strip just above the customer board
-function drawStockStrip(y,h){
+function drawStockStrip(y,h){   /* phone: the materials of this town and the fridge counts, in the middle, big */
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   if(!twn)return;
   ctx.fillStyle='rgba(30,44,50,.94)';ctx.fillRect(0,y,GW*T,h);
-  const cy=y+h/2;
-  text('材料',8,cy,11,'#ffe08a',800,'left');
-  let x=52;
-  for(const id of townNeeds(twn)){
+  const cy=y+h/2,ids=townNeeds(twn),iw=64;
+  ctx.font=`800 17px ${FNT}`;const lw=ctx.measureText('材料').width+12,tot=lw+ids.length*iw;
+  let x=Math.max(4,(GW*T-tot)/2);
+  text('材料',x,cy,17,'#ffe08a',800,'left');x+=lw;
+  for(const id of ids){
     const n=S.stock[id]||0;
-    if(x>GW*T-40)break;
-    emoji(ingIc(id),x+7,cy,13);
-    text(String(n),x+17,cy,12,n?'#fff':'#ff9c9c',800,'left');
-    x+=40;
+    emoji(ingIc(id),x+11,cy,20);
+    text(String(n),x+26,cy,19,n?'#fff':'#ff9c9c',800,'left');
+    x+=iw;
   }
 }
 function drawCustBoard(y0,h){
@@ -5058,7 +5043,7 @@ function drawCustBoard(y0,h){
     ctx.fillStyle=r>0.35?'#f6d36a':'#d63b3b';rr(x+6,by+38,(cw-12)*r,6,3);ctx.fill();
     const oid=c.type==='boss'?pendingOrders(c)[0]:c.order||(c.orders&&c.orders[0]);if((seat||takeout)&&oid&&RECIPES[oid])emoji(dishIc(oid),cx,by+bh-15,28);
   };
-  for(let i=0;i<NS;i++)card(xs+i*(cw+gap),seats[i]||null,false,true);
+  {const ph=phoneView();for(let i=0;i<NS;i++)card(xs+(ph?NS-1-i:i)*(cw+gap),seats[i]||null,false,true)}   // phone: the table seats fill from the right
   for(let i=0;i<QMAX;i++){const c=wait[i]||null;card(xq+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}
   for(const [lx,lab] of [[13,'テーブル席'],[xq-12,'待ち列']]){const ch=[...lab],lh=12,top0=y0+h/2-(ch.length-1)*lh/2;ch.forEach((c2,i)=>text(c2==='ー'?'｜':c2,lx,top0+i*lh,11,'#cfe0e2',800))   /* vertical writing: the long-vowel mark stands upright */}
 }

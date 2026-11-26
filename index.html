@@ -1844,6 +1844,14 @@ function genShopItems(ty){
     const add=ty.gen().find(m=>m.type==='mystery'||!items.some(i=>i.type===m.type&&i.id===m.id));
     if(add)items.push(add);
   }
+  // ★遠回りルート: a food stall always shows 3 things (filled from any food stall's goods)
+  if(S.up.drive>0&&SHOPTYPES.includes(ty)){
+    while(items.length<3){
+      const pool=SHOPTYPES.flatMap(s=>s.gen()).filter(m=>!items.some(i=>i.type===m.type&&i.id===m.id));
+      if(!pool.length)break;
+      items.push(pool[rnd(pool.length)]);
+    }
+  }
   items.forEach(i=>i.price=Math.max(2,Math.round(i.price*S.up.shopDisc)));
   return items;
 }
@@ -1851,11 +1859,11 @@ function genMarket(town){
   const out=[],needs=townNeeds(town);
   for(const id of needs){
     if(GATHERABLE.has(id)||ING[id].grow)continue;
-    out.push({type:'pack',id,qty:2,price:Math.round(ING[id].price*1.5)});
+    out.push({type:'pack',id,qty:2,price:Math.max(2,Math.round(ING[id].price*1.5*S.up.shopDisc))});
   }
   // the market always sells every seed (needed ones first)
   const seeds=Object.keys(ING).filter(id=>ING[id].grow).sort((a,b)=>needs.includes(b)-needs.includes(a));
-  for(const id of seeds)out.push({type:'seed',id,qty:2,price:Math.round(ING[id].seed*1.5)});
+  for(const id of seeds)out.push({type:'seed',id,qty:2,price:Math.max(2,Math.round(ING[id].seed*1.5*S.up.shopDisc))});
   return out;
 }
 // 全員ミッション: one per town, "everyone does X once" (alone: X three times). It nudges people out of fixed roles.
@@ -2068,20 +2076,17 @@ const UPS=[
   {id:'pat',e:'🪑',n:'座り心地のいい椅子',d:'客の待ち時間 +20%',max:3,apply:u=>u.pat*=1.2},
   {id:'tip',e:'😊',n:'笑顔の接客',d:'チップ 1.5倍',max:2,apply:u=>u.tip*=1.5},
   {id:'pay',e:'📈',n:'看板メニュー',d:'料理の値段 +10%',max:3,apply:u=>u.pay*=1.1},
-  {id:'plot',e:'🪴',n:'菜園を広げる',d:'菜園 +1マス（次の配置で置く）',max:3,apply:()=>addPlanter()},
   {id:'grow',e:'🌿',n:'肥料',d:'菜園1つの育つ速さ 1.3倍',max:3,tgt:'planter'},
   {id:'can',e:'💧',n:'じょうろの改造',d:'じょうろ1つの水 +2回分',max:2,tgt:'can'},
   {id:'yield',e:'🌾',n:'豊作',d:'菜園1つの収穫 +1個',max:3,tgt:'planter'},
   {id:'shopx',e:'🛒',n:'顔なじみの店',d:'窓口の品数 +1',max:2,apply:u=>u.shopExtra++},
-  {id:'disc',e:'🏷️',n:'値切り上手',d:'窓口の値段 -15%',max:2,apply:u=>u.shopDisc*=0.85},
+  {id:'disc',e:'🏷️',n:'値切り上手',d:'窓口と市場の値段 -15%',max:2,apply:u=>u.shopDisc*=0.85},
   {id:'shoes',e:'👟',n:'軽い靴',d:'移動速度 +15%',max:2,apply:u=>u.speed*=1.15},
   {id:'gather',e:'🎣',n:'採取の名人',d:'採取がかんたんに（連打が少なく、釣りの待ちが短く、当たりが広い）',max:2,apply:u=>{u.gatherSpd*=1.4}},
   {id:'basket',e:'🧺',n:'カゴの改造',d:'カゴ1つに入る数 +2',max:2,tgt:'basket'},
-  {id:'drive',e:'🛣️',n:'遠回りルート',d:'走行中の材料の店 +1軒',max:2,apply:u=>u.drive+=1},
+  {id:'drive',e:'🛣️',n:'遠回りルート',d:'走行中の材料の店 +1軒（材料の店は商品が必ず3つ並ぶ）',max:2,apply:u=>u.drive+=1},
   {id:'heart',e:'❤️',n:'いい口コミ',d:'評判 ♥ を1つ回復',max:9,cond:()=>S.hearts<HEART_MAX,apply:()=>{S.hearts++}},
 ];
-// the new planter is handed over outside and placed in the next layout time
-function addPlanter(){S.pendingEquip.push({id:'planter',pro:0})}
 const TGTN={sink:'シンク',stove:'コンロ',board:'まな板',blender:'ミキサー',planter:'菜園',can:'じょうろ',basket:'カゴ'};
 const upById=id=>UPS.find(u=>u.id===id);
 // the money, big, on the screens between towns

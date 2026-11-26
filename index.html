@@ -521,7 +521,7 @@ const EQUIP={
   board:{n:'まな板',e:'🔪',price:20,pros:[{n:'よく切れるまな板',d:'切る時間 -40%'},{n:'自動まな板',d:'置いておくと自動で切れる（人の7割の速さ）'}]},
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
-  counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上にのせた物は、町が終わっても次の町へ持ち越せる'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'寝かせカウンター',d:'町が終わったとき上にある食材が、次の町で1段階すすみ、冷蔵庫に同じ食材が1個増える'}]},
+  counter:{n:'カウンター',e:'🟫',price:8,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'上の完成品は、次の町のメニューの料理に変わって持ち越せる（材料の数が近いものを優先）。未完成の食材はそのまま残る'},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'}]},
   warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
   sign:{n:'呼び込み看板',e:'🪧',price:20,noShop:true},
   lucky:{n:'ラッキーボックス',e:'🎰',price:15,noShop:true},
@@ -706,6 +706,21 @@ function growTruck(nt,reroll){
 const TIER=np=>np>=7?{c:9,p:3,b:2,k:2,t:4,plate:7}:np>=5?{c:7,p:2,b:2,k:1,t:3,plate:6}:{c:6,p:2,b:1,k:1,t:3,plate:PLATES_TOTAL};
 // clean plates are kept on the sinks: the first sink on the truck takes them (there is no plate stand)
 function addCleanPlates(n){if(!S||!S.map||n<=0)return;for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'){k.clean=(k.clean||0)+n;return}}}
+// a finished dish left on a ★持ち越しカウンター (marked at the town's end) becomes one of the next town's dishes:
+// the same number of ingredients if the menu has one, otherwise the nearest count (fewer first); picked at random
+function carryDishes(){
+  if(!S||!S.map||!S.next||!S.next.menu)return;
+  const menu=S.next.menu.filter(k=>RECIPES[k]);
+  for(const r of S.map)for(const c of r){
+    const h=c.item;if(!h||!h.carryDish)continue;
+    delete h.carryDish;
+    const n=h.items.length,order=[];for(let m=n;m>=1;m--)order.push(m);for(let m=n+1;m<=8;m++)order.push(m);
+    let cand=[];for(const m of order){cand=menu.filter(k=>RECIPES[k].ings.length===m);if(cand.length)break}
+    if(!cand.length)continue;
+    const k=cand[rnd(cand.length)];
+    c.item={kind:'plate',bare:false,items:RECIPES[k].ings.map(x=>({kind:'ing',id:rid(x),step:rstep(x),burnt:false}))};
+  }
+}
 // the truck grows when the next town is chosen; the equipment for the new seats goes outside at the next 配置
 function confirmSeats(){
   if(!S||!S.map)return;
@@ -1982,7 +1997,6 @@ function spawnGroup(){
   S.cust.push(c);sfx('bell');S.toast={text:'👥 団体さんが来た！ テーブルに案内しよう',t:0,life:3};
 }
 function clearKitchen(){
-  const rested=[];
   for(const r of S.map)for(const c of r){c.fire=0;c.smoke=0}S.fireWarn=false;
   // leftovers from this town are thrown away (planters keep growing)
   // tools (watering can, basket) are kept; whatever is still in the basket is lost
@@ -1992,9 +2006,8 @@ function clearKitchen(){
     if(!c.item)continue;
     if(TOOL[c.item.kind]){if(c.item.kind==='basket'){lost+=c.item.items.length;c.item.items=[]}continue}
     if(c.item.kind==='station')continue; // bought equipment not installed yet is kept
-    if(c.t==='counter'&&c.pro===2)continue; // ★持ち越しカウンター: whatever is on it goes on to the next town
-    if(c.t==='counter'&&c.pro===5&&c.item.kind==='ing'&&!c.item.burnt){   // ★寝かせカウンター: one step on, and one more of it in the fridge
-      if(nextStep(c.item))c.item.step++;if(!ING[c.item.id].mix){S.stock[c.item.id]=(S.stock[c.item.id]||0)+1;rested.push(ING[c.item.id].e)}continue}
+    if(c.t==='counter'&&c.pro===2){ // ★持ち越しカウンター: a finished dish becomes a dish of the next town (carryDishes); other food stays as it is
+      if(c.item.kind==='plate'&&!c.item.bare&&c.item.items.length&&matchRecipe(c.item.items))c.item.carryDish=true;continue}
     // plates stay where they are: empty / dirty ones as they are, a dish loses its food and is left dirty
     if(emptyPlate(c.item)||c.item.kind==='dirty')continue;
     if(c.item.kind==='plate'&&!c.item.bare){lost++;c.item={kind:'dirty',cnt:1};continue}
@@ -2017,7 +2030,6 @@ function clearKitchen(){
       p.hold=null;
       continue}
     lost++;p.hold=null}
-  if(rested.length)S.toast={text:'🌙 寝かせカウンター：冷蔵庫に '+rested.join('')+' +1',t:0,life:4};
   return lost;
 }
 function endStop(){
@@ -2337,7 +2349,7 @@ function ovAction(a,v){
     if(v==='mode')MODE=MODE==='tour'?'casual':'tour';else if(v==='kit')TSET.kit=TSET.kit==='layout'?'preset':'layout';else if(v==='bot'){const L=[0,2,3,4,5,6,7];TSET.bot=L[(L.indexOf(TSET.bot)+1)%L.length]}
     showTitle();const i=ovButtons().findIndex(b=>b.dataset.act==='tcyc'&&b.dataset.v===v);ovSel=Math.max(0,i);markSel();play('confirm');return}
   if(a==='tstart'){newRun(1+TSET.bot,TSET.kit,TSET.bot>0)}   // player 1 + the chosen number of bots
-  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();if(S.stop===0)startDrive();else startDayLayout()}
+  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();carryDishes();if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
     if((S.eqBuys||0)>=3)return;
     const o=S.eqOffers[+v];if(!o||o.sold)return;const pr=eqPrice(o);o.sold=1;   /* bought: sold out, no second copy of the same card */

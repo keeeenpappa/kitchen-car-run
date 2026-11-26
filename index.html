@@ -1030,7 +1030,8 @@ function deviceInput(){
 }
 function baseInput(i,keysOnly){
   let mx=0,my=0,pick=false,act=false,sw=false,sk=false,swH=false,bk=false;
-  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw;sk=touch.sk;swH=touch.swH}
+  // the phone's 切替 button is the back button too (B): every back action that the pad's B does also works from it
+  if(i===0){mx+=touch.mx;my+=touch.my;pick=touch.pick;act=touch.act;sw=touch.sw;bk=touch.sw;sk=touch.sk;swH=touch.swH}
   const k=KB[i];
   if(k){
     const h=a=>a.some(c=>held.has(c)), p=a=>a.some(c=>pressed.has(c));

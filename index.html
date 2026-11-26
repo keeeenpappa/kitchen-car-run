@@ -119,6 +119,8 @@ body.touch #pauseBtn{display:none}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .ovbtn{position:relative;font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
+.eqrow{flex-wrap:nowrap;width:max(50%,min(100%,420px))}   /* the button that leaves the shop reaches the middle of the frame */
+.eqrow .ovbtn[data-act=eqdone]{flex:1 1 0;min-width:0}
 .pfr{position:absolute;inset:0;pointer-events:none}
 .pfr .pf{position:absolute;border:3px solid;border-radius:10px;display:block}
 .pfr .pl{position:absolute;top:-10px;text-decoration:none;font-size:11px;font-weight:800;color:#fff;border-radius:6px;padding:0 6px;line-height:17px;text-shadow:0 1px 2px rgba(0,0,0,.5);z-index:2}
@@ -870,7 +872,7 @@ function showEquipShop(){
       return `<div style="display:inline-block;margin:4px 0 6px;padding:8px 18px;border-radius:14px;background:${left?'rgba(255,216,74,.16)':'rgba(255,120,120,.18)'};border:2px solid ${left?'#ffd84a':'#ff9c9c'}"><b style="font-size:1.15em">買えるのは3つまで</b>　${dot(0)}${dot(1)}${dot(2)}　<b style="font-size:1.15em;color:${left?'#ffd84a':'#ff9c9c'}">${left?'あと'+left+'つ':'上限です'}</b></div>`})()}
     <p>買うたびに値段が上がります（買った物は売り切れ）（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
     <div class="cards" style="min-height:36vh">${cards}</div>
-    <div class="row">${S.eqRerolled||(S.eqBuys||0)>0?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${(S.eqBuys||0)>0?' autofocus':''}" data-act="eqdone">${(S.eqBuys||0)>0?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
+    <div class="row eqrow">${S.eqRerolled||(S.eqBuys||0)>0?'':`<button class="ovbtn" data-act="eqreroll">品ぞろえを引き直す（${S.rerollCost}G・1回だけ）</button>`}<button class="ovbtn hold${(S.eqBuys||0)>0?' autofocus':''}" data-act="eqdone">${(S.eqBuys||0)>0?'町選びへ進む':'買わずに町選びへ進む'}（${OVK()}）</button></div></div>`);
 }
 function startDayLayout(){
   unseatAll();
@@ -2371,7 +2373,7 @@ function ovDots(arr){
   const bs=ovButtons();
   const pup=!!S&&S.phase==='pup';   /* everyone's face, yourself included; on the host's own choice screens the host's cursor is the highlight, so only the guests get a face */
   ov.classList.toggle('pupmode',pup);
-  bs.forEach((b,i)=>{const who=S&&S.paused?[]:(arr||[]).map((k,j)=>k===i&&(pup||j>0)?j:-1).filter(j=>j>=0),key=who.join(',')+(pup?'p':'');if(b._pd===key)return;b._pd=key;
+  bs.forEach((b,i)=>{const who=S&&(S.paused||S.localPause)?[]:(arr||[]).map((k,j)=>k===i&&(pup||j>0)?j:-1).filter(j=>j>=0),key=who.join(',')+(pup?'p':'');if(b._pd===key)return;b._pd=key;
     let fr=b.querySelector('.pfr');   /* personal pick-ups: each player's coloured frame and 1P / 2P tag moves with the face (frames may overlap, the tags sit side by side on top) */
     if(!pup||!who.length){if(fr)fr.remove()}else{if(!fr){fr=document.createElement('span');fr.className='pfr';b.appendChild(fr)}
       fr.innerHTML=who.map((j,n)=>`<b class="pf" style="inset:0;border-color:${PCOL[j]}"></b><u class="pl" style="left:${6+n*30}px;background:${PCOL[j]}">${j+1}P</u>`).join('')}
@@ -5756,8 +5758,8 @@ function sendSnap(){
   d.gp=S.grp?[S.grp.st,Math.round(S.grp.ann*10),S.grp.orders.map(o=>REC_K.indexOf(o))]:0;
   d.ms=S.msn?[S.msn.k,S.msn.d,S.msn.ok?1:0]:0;
   d.wt=S.waitN||0;d.tx=TX;d.cap=ROOM_CAP;d.md=MODE==='tour'?1:0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
-  d.os=ov.hidden?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
-  d.oc=ov.hidden||S.players.length<2?0:S.players.map((p,i)=>i===0?ovSel:(NET.inputs[i]&&NET.inputs[i][7]!=null?+NET.inputs[i][7]:-1));ovDots(d.oc||[]);
+  d.os=ov.hidden||S.localPause?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
+  d.oc=ov.hidden||personalPause()||S.players.length<2?0:S.players.map((p,i)=>i===0?(S.localPause?-1:ovSel):(NET.inputs[i]&&NET.inputs[i][7]!=null?+NET.inputs[i][7]:-1));ovDots(d.oc||[]);
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);
   let bytes=new TextEncoder().encode(JSON.stringify(d)).length;
   if(bytes>3800){d.fl=[];bytes=new TextEncoder().encode(JSON.stringify(d)).length}

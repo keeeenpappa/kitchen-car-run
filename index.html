@@ -1008,6 +1008,14 @@ function pollPads(){
     if(ONLINE_PAD>0&&pads[ONLINE_PAD]){const t=pads[0];pads[0]=pads[ONLINE_PAD];pads[ONLINE_PAD]=t}
   }
 }
+// stick sensitivity per player (5 steps, 2 = ふつう): a bigger dead zone and a longer way to full speed when lower; kept in this browser
+const SENSN=['とても低い','低め','ふつう','高め','とても高い'];
+const SENS=[2,2,2,2,2,2,2,2];
+try{const v=JSON.parse(localStorage.getItem('kcr-sens')||'null');if(Array.isArray(v))v.forEach((x,i)=>{if(Number.isInteger(x)&&x>=0&&x<=4&&i<8)SENS[i]=x})}catch(_){}
+const sensOf=i=>(SENS[i]==null?2:SENS[i])-2;
+function cycleSens(i){SENS[i]=((SENS[i]==null?2:SENS[i])+1)%5;try{localStorage.setItem('kcr-sens',JSON.stringify(SENS))}catch(_){}}
+// controller stick: dead zone 0.35 and full speed near the far end (0.95) at ふつう; in between it ramps up gently
+const padAx=(v,i)=>{const s=sensOf(i||0),dz=0.35-0.04*s,hi=Math.min(1,0.95-0.07*s),a=Math.abs(v);return a>dz?Math.sign(v)*Math.min(1,(a-dz)/(hi-dz)):0};
 // touch (drives P1)
 const touch={mx:0,my:0,pick:false,act:false,sw:false,sk:false,pause:false};
 const isTouch=('ontouchstart' in window)||(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
@@ -1016,9 +1024,9 @@ if(isTouch)document.body.classList.add('touch');
   const joy=document.getElementById('joy'),knob=document.getElementById('knob');
   let jid=null;
   const upd=e=>{const r=joy.getBoundingClientRect(),R=r.width/2;let dx=e.clientX-(r.left+R),dy=e.clientY-(r.top+R);
-    const d=Math.hypot(dx,dy),max=R*0.75;if(d>max){dx*=max/d;dy*=max/d}
+    const sn=sensOf(0),d=Math.hypot(dx,dy),max=R*(0.9-0.07*sn);if(d>max){dx*=max/d;dy*=max/d}
     knob.style.transform=`translate(${dx}px,${dy}px)`;
-    const nx=dx/max,ny=dy/max;touch.mx=Math.abs(nx)>0.25?nx:0;touch.my=Math.abs(ny)>0.25?ny:0};
+    const nx=dx/max,ny=dy/max;const dzn=0.3-0.025*sn;touch.mx=Math.abs(nx)>dzn?nx:0;touch.my=Math.abs(ny)>dzn?ny:0};
   const end=e=>{if(e.pointerId!==jid)return;jid=null;touch.mx=0;touch.my=0;knob.style.transform=''};
   joy.addEventListener('pointerdown',e=>{e.preventDefault();jid=e.pointerId;joy.setPointerCapture(jid);upd(e)});
   joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)upd(e)});
@@ -1057,7 +1065,7 @@ function baseInput(i,keysOnly){
   }
   const ps=keysOnly?null:pads[i];
   if(ps){
-    if(Math.abs(ps.ax)>0.3)mx+=ps.ax; if(Math.abs(ps.ay)>0.3)my+=ps.ay;
+    mx+=padAx(ps.ax,i); my+=padAx(ps.ay,i);
     if(ps.now.l)mx-=1; if(ps.now.r)mx+=1; if(ps.now.u)my-=1; if(ps.now.d)my+=1;
     pick=pick||ps.edge('a'); act=act||ps.now.x; sw=sw||ps.edge('sw'); bk=bk||ps.edge('bk'); sk=sk||ps.edge('sk'); swH=swH||ps.now.sw;
     if(Math.abs(ps.ax)>0.3||Math.abs(ps.ay)>0.3||ps.now.a||ps.now.x||ps.now.sw||ps.now.l||ps.now.r||ps.now.u||ps.now.d)LASTIN[i]='pad';
@@ -1282,6 +1290,9 @@ function devRowInner(){
     return `<button class="ovbtn" data-act="dev" data-v="${i}">${'この端末'}：${pr==='auto'?'自動（'+DEVN[cur==='kb'?'kb':cur]+'）':DEVN[pr]}</button>`}).join('');
 }
 const devRow=()=>`<div class="row" id="devRow">${devRowInner()}</div>`;
+const sensRowInner=()=>{const n=NET.role!=='off'?1:Math.max(1,Math.min(S&&S.players?S.players.length:1,4));
+  return '<span style="align-self:center;min-width:9em">スティックの感度</span>'+Array.from({length:n},(_,i)=>`<button class="ovbtn" data-act="sens" data-v="${i}">${n>1?'P'+(i+1)+'：':'この端末：'}${SENSN[SENS[i]==null?2:SENS[i]]}</button>`).join('')};
+const sensRow=()=>`<div class="row" id="sensRow">${sensRowInner()}</div>`;
 const BTN_N={pick:'持つ',act:'作業',sw:'切替',bk:'切替',sk:'スキル'};
 // action name first, then the key: 入れる（Space）, 購入（F長押し）
 function AL(p,k,label,hold){
@@ -1297,7 +1308,7 @@ const OVP=()=>`<span class="kn" data-v="press">${pressText()}</span>`;
 function localizeOv(){
   for(const el of ov.querySelectorAll('.kn'))el.textContent=el.dataset.v==='menu'?keyName(0,'menu'):el.dataset.v==='press'?pressText():ovkText();
   // the rows lose their id in the copy: find them by their buttons, give the id back, show this device's settings
-  for(const [act,id,inner] of [['dev','devRow',devRowInner],['snd','sndRow',sndRowInner]]){
+  for(const [act,id,inner] of [['dev','devRow',devRowInner],['sens','sensRow',sensRowInner],['snd','sndRow',sndRowInner]]){
     const b=ov.querySelector(`[data-act="${act}"]`);if(!b)continue;const row=b.parentElement;row.id=id;row.innerHTML=emoHtml(inner());fillFood(row)}
 }
 function BL(p,k){
@@ -2414,6 +2425,7 @@ function doOv(a,v){
   if(a==='pup'&&S&&S.phase==='pup'){const nx=ovButtons().findIndex(x=>x.classList.contains('pupnext'));if(nx>=0&&ovSel!==nx){ovSel=nx;markSel()}}
   if(a!=='dev'&&a!=='title'&&guestLocked())return;   // the host's choice screens: a guest only watches
   if(a!=='ready'&&a!=='pause')play('confirm');
+  if(a==='sens'){cycleSens(+v);const r=document.getElementById('sensRow');if(r){r.innerHTML=sensRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='sens'&&b.dataset.v===String(v)));markSel()}play('tick');return}
   if(a==='dev'){cycleDev(+v);const r=document.getElementById('devRow');if(r){r.innerHTML=devRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='dev'&&b.dataset.v===String(v)));markSel()}return}
   if(NET.role==='guest'&&a!=='title'&&(NET.mirror||a==='ready'||a==='pause')){guestSend(a,v);return}
   ovAction(a,v);
@@ -2469,7 +2481,7 @@ function canPause(){
   if(['drive','stop','layout','select'].includes(S.phase))return ov.hidden||!!S.guest;
   return ['choose','upgrade','equip'].includes(S.phase);
 }
-const pauseHtml=()=>`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="ctypes">お客さんの種類</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sndRow()}${viewRow()}</div>`;
+const pauseHtml=()=>`<div class="box"><h2>一時停止</h2><p class="mut">${isTouch?'':'<span class="kn" data-v="menu">'+keyName(0,'menu')+'</span> でもつづけられます。'}</p><div class="row"><button class="ovbtn autofocus" data-act="resume">つづける</button><button class="ovbtn" data-act="ctypes">お客さんの種類</button><button class="ovbtn" data-act="title">${NET.role==='off'?'ゲームをやめてタイトルへ':'部屋を出てタイトルへ'}</button></div>${isTouch?'':devRow()}${sensRow()}${sndRow()}${viewRow()}</div>`;
 // the customer types, for the pause menu (shown on this device only)
 const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べる',slow:'気が長いけど、食べるのがゆっくり（テーブルを長く使う）',hasty:'気が短いけど、早く出すとチップが多い',
   big:'食べ終わると、おかわりを頼む',family:'食事中に子どもが歩き回る。子どもの近くで「持つ」で連れ戻すまで帰れない',

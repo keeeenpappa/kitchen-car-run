@@ -304,7 +304,7 @@ const inTblZone=(x,y)=>x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZO
 const PRESET_TABLES=[[4,10],[9,10],[14,10]];
 const tableOK=(x,y)=>inTblZone(x,y)&&!(y===QY&&x>=QX-1)&&S.map[y][x].t==='ground'&&!S.map[y][x].item&&!DIRS.some(([dx,dy])=>{const c=tile(x+dx,y+dy);return c&&c.t==='table'});
 const FIRE_T=3, FIRE_SPREAD=8, EXT_T=0.5, WET_T=6;   /* WET_T: a tile just put out cannot catch fire again for this long */   // a burnt dish left on the stove catches fire after FIRE_T s; fire spreads to a neighbour every FIRE_SPREAD s; spraying takes EXT_T s
-const FLAMMABLE=['counter','board','stove','blender','plates','serve'];
+const FLAMMABLE=['counter','board','stove','blender','serve'];
 const COOK=6, BURN=10, CHOP=2.2, BLEND=4, BUY=0.7, GATHER=1.4, YIELD=2;
 const WATER_DUR=45, FILL=1.0;
 const HEART_MAX=3;
@@ -525,7 +525,6 @@ const EQUIP={
   warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
   sign:{n:'呼び込み看板',e:'🪧',price:20,noShop:true},
   lucky:{n:'ラッキーボックス',e:'🎰',price:15,noShop:true},
-  plates:{n:'皿置き場',e:'🍽️',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
   trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
   table:{n:'テーブル',e:'🪑',price:12,outside:true},
@@ -542,8 +541,7 @@ function equipOffer(id,priceMul,proChance){
 // a rare version is stored as a number: 1 = first variant, 2 = second (the planter has two)
 const proList=id=>EQUIP[id]?(EQUIP[id].pros||(EQUIP[id].pro?[EQUIP[id].pro]:[])):[];
 const proInfo=(id,pro)=>proList(id)[(pro||1)-1]||{n:'',d:''};
-const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n+(id==='plates'?'（皿5枚つき）':id==='counter'?' ×2個':'');
-const PLATES_PER_STAND=5;   // a plate stand bought from a shop comes with 5 more plates (added to the clean pool)
+const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n+(id==='counter'?' ×2個':'');
 function makeEquip(id,pro){
   if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
   if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
@@ -619,7 +617,7 @@ function buildMap(){
   for(let y=1;y<=6;y++){set(1,y,'wall');for(let x=14+TX;x<=16+TX;x++)set(x,y,'wall')}
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++)set(x,y,'floor');
   /* the ready-made kitchen holds exactly what a self-made layout gets: COUNTERS_GIVEN counters, PLANTERS_GIVEN planters, one of each unit */
-  const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','plates','trash'];
+  const top=['counter','fridge','seedbox','sink','board','counter','stove','counter','stove','blender','counter','trash'];
   top.forEach((t,i)=>set(2+i,2,t));
   set(2,3,'planter',{plant:null});set(2,4,'planter',{plant:null});
   set(14+TX,4,'lever');
@@ -672,7 +670,7 @@ function newRun(np,mode,test){
     ...[1,2,3,4,5].map(pro=>({kind:'station',st:'counter',pro}))]);
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
-  S.bonus=0;S.pendingEquip=[];S.stored=[];S.supply=[];S.tierNp=np;S.cleanPlates=TIER(np).plate;   // more players, more plates
+  S.bonus=0;S.pendingEquip=[];S.stored=[];S.supply=[];S.tierNp=np;addCleanPlates(TIER(np).plate);   // more players: the extra clean plates go on a sink
   // everyone picks an animal (= skill) first; then the layout or the first town choice
   // test mode: player 1 is real, everyone else is a bot (random animal, never moves or picks by hand)
   S.bots=test?Array.from({length:np-1},(_,k)=>k+1):[];
@@ -706,6 +704,8 @@ function growTruck(nt,reroll){
 }
 // the same equipment counts for a given player count (the ready-made kitchen and the self-made layout both use these)
 const TIER=np=>np>=7?{c:9,p:3,b:2,k:2,t:4,plate:7}:np>=5?{c:7,p:2,b:2,k:1,t:3,plate:6}:{c:6,p:2,b:1,k:1,t:3,plate:PLATES_TOTAL};
+// clean plates are kept on the sinks: the first sink on the truck takes them (there is no plate stand)
+function addCleanPlates(n){if(!S||!S.map||n<=0)return;for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'){k.clean=(k.clean||0)+n;return}}}
 // the truck grows when the next town is chosen; the equipment for the new seats goes outside at the next 配置
 function confirmSeats(){
   if(!S||!S.map)return;
@@ -717,7 +717,7 @@ function confirmSeats(){
   const add=(st,n,ex)=>{for(let i=0;i<n;i++)S.supply.push(Object.assign({kind:'station',st},ex||{}))};
   add('counter',b.c-a.c);add('planter',b.p-a.p,{plant:null});add('board',b.b-a.b);add('table',b.t-a.t,{n:1});
   for(let i=0;i<b.k-a.k;i++)S.supply.push({kind:'basket',items:[]});
-  S.cleanPlates=(S.cleanPlates||0)+(b.plate-a.plate);
+  addCleanPlates(b.plate-a.plate);
   S.tierNp=to;
 }
 function rebuildStations(){
@@ -725,7 +725,7 @@ function rebuildStations(){
   S.map.forEach((r,y)=>r.forEach((c,x)=>{if(['stove','blender','planter','lucky'].includes(c.t)){c._x=x;c._y=y;S.stations.push(c)}}));
 }
 // ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
-const MOVABLE=['fridge','seedbox','sink','board','stove','blender','plates','trash','lucky'];
+const MOVABLE=['fridge','seedbox','sink','board','stove','blender','trash','lucky'];
 const LAYOUT_TIME=90;
 const inTruck=(x,y)=>x>=2&&x<=IX1&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
@@ -792,7 +792,7 @@ function setupLayout(){
   S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layLock=1;   // ignore 持つ/作業 for 1 s so the last long press does not carry over
   hideOv();
 }
-const REQUIRED=['sink','planter','can','seedbox','fridge','board','stove','blender','plates','trash','basket'];
+const REQUIRED=['sink','planter','can','seedbox','fridge','board','stove','blender','trash','basket'];
 const REQN={seedbox:'種箱',fridge:'冷蔵庫'};
 const reqName=id=>REQN[id]||(EQUIP[id]&&EQUIP[id].n)||id;
 function missingUnits(){
@@ -1345,8 +1345,7 @@ function autoPlate(p){
   const h=p.hold;if(!h)return;
   const bare=h.kind==='plate'&&h.bare&&h.items.length&&matchRecipe(h.items),one=h.kind==='ing'&&plateOk(h)&&!h.burnt&&matchRecipe([h]);
   if(!bare&&!one)return;
-  if(S.cleanPlates>0)S.cleanPlates--;
-  else{const sk=[];for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0)sk.push(k)}if(!sk.length)return;sk[0].clean--}
+  {const sk=[];for(let y=1;y<=6;y++)for(let x=1;x<=16+TX;x++){const k=S.map[y][x];if(k.t==='sink'&&(k.clean||0)>0)sk.push(k)}if(!sk.length)return;sk[0].clean--}
   if(bare)h.bare=false;else p.hold={kind:'plate',items:[h]};
   sfx('plate');
 }
@@ -1369,7 +1368,7 @@ function doPick(p,c,tx,ty){
     // (washing starts once on the road), empty ones back on the stand; nothing else is used
     const tool=it=>it&&(it.kind==='can'||it.kind==='basket'||it.kind==='dirty'||emptyPlate(it));
     if(c.t==='counter'&&(tool(p.hold)||(!p.hold&&tool(c.item)))){placeOrTake(p,c);return}
-    const plateTo=(c.t==='sink'&&p.hold&&p.hold.kind==='dirty')||(c.t==='plates'&&emptyPlate(p.hold));
+    const plateTo=c.t==='sink'&&p.hold&&p.hold.kind==='dirty';
     if(!plateTo){if(c.t!=='floor'&&c.t!=='gap'&&c.t!=='wall')say(p,'配置の時間は並べ替えだけ');return}
   }
   switch(c.t){
@@ -1387,19 +1386,6 @@ function doPick(p,c,tx,ty){
         p.menu={kind:'seedbox',sel:Math.max(0,seedList().indexOf(p.lastS))};p.menuLast='0,0';p.menuRep=0}
       else if(p.hold.kind==='seed'){S.seeds[p.hold.id]=(S.seeds[p.hold.id]||0)+1;p.hold=null}
       return}
-    case 'plates':
-      // the stand holds the truck's clean plates (S.cleanPlates, 5 in all): one comes off at a time
-      if(emptyPlate(p.hold)){S.cleanPlates+=p.hold.cnt||1;p.hold=null;sfx('plate');return}
-      if(p.hold&&p.hold.kind==='dirty'){say(p,'汚れた皿はシンクで洗う');return}
-      if((!p.hold||(p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt))&&S.cleanPlates<=0){say(p,'きれいな皿がない（シンクで洗う）');return}
-      if(!p.hold||(p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)){sfx('plate');S.cleanPlates--}
-      if(!p.hold)p.hold={kind:'plate',items:[]};
-      // holding a finished stack or a prepared ingredient: take a plate with it on
-      else if(p.hold.kind==='plate'&&p.hold.bare)p.hold.bare=false;
-      else if(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)p.hold={kind:'plate',items:[p.hold]};
-      else if(p.hold.kind==='ing')say(p,p.hold.burnt?badW(p.hold):'先に'+STEPN[nextStep(p.hold)]);
-      else say(p,'皿には乗せられない');
-      return;
     case 'trash':
       if(p.hold){
         if(p.hold.kind==='can'){say(p,'じょうろは捨てられない');return}
@@ -1525,7 +1511,7 @@ function buy(list,p,shop,tx,ty){
     if(S.fuel>=FUEL_MAX){say(p,'もう満タン');return}
     S.money-=pr;S.fuel=Math.min(FUEL_MAX,S.fuel+it.qty);float(tx+.5,ty,'⛽ +'+it.qty+(S.fuel>=FUEL_MAX?'（満タン）':''),'#ffd0c0');return}
   S.money-=pr;if(pr<it.price)float(tx+.5,ty-0.5,'💰 値切った！ -'+(it.price-pr)+'G','#bff2c6');
-  if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);if(it.id==='plates')S.cleanPlates+=PLATES_PER_STAND;float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
+  if(it.type==='equip'){p.hold=makeEquip(it.id,it.pro);float(tx+.5,ty,EQUIP[it.id].e+equipName(it.id,it.pro)+'を買った','#ffe08a');if(shop)it.sold=true;return}
   if(it.type==='pack'){S.stock[it.id]=(S.stock[it.id]||0)+it.qty;float(tx+.5,ty,'+'+it.qty+' '+ING[it.id].e)}
   else if(it.type==='seed'){S.seeds[it.id]=(S.seeds[it.id]||0)+it.qty;float(tx+.5,ty,'種+'+it.qty+' '+ING[it.id].e)}
   else{const ids=pickN(BUYABLE(),2);for(const id of ids)S.stock[id]=(S.stock[id]||0)+2;
@@ -1575,7 +1561,7 @@ function doAct(p,c,tx,ty,dt){
   if(c.t==='board'&&c.item&&nextStep(c.item)==='chop'){c.prog+=dt*pupSp(p,'chp',0.08)*Math.max((p.skT||0)>0&&skillOf(p)===SKILLS.knife?2:1,herdMul(p));if(c.prog>=chopT(c)){c.item.step++;c.prog=0;act(p,'chop')}return}
   if(c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow){harvest(c,tx,ty,p);act(p,'harvest');p.lock=true;return}
   if(c.t==='sink'&&!p.hold&&(c.dirty||0)>0){   // washing: hold 作業, one plate every WASH s (keeps going while held)
-    p.actT+=dt*pupSp(p,'wsh',0.1)*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;act(p,'wash');if(upN(c,'ret'))S.cleanPlates++;else c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,upN(c,'ret')?'🍽 皿置き場へ':'✨','#cdeeff')}
+    p.actT+=dt*pupSp(p,'wsh',0.1)*Math.max((p.skT||0)>0&&p.skill==='wash'?2:1,herdMul(p));if(p.actT>=WASH*proMul(c)){p.actT=0;c.dirty--;act(p,'wash');c.clean=(c.clean||0)+1;sfx('washed');float(tx+.5,ty,'✨','#cdeeff')}
     return}
   if(c.t==='sink'&&p.hold&&p.hold.kind==='can'){
     if(p.hold.water>=canCap(p.hold)){say(p,'もう満タン');p.lock=true;return}
@@ -1711,7 +1697,7 @@ const TUT=[
   {t:p=>AL(p,'act','作業',1)+'を長押しして、りんごを切ろう',legend:1,tg:()=>tileOf('board'),ok:p=>{const i=tileItem('board');return !!i&&i.id==='apple'&&i.step>=1}},
   {t:p=>'切れたら '+BL(p,'pick')+'（りんごを持つ）',tg:()=>tileOf('board'),ok:p=>!!p.hold&&p.hold.kind==='ing'&&p.hold.id==='apple'&&p.hold.step>=1},
   {t:p=>'コンロに向かって '+BL(p,'pick')+'（置いて焼く）',legend:1,tg:()=>tileOf('stove'),ok:p=>{const i=tileItem('stove');return !!i&&i.id==='apple'}},
-  {t:p=>'焼けるまでの間に、皿置き場で '+BL(p,'pick')+'（皿を1枚取る）',tg:()=>tileOf('plates'),ok:p=>!!p.hold&&p.hold.kind==='plate'},
+  {t:p=>'焼けるまでの間に、シンクで '+BL(p,'pick')+'（きれいな皿を1枚取る）',tg:()=>tileOf('sink'),ok:p=>!!p.hold&&p.hold.kind==='plate'},
   {t:p=>'皿を持ったまま、コンロで '+BL(p,'pick')+'（焼けたら皿にすくう。焼けるまで待つ）',legend:1,tg:()=>tileOf('stove'),ok:p=>isDish(p.hold)},
   {t:p=>'お客さんが来た！ 列の先頭で '+BL(p,'pick')+'（席へ案内する）',tg:()=>[Math.floor(qCX(0)),QY],enter:()=>{S.cust.push({type:'normal',order:'bakedapple',pat:999,max:999,hue:rnd(360),an:pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0});sfx('bell')},
     ok:p=>{const c=tutCust();return !!c&&c.st!=='wait'}},
@@ -2072,7 +2058,6 @@ const UPS=[
   {id:'pay',e:'📈',n:'看板メニュー',d:'料理の値段 +10%',max:3,apply:u=>u.pay*=1.1},
   {id:'plot',e:'🪴',n:'菜園を広げる',d:'菜園 +1マス（次の配置で置く）',max:3,apply:()=>addPlanter()},
   {id:'grow',e:'🌿',n:'肥料',d:'菜園1つの育つ速さ 1.3倍',max:3,tgt:'planter'},
-  {id:'ret',e:'🍽️',n:'食器の返却口',d:'シンク1台で洗ったお皿が、自動で皿置き場に戻る',max:1,tgt:'sink'},
   {id:'can',e:'💧',n:'じょうろの改造',d:'じょうろ1つの水 +2回分',max:2,tgt:'can'},
   {id:'yield',e:'🌾',n:'豊作',d:'菜園1つの収穫 +1個',max:3,tgt:'planter'},
   {id:'shopx',e:'🛒',n:'顔なじみの店',d:'窓口の品数 +1',max:2,apply:u=>u.shopExtra++},
@@ -2357,7 +2342,7 @@ function ovAction(a,v){
     if((S.eqBuys||0)>=3)return;
     const o=S.eqOffers[+v];if(!o||o.sold)return;const pr=eqPrice(o);o.sold=1;   /* bought: sold out, no second copy of the same card */
     if(S.money<pr){o.sold=0;const b=ov.querySelector(`[data-v="${v}"] .menu`);if(b)b.textContent=pr+'G（お金が足りない）';return}
-    S.money-=pr;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */if(o.id==='plates')S.cleanPlates+=PLATES_PER_STAND;S.eqBuys=(S.eqBuys||0)+1;const left=S.ovT;sfx('coin');showEquipShop();S.ovT=left;
+    S.money-=pr;S.pendingEquip.push({id:o.id,pro:o.pro});if(o.id==='counter'&&!o.pro)S.pendingEquip.push({id:'counter',pro:0});   /* a plain counter comes as a pair */S.eqBuys=(S.eqBuys||0)+1;const left=S.ovT;sfx('coin');showEquipShop();S.ovT=left;
   }
   else if(a==='eqreroll'){
     if(S.eqRerolled||(S.eqBuys||0)>0)return;
@@ -2897,7 +2882,7 @@ function drawItem(it,cx,cy,s,inHand){
   st.forEach((k,i)=>{const px=cx-(st.length-1)*5+i*10,py=cy+s*0.38;ctx.fillStyle=i<it.step?'#7fd893':'rgba(0,0,0,.55)';ctx.beginPath();ctx.arc(px,py,4,0,7);ctx.fill()});
   if(it.step>0){const k=st[it.step-1];text(k==='chop'?'切':k==='cook'?'焼':'混',cx+s*0.34,cy-s*0.32,11,'#fff',800)}
 }
-const TCOL={sink:'#cfd8dc',counter:'#e6dcc4',board:'#e6dcc4',stove:'#5b5f66',blender:'#e6dcc4',fridge:'#cfe5ef',seedbox:'#c9a777',plates:'#e6dcc4',trash:'#8d969c',serve:'#f6d36a',window:'#9fd2e8',planter:'#7a5434'};
+const TCOL={sink:'#cfd8dc',counter:'#e6dcc4',board:'#e6dcc4',stove:'#5b5f66',blender:'#e6dcc4',fridge:'#cfe5ef',seedbox:'#c9a777',trash:'#8d969c',serve:'#f6d36a',window:'#9fd2e8',planter:'#7a5434'};
 // soft round shadow on the ground
 function softShadow(cx,cy,rx,ry,a){const g=ctx.createRadialGradient(cx,cy,0,cx,cy,rx);g.addColorStop(0,`rgba(30,20,10,${a||.32})`);g.addColorStop(1,'rgba(30,20,10,0)');
   ctx.save();ctx.translate(cx,cy);ctx.scale(1,ry/rx);ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,7);ctx.fill();ctx.restore()}
@@ -3137,19 +3122,6 @@ function unitBase(c,X,Y,loose){
       ctx.fillStyle='#5e9440';ctx.beginPath();ctx.ellipse(cx-4,bot-15,4,2.2,-0.5,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(cx+4,bot-16,4,2.2,0.5,0,7);ctx.fill();
       if(!loose){ctx.fillStyle='#e8cf8f';for(const [dx,dy] of [[-15,0],[-12,2],[14,1]]){ctx.beginPath();ctx.ellipse(cx+dx,bot+dy-1,1.4,0.9,0.3,0,7);ctx.fill()}}
       break}
-    case 'plates':{
-      // a blue-grey stand with a tall stack of plates rising above it
-      b=box3d(X,Y,'#c9dbe8','#6f8ea6');
-      const N=loose?5:Math.max(0,Math.min(8,S.cleanPlates||0));   // the clean plates that are on the stand now
-      if(N){ctx.save();ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=4;ctx.shadowOffsetY=3;
-        ctx.fillStyle='#d9d4c8';ctx.beginPath();ctx.ellipse(b.cx,b.cy+6,14,5.5,0,0,7);ctx.fill();ctx.restore()}
-      else{ctx.strokeStyle='rgba(40,70,100,.35)';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(b.cx,b.cy+4,13,5,0,0,7);ctx.stroke();ctx.setLineDash([])}
-      if(N&&fimg('tool_plate')){for(let k=0;k<N;k++)toolImg('tool_plate',b.cx,b.cy+4-k*3,29,1.3);break}
-      for(let k=0;k<N;k++){const py=b.cy+5-k*3;
-        ctx.fillStyle=k%2?'#cfc9bb':'#d9d4c8';ctx.beginPath();ctx.ellipse(b.cx,py+1.4,14,5.5,0,0,7);ctx.fill();
-        const g=ctx.createLinearGradient(0,py-5,0,py+5);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#e9e4d8');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(b.cx,py,14,5.5,0,0,7);ctx.fill()}
-      if(N){ctx.strokeStyle='rgba(70,120,170,.7)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(b.cx,b.cy+5-(N-1)*3,9,3.2,0,0,7);ctx.stroke()}
-      break}
     case 'trash':{
       if(!loose)softShadow(X+T/2+2,Y+T-6,18,6,.3);
       const cx=X+T/2,g=ctx.createLinearGradient(cx-15,0,cx+15,0);g.addColorStop(0,'#6f7a81');g.addColorStop(0.35,'#b7c1c7');g.addColorStop(1,'#59636a');
@@ -3271,7 +3243,7 @@ function drawTile(c,x,y){
   // the still part of the unit is a cached picture; only what changes is drawn every frame
   const PX=10,PY=16;
   if(loose)unitBase(c,X,Y,true);
-  else sprite('u'+t+(t==='window'?c.win:'')+(t==='board'&&!c.item?'k':'')+(t==='planter'&&!c.plant?'e':'')+(t==='plates'?'n'+(S.cleanPlates||0):''),X-PX,Y-PY,T+2*PX,T+PY+PX,()=>unitBase(c,PX,PY,false));
+  else sprite('u'+t+(t==='window'?c.win:'')+(t==='board'&&!c.item?'k':'')+(t==='planter'&&!c.plant?'e':''),X-PX,Y-PY,T+2*PX,T+PY+PX,()=>unitBase(c,PX,PY,false));
   const b=unitGeom(t,X,Y);
   if(t==='counter'&&lay&&!c.item){ctx.strokeStyle='rgba(60,120,140,.55)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(b.x+4,b.y+3,b.w-8,b.th-6,5);ctx.stroke();ctx.setLineDash([])}
   if(t==='stove'){
@@ -3280,9 +3252,6 @@ function drawTile(c,x,y){
   }
   if((t==='stove'||t==='blender')&&c.fast&&c.item){   // ちびドラゴン's skill: this one cooks 2x
     const a=0.6+0.4*Math.sin(S.t*8);ctx.fillStyle=`rgba(214,59,59,${0.75+0.2*a})`;rr(X+1,Y-4,26,15,7.5);ctx.fill();text('×2',X+14,Y+3.5,10,'#fff',800)}
-  if(t==='plates'&&(S.cleanPlates||0)>0){   // how many clean plates are on the stand
-    ctx.fillStyle='rgba(30,110,170,.95)';rr(X+T-25,Y+T-18,24,15,7.5);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
-    text('×'+S.cleanPlates,X+T-13,Y+T-10.5,10,'#fff',800)}
   if(t==='sink'){
     // dirty plates soak in the basin; washed ones stand on the right edge
     const nd=Math.min(4,c.dirty||0),nc=Math.min(5,c.clean||0);
@@ -5544,7 +5513,7 @@ function sendSnap(){
     tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
     sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,dd:(S.dirtyDrops||[]).map(d=>[d.tx,d.ty,d.n||1]),
-    mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),cp:S.cleanPlates,
+    mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const it=S.map[y][x].item;return it&&it.kind==='dirty'?[x,y,it.cnt||1]:[x,y]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?p.menu.sel:0,Math.round((p.actT||0)*100),p.cur,
       p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100),(p.pouch||[]).map(encItem),p.pouchSel?p.pouchSel.k:-1]),
@@ -5714,7 +5683,6 @@ function applySnap(d){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table'||c.t==='sign')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
   for(const a of Array.isArray(d.sg)?d.sg:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'sign',item:null}}
   for(const a of Array.isArray(d.tb)?d.tb:[]){const x=n(a[0]),y=n(a[1]);if(y>=7&&y<GH&&x>=0&&x<GW&&S.map[y][x].t==='ground')S.map[y][x]={t:'table',item:n(a[2])>0?{kind:'dirty',cnt:Math.min(9,n(a[2]))}:null}}
-  S.cleanPlates=Math.max(0,Math.min(9,n(d.cp)));
   for(const g of Array.isArray(d.gr)?d.gr:[]){const c=tile(n(g[0]),n(g[1]));if(c&&c.t==='ground')c.item=decItem(g[2])}
   S.players=(Array.isArray(d.pl)?d.pl:[]).slice(0,ROOM_CAP).map((a,i)=>{
     const nx=n(a[0])/100,ny=n(a[1])/100,p=S.players[i]||{x:nx,y:ny};

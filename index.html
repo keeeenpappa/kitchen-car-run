@@ -4671,7 +4671,7 @@ function drawArrive(){
 // ----- phone view: the world 1.5x around this device's chef; one fixed zoom (never zooms in / out),
 // and the camera only slides when the chef nears the edge of a big middle zone, so walking in and out of the door
 // does not move the picture -----
-const PZ=1.6, UZ=1.45, PCZ=1.5, BOARD_H=1.8;   // phone 1.6x, PC 1.5x close-up; the customer board takes the bottom rows
+const PZ=1.6, UZ=1.45, PCZ=1.5, BOARD_H=1.8, STRIP_H=0.6;   // STRIP_H: on a phone, the strip of materials sits just above the customer board   // phone 1.6x, PC 1.5x close-up; the customer board takes the bottom rows
 const CAM={x:0,y:0,ok:false};
 let VIEW='auto', PHONE_INFO=false;
 try{const v=localStorage.getItem('kcr-view');if(v==='pc'||v==='phone')VIEW=v}catch(_){}
@@ -4682,7 +4682,7 @@ const viewRowInner=()=>`<span style="align-self:center;min-width:9em">画面の�
 const viewRow=()=>`<div class="row" id="viewRow">${viewRowInner()}</div>`;
 const camFollow=()=>!!S&&VIEW!=='pc';
 const camZoom=()=>phoneView()?PZ:camFollow()?PCZ:1;
-const boardH=()=>S&&S.phase==='stop'&&VIEW!=='pc'?BOARD_H:0;
+const boardH=()=>S&&S.phase==='stop'&&VIEW!=='pc'?BOARD_H+(phoneView()?STRIP_H:0):0;
 function updateCam(dt){
   if(!camFollow()){CAM.ok=false;return}
   const p=localP();if(!p)return;
@@ -4866,6 +4866,22 @@ function drawTopBar(){
   text('急ぐ'+FUEL_USE_TXT[2],fx+214,fy+37,11,S.speed===2?'#ff9c9c':'#6f8587',S.speed===2?800:600,'right');
 }
 const isMine=p=>NET.role==='off'||p.i===NET.mySlot;
+// phone: the materials this town needs and how many are in the fridge, in a strip just above the customer board
+function drawStockStrip(y,h){
+  const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
+  if(!twn)return;
+  ctx.fillStyle='rgba(30,44,50,.94)';ctx.fillRect(0,y,GW*T,h);
+  const cy=y+h/2;
+  text('材料',8,cy,11,'#ffe08a',800,'left');
+  let x=52;
+  for(const id of townNeeds(twn)){
+    const n=S.stock[id]||0;
+    if(x>GW*T-40)break;
+    emoji(ingIc(id),x+7,cy,13);
+    text(String(n),x+17,cy,12,n?'#fff':'#ff9c9c',800,'left');
+    x+=40;
+  }
+}
 function drawCustBoard(y0,h){
   const W=GW*T,top=y0+6,ch=h-12;
   ctx.fillStyle='#2a3a40';ctx.fillRect(0,y0,W,h);
@@ -4927,7 +4943,7 @@ function draw(){
   if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}
   drawWorld(arr);
   ctx.restore();
-  if(bh)drawCustBoard((VH-bh)*T,bh*T);
+  if(bh){drawCustBoard((VH-BOARD_H)*T,BOARD_H*T);if(ph)drawStockStrip((VH-bh)*T,STRIP_H*T)}
   if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
   else{drawTopBar();if(!TX){ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
     // the customers waiting in line stay in front of the info panel (it can cover them when the camera is zoomed)

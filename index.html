@@ -119,6 +119,10 @@ body.touch #pauseBtn{display:none}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .pdots img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.5);transform-origin:50% 45%}
 .ovbtn{position:relative;font:inherit;font-weight:800;background:#2c4650;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
+.pfr{position:absolute;inset:0;pointer-events:none}
+.pfr .pf{position:absolute;border:3px solid;border-radius:10px;display:block}
+.pfr .pl{position:absolute;top:-10px;text-decoration:none;font-size:11px;font-weight:800;color:#fff;border-radius:6px;padding:0 6px;line-height:17px;text-shadow:0 1px 2px rgba(0,0,0,.5);z-index:2}
+.pupmode .ovbtn.sel:not(.pupnext){border-color:var(--line)}
 .ovbtn.sel,.ovbtn:focus-visible{border-color:var(--truck);outline:none;background:#36545f}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .town{text-align:left;display:flex;flex-direction:column;gap:6px;line-height:1.5}
@@ -141,7 +145,11 @@ body.touch #pauseBtn{display:none}
 .netrow{align-items:center} .netrow .lab{min-width:9em}
 .codein{font:inherit;font-weight:800;font-size:18px;letter-spacing:.2em;text-transform:uppercase;width:7em;padding:8px 10px;border-radius:10px;border:2px solid var(--line);background:#132026;color:var(--ink)}
 .box .ng{color:var(--bad)}
-.ovtime{color:var(--truck);font-family:var(--display);font-size:22px;font-weight:400}
+.ovtp{text-align:center;display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 8px}
+.ovtp .mut{flex:0 0 100%;font-size:12px}
+.ovtime{color:var(--truck);font-family:var(--display);font-size:46px;line-height:1.1;font-weight:400;min-width:1.2em;text-align:center;display:inline-block}
+.ovtime.low{color:#ff4d4d;text-shadow:0 0 14px rgba(255,77,77,.65);animation:ovlow .8s ease-in-out infinite}
+@keyframes ovlow{50%{transform:scale(1.18)}}
 #stock{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;align-items:center}
 .chip.zero{color:var(--bad);opacity:.85}
 .townstars{display:flex;flex-wrap:wrap;gap:4px 18px}.townstars>span{white-space:nowrap}
@@ -539,7 +547,7 @@ const EQUIP={
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
 };
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,sink:0.4};
-const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=40, PUP_TIME=20; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
+const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=50, PUP_TIME=30; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
 function equipOffer(id,priceMul,proChance){
   const L=proList(id),pro=L.length&&Math.random()<proChance?1+rnd(L.length):0;
   return {type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*priceMul*(pro?1.8:1))};
@@ -857,7 +865,7 @@ function showEquipShop(){
       ${o.pro||o.bonus?`<span class="badges">${o.pro?'<span class="rarebadge">★ 特殊</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}</span>`:''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="tn">${pr}G</span>${o.sold||done||S.money<pr?`<span class="sub">${o.sold?'売り切れ':done?'これ以上買えません':'お金が足りない'}</span>`:''}
       <span class="needs"><span class="${o.pro?'pay':'sub'}">${desc}</span></span></button>`}).join('');
-  showOv(`<div class="box big"><h2>器具屋</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
+  showOv(`<div class="box big"><h2>器具屋</h2><p class="ovtp">残り <span class="ovtime${Math.ceil(S.ovT||0)<=10?' low':''}">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れはそのまま町選びへ）</span></p>
     ${(()=>{const n=Math.min(3,S.eqBuys||0),left=3-n,dot=i=>`<span style="display:inline-block;width:24px;height:24px;border-radius:50%;margin:0 4px;vertical-align:middle;box-sizing:border-box;border:3px solid #ffd84a;background:${i<n?'#ffd84a':'transparent'}"></span>`;
       return `<div style="display:inline-block;margin:4px 0 6px;padding:8px 18px;border-radius:14px;background:${left?'rgba(255,216,74,.16)':'rgba(255,120,120,.18)'};border:2px solid ${left?'#ffd84a':'#ff9c9c'}"><b style="font-size:1.15em">買えるのは3つまで</b>　${dot(0)}${dot(1)}${dot(2)}　<b style="font-size:1.15em;color:${left?'#ffd84a':'#ff9c9c'}">${left?'あと'+left+'つ':'上限です'}</b></div>`})()}
     <p>買うたびに値段が上がります（買った物は売り切れ）（${isTouch?'長押しで購入':`←→で選んで <b>${OVK()}</b> で購入`}）。買った物は、町を選んだあとの配置の時間に外に出ます。</p>${moneyBig()}
@@ -982,16 +990,17 @@ const GAMEKEYS=new Set(KB.flatMap(k=>Object.values(k).flat()).concat(['Escape','
 addEventListener('keydown',e=>{
   if(e.target&&e.target.tagName==='INPUT')return; // typing a room code
   if(GAMEKEYS.has(e.code)||/^Digit[1-4]$/.test(e.code))e.preventDefault();
-  if(!e.repeat)pressed.add(e.code); held.add(e.code);
+  kbUsed=true;if(!e.repeat)pressed.add(e.code); held.add(e.code);
 });
 addEventListener('keyup',e=>held.delete(e.code));
 addEventListener('blur',()=>held.clear());
-let pads=[], padPrev=[], PADGP=[], ONLINE_PAD=0;
+let pads=[], padPrev=[], PADGP=[], ONLINE_PAD=0, padSeen=false, kbUsed=false;   // a pad that shows up before any key was pressed: show its buttons at once
 function pollPads(){
   let gps=[];try{gps=navigator.getGamepads?[...navigator.getGamepads()]:[]}catch(_){}
   // connected pads in order, with no holes: the browser can put the only pad in slot 2 (after a reconnect, or next to
   // a virtual pad), and P1 / an online player must still get it
   PADGP=gps.filter(gp=>gp&&gp.connected!==false&&gp.buttons&&gp.buttons.length).slice(0,4);
+  if(PADGP.length&&!padSeen){padSeen=true;if(!kbUsed)LASTIN[0]='pad'}
   pads=[];
   for(let i=0;i<4;i++){
     const gp=PADGP[i]; if(!gp){pads[i]=null;continue}
@@ -1045,6 +1054,7 @@ if(isTouch)document.body.classList.add('touch');
 // online: this device is one player, so both key sets drive it; remote players come from the room
 function readInput(i){
   if(S&&S.bots&&S.bots.includes(i))return NOINP;   // test bots stand still
+  if(NET.role==='host'&&i===0&&personalPause())return NOINP;   // the host's chef stands still while the host's own menu is open
   if(NET.role==='host')return i>0?remoteInput(i):deviceInput();
   return baseInput(i);
 }
@@ -2206,7 +2216,7 @@ function showPersonal(){
   const cards=S.pupOffers.map((u,j)=>`<button class="ovbtn town hold" data-act="pup" data-v="${j}">
       <span class="tn">${u.e} ${u.n}</span><span class="menu">${u.d}</span></button>`).join('');
   const n=S.pupDone.filter(Boolean).length;
-  showOv(`<div class="box big"><h2>個人パワーアップ（全員いっせい）</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
+  showOv(`<div class="box big"><h2>個人パワーアップ（全員いっせい）</h2><p class="ovtp">残り <span class="ovtime${Math.ceil(S.ovT||0)<=10?' low':''}">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}　選んだ人は下の枠に移ります（${n}/${S.players.length}人）</p>
     <div class="cards" style="min-height:36vh">${cards}</div>
     <button class="ovbtn hold pupnext" data-act="pupnext" data-v="" style="display:block;width:100%;margin-top:10px;min-height:56px">次へ</button></div>`);
@@ -2231,7 +2241,7 @@ function showUpgrade(){
       ${u.bonus?'<span class="badges"><span class="rarebadge bonusbadge">🎯 ミッションボーナス</span></span>':''}
       <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}</span>
       <span class="needs">${u.tgt?`<span class="pay">↑ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
-  showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p>残り <span class="ovtime">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
+  showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p class="ovtp">残り <span class="ovtime${Math.ceil(S.ovT||0)<=10?' low':''}">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>${moneyBig()}
     <div class="cards" style="min-height:36vh">${cards}</div>
     ${S.rerollUsed?'':`<div class="row"><button class="ovbtn" data-act="reroll">引き直す（${S.rerollCost}G・1回だけ）</button></div>`}
@@ -2311,7 +2321,7 @@ function showEnd(){
 // ---------- overlays ----------
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
-function showOv(html){paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
+function showOv(html){if(S&&S.localPause&&S.ovSave==null)S.localPause=false;paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
 function paintOv(html){const wasPup=!!ov.querySelector('.pupnext');ov.innerHTML=emoHtml(html);fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();
   // while everyone picks, a repaint (someone else picked) keeps your own cursor; the first paint of the screen starts at the top
   ovSel=S&&S.phase==='pup'&&wasPup?Math.max(0,Math.min(ovSel,ovButtons().length-1)):Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));
@@ -2359,7 +2369,12 @@ function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel'
 let GSEL=0;
 function ovDots(arr){
   const bs=ovButtons();
-  bs.forEach((b,i)=>{const me=NET.role==='guest'?NET.mySlot:0,who=S&&S.paused?[]:(arr||[]).map((k,j)=>k===i&&j!==me?j:-1).filter(j=>j>=0),key=who.join(',');if(b._pd===key)return;b._pd=key;
+  const pup=!!S&&S.phase==='pup';   /* everyone's face, yourself included; on the host's own choice screens the host's cursor is the highlight, so only the guests get a face */
+  ov.classList.toggle('pupmode',pup);
+  bs.forEach((b,i)=>{const who=S&&S.paused?[]:(arr||[]).map((k,j)=>k===i&&(pup||j>0)?j:-1).filter(j=>j>=0),key=who.join(',')+(pup?'p':'');if(b._pd===key)return;b._pd=key;
+    let fr=b.querySelector('.pfr');   /* personal pick-ups: each player's coloured frame and 1P / 2P tag moves with the face (frames may overlap, the tags sit side by side on top) */
+    if(!pup||!who.length){if(fr)fr.remove()}else{if(!fr){fr=document.createElement('span');fr.className='pfr';b.appendChild(fr)}
+      fr.innerHTML=who.map((j,n)=>`<b class="pf" style="inset:0;border-color:${PCOL[j]}"></b><u class="pl" style="left:${6+n*30}px;background:${PCOL[j]}">${j+1}P</u>`).join('')}
     let el=b.querySelector('.pdots');if(!who.length){if(el)el.remove();return}
     if(!el){el=document.createElement('span');el.className='pdots';b.appendChild(el)}
     el.innerHTML=who.map(j=>{const an=SKILL_ANIMAL[S.players[j]&&S.players[j].skill]||'beaver',src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_head_front']:null;return `<i style="border-color:${PCOL[j]}">${src?`<img src="${src}" alt="">`:''}</i>`}).join('')});
@@ -2372,7 +2387,7 @@ const setP=(b,f)=>{if(b)b.style.setProperty('--p',Math.round(Math.min(1,f)*100)+
 const holdReset=()=>{setP(ovHold.btn,0);ovHold={btn:null,t:0,src:null}};
 // online: town / upgrade / shop / result screens are the host's to choose. Guests see the host's cursor and can't move it
 // (only the pause screen is shared: anyone can press つづける there)
-const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused)&&!(S&&S.phase==='pup');
+const guestLocked=()=>NET.role==='guest'&&NET.mirror&&!(S&&S.paused)&&!(S&&S.localPause)&&!(S&&S.phase==='pup');
 ov.addEventListener('pointerdown',e=>{const b=e.target.closest('.ovbtn.hold');if(!b||guestLocked())return;e.preventDefault();
   holdReset();ovHold={btn:b,t:0,src:'ptr'};ovSel=Math.max(0,ovButtons().indexOf(b));markSel();try{b.setPointerCapture(e.pointerId)}catch(_){}});
 for(const ev of ['pointerup','pointercancel'])ov.addEventListener(ev,()=>{if(ovHold.src==='ptr')holdReset()});
@@ -2427,7 +2442,7 @@ function doOv(a,v){
   if(a!=='ready'&&a!=='pause')play('confirm');
   if(a==='sens'){cycleSens(+v);const r=document.getElementById('sensRow');if(r){r.innerHTML=sensRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='sens'&&b.dataset.v===String(v)));markSel()}play('tick');return}
   if(a==='dev'){cycleDev(+v);const r=document.getElementById('devRow');if(r){r.innerHTML=devRowInner();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='dev'&&b.dataset.v===String(v)));markSel()}return}
-  if(NET.role==='guest'&&a!=='title'&&(NET.mirror||a==='ready'||a==='pause')){guestSend(a,v);return}
+  if(NET.role==='guest'&&a!=='title'&&((NET.mirror&&!(S&&S.localPause))||a==='ready')){guestSend(a,v);return}
   ovAction(a,v);
 }
 function ovAction(a,v){
@@ -2470,7 +2485,7 @@ function ovTimerTick(dt){
   if((S.phase!=='upgrade'&&S.phase!=='equip'&&S.phase!=='pup')||S.paused)return;
   S.ovT=(S.ovT||0)-dt;
   const v=String(Math.max(0,Math.ceil(S.ovT)));
-  for(const el of ov.querySelectorAll('.ovtime'))if(el.textContent!==v)el.textContent=v;
+  for(const el of ov.querySelectorAll('.ovtime')){if(el.textContent!==v)el.textContent=v;el.classList.toggle('low',+v<=10)}
   if(S.ovT>0)return;
   if(S.phase==='pup')finishPersonal();   // time's up: whoever has not picked gets nothing
   else if(S.phase==='upgrade'){S.ovT=EQ_TIME;showEquipShop()}  // time's up: no upgrade this time
@@ -2491,6 +2506,7 @@ const CTYPE_D={normal:'特徴なし。ふつうに待って、ふつうに食べ
 const ctypesHtml=()=>`<div class="box big"><h2>お客さんの種類</h2><table class="ctl ctypes">${CTYPE_K.filter(k=>k!=='boss').map(k=>{const C=CTYPE[k],ic=CICON[k],im=ic&&CUST.img[ic];
   return `<tr><td>${im?`<span class="fi fk-${ic}"></span>`:k==='normal'&&CUST.img.dog_front_base?'<span class="fi fk-dog_front_base"></span>':(C.e||'')}</td><td><b>${C.n||'ふつう'}</b></td><td>${CTYPE_D[k]||''}</td></tr>`}).join('')}</table>
   <div class="row"><button class="ovbtn autofocus" data-act="pback">もどる</button><button class="ovbtn" data-act="resume">つづける</button></div></div>`;
+const personalPause=()=>!!S&&!!S.localPause&&S.ovSave==null;   /* online: the pause menu is one player's own screen; the game keeps running for everyone */
 function pauseGame(){
   if(!S||S.paused||S.localPause||!canPause())return;
   S.ovSave=ov.hidden?null:ov.innerHTML;
@@ -5105,7 +5121,7 @@ function draw(){
   ctx.restore();
   if(bh){drawCustBoard((VH-BOARD_H)*T,BOARD_H*T);if(ph)drawStockStrip((VH-bh)*T,STRIP_H*T)}
   if(ph){ctx.save();ctx.scale(UZ,UZ);drawTopBarPhone();if(PHONE_INFO)drawSidePanel(GW*T/UZ-318,48,310,GH*T/UZ-120);ctx.restore()}
-  else{drawTopBar();if(!TX){ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
+  else{drawTopBar();if(!TX||camFollow()){ctx.save();ctx.translate(GW*T,0);ctx.scale(1.2,1.2);ctx.translate(-GW*T,0);drawSidePanel();ctx.restore()}
     // the customers waiting in line stay in front of the info panel (it can cover them when the camera is zoomed)
     if(S.view==='town'&&S.cust.some(c=>c.st==='wait')){ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawCustomers(true);ctx.restore()}}
   // the basket contents stay in front of the info panel too (like the waiting customers)
@@ -5599,7 +5615,7 @@ function bindSlot(p,k){
   const pr=p.presence||{};
   for(const peer in NET.slots)if(NET.slots[peer]===k)delete NET.slots[peer];
   NET.slots[p.peer]=k;if(typeof pr.uid==='string')NET.uidSlot[pr.uid]=k;
-  NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;(NET.lastSk=NET.lastSk||[])[k]=pr.in?+pr.in[5]||0:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0;
+  NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;(NET.lastSk=NET.lastSk||[])[k]=pr.in?+pr.in[5]||0:0;(NET.lastBk=NET.lastBk||[])[k]=pr.in?+pr.in[9]||0:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0;
 }
 // a free spot on the truck floor near the slot's start position
 function spawnSpot(k){
@@ -5636,16 +5652,17 @@ function hostRoster(){
 function remoteInput(i){
   const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false,sk:false};
   NET.lastSk=NET.lastSk||[];
+  NET.lastBk=NET.lastBk||[];const bk=(+r[9]||0)!==(NET.lastBk[i]||0);NET.lastBk[i]=+r[9]||0;
   const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i], sk=(+r[5]||0)!==(NET.lastSk[i]||0);
   NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];NET.lastSk[i]=+r[5]||0;
   const cl=v=>Math.max(-1,Math.min(1,+v||0));
-  const gv=+r[8];return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,sk,swH:!!r[6],gv:gv>=0&&gv<=1?gv:-1};
+  const gv=+r[8];return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,bk,sk,swH:!!r[6],gv:gv>=0&&gv<=1?gv:-1};
 }
 const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
 function guestAction(a,v,slot){
   if(a==='selpick'){if(S&&S.phase==='select'&&slot!=null)selectTap(slot,+v);return}   // a guest tapped an animal
   if(a==='ready'){if(ov.hidden)finishLayout();return}
-  if(a==='pause'){pauseGame();return}
+  if(a==='pause')return;   // the menu is each player's own
   if(a==='pup'){if(slot!=null)takePersonal(slot,+v);return}
   if(!GUEST_OK.has(a)||ov.hidden)return;
   // only a button that is on the host's screen right now counts
@@ -5662,11 +5679,11 @@ function hostFrame(dt){
     if(Array.isArray(pr.oc)&&pr.oc[0]!==NET.lastOc[p.peer]){NET.lastOc[p.peer]=pr.oc[0];guestAction(String(pr.oc[1]),pr.oc[2],i)}
   }
   // presses made while a screen was up are dropped
-  if(!ov.hidden||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];(NET.lastSk=NET.lastSk||[])[i]=+r[5]||0}});
+  if((!ov.hidden&&!personalPause())||!S)NET.inputs.forEach((r,i)=>{if(r){NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];(NET.lastSk=NET.lastSk||[])[i]=+r[5]||0;(NET.lastBk=NET.lastBk||[])[i]=+r[9]||0}});
   if(!S)return;
   hostRoster();
   NET.snapT-=dt; if(NET.snapT<=0){NET.snapT=1/15;sendSnap()}
-  if(!ov.hidden&&performance.now()-NET.ovSentAt>2500)emitOv();
+  if(!ov.hidden&&!personalPause()&&performance.now()-NET.ovSentAt>2500)emitOv();
 }
 function hostOvChanged(html){NET.ovId++;NET.ovHtml=html;if(html)emitOv()}
 function emitOv(){
@@ -5708,7 +5725,7 @@ function sendSnap(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&c.item)ground.push([x,y,encItem(c.item)])}
   const mk=k=>k==='fridge'?1:k==='seedbox'?2:k==='vault'?3:0;
   const d={q:++NET.seq,ph:S.phase,v:S.view,sb:S.sub,tm:Math.round(S.timer*10),m:S.money,h:S.hearts,st:S.stop,np:S.np,
-    ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,pi:S.pupI==null?-1:S.pupI,o:ov.hidden?0:NET.ovId,
+    ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,pi:S.pupI==null?-1:S.pupI,o:ov.hidden||personalPause()?0:NET.ovId,
     tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
     sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,dd:(S.dirtyDrops||[]).map(d=>[d.tx,d.ty,d.n||1]),
@@ -5740,7 +5757,7 @@ async function joinRoom(code){
   code=code.replace(/[^A-Z0-9]/g,'').slice(0,6);
   if(!NET.lobby||!code)return;
   AU.fxSeen=0;
-  Object.assign(NET,{role:'guest',code,pk:0,sw:0,ocSeq:0,seenSnap:-1,lastSnapAt:performance.now(),shownOv:-1,ovParts:{},hostPeer:null,wantOv:0,lastIn:''});
+  Object.assign(NET,{role:'guest',code,pk:0,sw:0,bk:0,ocSeq:0,seenSnap:-1,lastSnapAt:performance.now(),shownOv:-1,ovParts:{},hostPeer:null,wantOv:0,lastIn:''});
   S=null;NET.err='';guestLocalOv(NET.peer?'conn':'wait');
   try{
     const room=await NET.lobby.join('kcr-'+code,'guest');
@@ -5780,17 +5797,18 @@ function guestFrame(dt){
   if(!NET.room){if(!ov.hidden)overlayInput();return}
   const inp=deviceInput();
   if(ov.hidden&&S){
-    if(inp.pick)NET.pk++; if(inp.sw)NET.sw++;
-    if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))guestSend('pause');
+    if(inp.pick)NET.pk++; if(inp.sw)NET.sw++; if(inp.bk)NET.bk=(NET.bk||0)+1;
+    if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))pauseGame();
   } else if(!ov.hidden){
     // the pause screen: Esc / Start again resumes, like on the host
-    if(S&&S.paused&&(pressed.has('Escape')||pressed.has('KeyP')||(pads[0]&&pads[0].edge('st'))))guestSend('resume');
+    if(S&&S.localPause&&(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st'))))resumeGame();
+    else if(S&&S.paused&&(pressed.has('Escape')||pressed.has('KeyP')||(pads[0]&&pads[0].edge('st'))))guestSend('resume');
     else overlayInput();
   }
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
   const gq=S?localP():null,gv=gq&&gq.g&&GOBJ[gq.g.obj]&&GOBJ[gq.g.obj].act==='timing'?Math.round(gq.g.v*100)/100:-1;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,S&&S.phase==='pup'?ovSel:guestLocked()?GSEL:-1,gv];
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv,NET.bk||0]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,S&&S.phase==='pup'?ovSel:guestLocked()?GSEL:-1,gv,NET.bk||0];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state
@@ -5825,10 +5843,11 @@ function guestFrame(dt){
 function syncGuestOv(o){
   if(NET.localOv)return;
   NET.wantOv=o;
+  if(!o&&S&&S.localPause&&S.ovSave==null)return;   // this player's own menu stays
   if(!o){if(!ov.hidden){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen')}NET.mirror=false;NET.shownOv=0;return}
   if(o===NET.shownOv)return;
   const P=NET.ovParts[o];
-  if(P&&P.got===P.n){paintOv(sanitizeOv(P.parts.join('')));localizeOv();NET.mirror=true;NET.shownOv=o}
+  if(P&&P.got===P.n){if(S&&S.localPause){S.localPause=false;S.ovSave=null}paintOv(sanitizeOv(P.parts.join('')));localizeOv();NET.mirror=true;NET.shownOv=o}
 }
 function onOvMsg(m){
   if(NET.role!=='guest'||(NET.hostPeer&&m.peer!==NET.hostPeer))return;
@@ -5905,7 +5924,7 @@ function applySnap(d){
   const fresh=AU.fxSeen>0;
   for(const e of Array.isArray(d.fx)?d.fx:[])if(Array.isArray(e)&&n(e[0])>AU.fxSeen){AU.fxSeen=n(e[0]);const k=SND_K[n(e[1])];if(k&&fresh)play(k)}
   if(!AU.fxSeen)AU.fxSeen=0.5;   // synced: whatever comes next is new
-  if(n(d.ot)>=0&&d.ot!==-1)for(const el of ov.querySelectorAll('.ovtime'))el.textContent=String(n(d.ot));
+  if(n(d.ot)>=0&&d.ot!==-1)for(const el of ov.querySelectorAll('.ovtime')){el.textContent=String(n(d.ot));el.classList.toggle('low',n(d.ot)<=10)}
 }
 const decPlant=a=>Array.isArray(a)&&ING_K[a[0]]?{id:ING_K[a[0]],t:(+a[1]||0)/10,watered:!!a[2]}:null;
 function decItem(a){
@@ -6201,7 +6220,8 @@ function frame(now){
   if(NET.role==='guest'){guestFrame(dt)}
   else if(escK&&S&&S.paused&&!ov.hidden){resumeGame()}
   else if(escK&&S&&!ov.hidden&&canPause()){pauseGame()}
-  else if(!ov.hidden){overlayInput()}
+  else if(escK&&S&&S.localPause&&!ov.hidden){resumeGame()}
+  else if(!ov.hidden){overlayInput();if(NET.role==='host'&&personalPause()&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'))update(dt)}
   else if(S&&(S.phase==='drive'||S.phase==='stop'||S.phase==='layout'||S.phase==='select')){
     // layout: R (or the gamepad Back/Select button) finishes; finishing opens the town choice
     if(!ov.hidden){}

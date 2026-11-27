@@ -2307,12 +2307,13 @@ function spawnBoss(){
 
 // ---------- boss-fight obstacle events (forest tree / farm carrots / sweets giant cake) ----------
 // Counted from the moment the boss sits down: a warning (banner + sound + marked spots), EVT_WARN s later the obstacle appears; once solved, the next one comes 15-20 s later (2 per fight).
-const EVT_TOWN={forest:'tree',farm:'carrot',sweets:'cake'}, EVT_WARN=6, EVT_FIRST=[5,12], EVT_GAP=[15,20], EVT_MAX=2;
-const EVK=['tree','carrot','cake'], EVS=['idle','warn','on'];
-const EVT_MSG={tree:'🌳 大木が生えてくる！ 出口がふさがるよ',carrot:'🥕 にんじんが生えてくる！ 抜かないと通れないよ',cake:'🎂 巨大ショートケーキが出てくる！ みんなでいちごを載せよう'};
-const EVT_HINT={tree:'作業を連打して大木を切ろう',carrot:'作業を長押しして、にんじんを抜こう',cake:'いちごを切って、持つ で載せよう（1人1つ）'};
+const EVT_TOWN={forest:'tree',farm:'carrot',sweets:'cake',ranch:'cow'}, EVT_WARN=6, EVT_FIRST=[5,12], EVT_GAP=[15,20], EVT_MAX=2;
+const EVK=['tree','carrot','cake','cow'], EVS=['idle','warn','on'];
+const EVT_MSG={tree:'🌳 大木が生えてくる！ 出口がふさがるよ',carrot:'🥕 にんじんが生えてくる！ 抜かないと通れないよ',cake:'🎂 巨大ショートケーキが出てくる！ みんなでいちごを載せよう',cow:'🐄 牛が畜舎から逃げ出す！'};
+const EVT_HINT={tree:'作業を連打して大木を切ろう',carrot:'作業を長押しして、にんじんを抜こう',cake:'いちごを切って、持つ で載せよう（1人1つ）',cow:'牛を 持つ でつかまえて、畜舎で 持つ（逃げている間、ボスの待ち時間が速く減る）'};
 const evRand=a=>a[0]+Math.random()*(a[1]-a[0]);
-function evObsAt(x,y){const E=S&&S.evt;if(!E||E.st!=='on')return null;for(const o of E.obs)if(x>=o.x&&x<o.x+o.w&&y>=o.y&&y<o.y+o.h)return o;return null}
+function evObsAt(x,y){const E=S&&S.evt;if(!E||E.st!=='on'||E.k==='cow')return null;for(const o of E.obs)if(x>=o.x&&x<o.x+o.w&&y>=o.y&&y<o.y+o.h)return o;return null}
+const evtPatMul=c=>c&&c.type==='boss'&&S.evt&&S.evt.k==='cow'&&S.evt.st==='on'?2:1;
 const evtBlocksServe=c=>!!(c&&c.type==='boss'&&S.evt&&S.evt.k==='cake'&&S.evt.st==='on');
 const evFree=(x,y,w,h)=>{
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){const c=tile(x+i,y+j);if(!c||c.t!=='ground'||c.item)return false;
@@ -2328,9 +2329,10 @@ function evtPlan(k){
     for(const [x,y] of cand){if(obs.length>=n)break;if(obs.some(o=>Math.abs(o.x-x)+Math.abs(o.y-y)<3))continue;obs.push({x,y,w:1,h:1,hp:1.6,max:1.6})}
     return obs.length?{obs}:null}
   if(k==='cake'){const cand=[];
-    for(let y=8;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&evFree(x,y,2,2))cand.push([x,y]);
+    for(let y=7;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&!(y===7&&x<=DOOR_FRONT[0]&&x+1>=DOOR_FRONT[0])&&evFree(x,y,2,2))cand.push([x,y]);
     if(!cand.length)return null;const [x,y]=cand[rnd(cand.length)];
     obs.push({x,y,w:2,h:2,hp:1,max:1});return {obs,need:Math.max(1,Math.min(4,np))}}
+  if(k==='cow'){const bx=GOBJ.barn.x;return {obs:[{x:bx,y:GROW,w:1,h:1,hp:1,max:1}],n:Math.max(2,Math.min(5,np+1))}}
   return null}
 function evtEnd(E,msg){E.st='idle';E.obs=[];E.by=[];E.next=evRand(EVT_GAP);if(msg){S.toast={text:msg,t:0,life:2.5}}}
 function evtUpdate(dt){
@@ -2338,21 +2340,32 @@ function evtUpdate(dt){
   const k=S.town&&EVT_TOWN[S.town.id];if(!k)return;
   const b=S.cust.find(c=>c.type==='boss');
   let E=S.evt;
-  if(!b||b.st!=='seat'){if(E&&E.st!=='idle'){E.st='idle';E.obs=[];E.by=[]}if(E)E.next=null;return}
+  if(!b||b.st!=='seat'){if(E&&E.st!=='idle'){E.st='idle';E.obs=[];E.by=[];E.cows=[];for(const q of S.players)if(q.hold&&q.hold.kind==='cow')q.hold=null}if(E)E.next=null;return}
   if(!E)E=S.evt={k,n:0,st:'idle',t:0,obs:[],by:[],need:0,next:null};
   if(E.st==='idle'){
     if(E.n>=EVT_MAX)return;
     if(E.next==null)E.next=evRand(EVT_FIRST);
     E.next-=dt;if(E.next>0)return;
     const pl=evtPlan(k);if(!pl){E.next=3;return}
-    E.n++;E.st='warn';E.t=EVT_WARN;E.obs=pl.obs.map(o=>Object.assign({},o));E.need=pl.need||0;E.by=[];
+    E.n++;E.st='warn';E.t=EVT_WARN;E.obs=pl.obs.map(o=>Object.assign({},o));E.need=pl.need||0;E.by=[];E.cows=[];E.cn=pl.n||0;
     if(k==='cake'){const have=(S.stock.strawberry||0)+(S.seeds.strawberry||0);if(have<E.need){S.stock.strawberry=(S.stock.strawberry||0)+E.need}}   // never leave the team without a strawberry
     sfx('bell');return}
-  if(E.st==='warn'){E.t-=dt;if(E.t<=0){E.st='on';sfx('mystery');S.toast={text:EVT_HINT[k],t:0,life:3.5}}return}
+  if(E.st==='warn'){E.t-=dt;if(E.t<=0){E.st='on';if(k==='cow'){E.obs=[];const bx=GOBJ.barn.x+.5;for(let i=0;i<E.cn;i++)E.cows.push({x:bx+(Math.random()-.5)*1.4,y:11.3,dx:(Math.random()-.5)*2,dy:-Math.random(),t:0,f:1})}sfx('mystery');S.toast={text:EVT_HINT[k],t:0,life:3.5}}return}
   if(E.st==='on'){
     for(const o of E.obs)if(o.sh>0)o.sh=Math.max(0,o.sh-dt);
     if(k==='cake'){if(E.by.length>=E.need){evtEnd(E,'🎂 ケーキ完成！ ボス客が食べ始めた');sfx('ready')}}
+    else if(k==='cow'){for(const w of E.cows)cowMove(w,dt);if(!E.cows.length&&!S.players.some(q=>q.hold&&q.hold.kind==='cow')){evtEnd(E,'🐄 牛を全部戻した！');sfx('ready')}}
     else{E.obs=E.obs.filter(o=>o.hp>0);if(!E.obs.length){evtEnd(E,k==='tree'?'🌳 大木を切り倒した！':'🥕 にんじんを全部抜いた！');sfx('ready')}}}
+}
+function cowMove(w,dt){
+  w.t-=dt;
+  let near=null,nd=2.2;for(const q of S.players){const d=Math.hypot(q.x-w.x,q.y-w.y);if(d<nd){nd=d;near=q}}
+  if(near){const a=Math.atan2(w.y-near.y,w.x-near.x);w.dx=Math.cos(a);w.dy=Math.sin(a);w.t=0.4;w.sp=1.9}
+  else if(w.t<=0){const a=Math.random()*Math.PI*2;w.dx=Math.cos(a);w.dy=Math.sin(a);w.t=1+Math.random()*1.6;w.sp=Math.random()<0.35?0:1.0}
+  const m=Math.hypot(w.dx,w.dy)||1,sp=(w.sp==null?1:w.sp)*dt;let nx=w.x+w.dx/m*sp,ny=w.y+w.dy/m*sp;
+  nx=Math.max(0.6,Math.min(GW-0.6,nx));ny=Math.max(7.6,Math.min(11.4,ny));
+  if(solid(Math.floor(nx),Math.floor(ny))){w.dx=-w.dx;w.dy=-w.dy;w.t=0.3;return}
+  w.x=nx;w.y=ny;
 }
 function evtAct(p,o,dt){
   const E=S.evt;if(!E)return;
@@ -2361,15 +2374,24 @@ function evtAct(p,o,dt){
   else say(p,'いちごを切って、持つ で載せる')
 }
 function evtPick(p,tx,ty){
-  const E=S.evt,o=evObsAt(tx,ty);if(!o)return false;
+  const E=S.evt;
+  if(E&&E.k==='cow'&&E.st==='on'){
+    const c=tile(tx,ty);
+    if(p.hold&&p.hold.kind==='cow'){
+      if(c&&c.t==='gather'&&c.obj==='barn'){p.hold=null;sfx('ready');float(tx+.5,ty,'🐄 おかえり','#fff');return true}
+      say(p,'牛は畜舎へ戻す');return true}
+    if(!p.hold){let bi=-1,bd=1.5;E.cows.forEach((w,i)=>{const d=Math.min(Math.hypot(w.x-(tx+.5),w.y-(ty+.5)),Math.hypot(w.x-p.x,w.y-p.y));if(d<bd){bd=d;bi=i}});
+      if(bi>=0){E.cows.splice(bi,1);p.hold={kind:'cow'};sfx('pick');return true}}
+    return false}
+  const o=evObsAt(tx,ty);if(!o)return false;
   if(E.k!=='cake'){say(p,E.k==='tree'?'作業を連打で切る':'作業を長押しで抜く');return true}
   const h=p.hold;
   if(!h||h.kind!=='ing'||h.id!=='strawberry'||h.step<1){say(p,'切ったいちごを持ってきて載せる');sfx('nope');return true}
   if(E.by.includes(p.i)){say(p,'もう載せたよ。ほかの人にまかせよう');sfx('nope');return true}
   p.hold=null;E.by.push(p.i);sfx('put');float(o.x+1,o.y+.4,'🍓 '+E.by.length+'/'+E.need,'#ffd0e0');return true}
-const evtEnc=()=>{const E=S.evt;return E?[EVK.indexOf(E.k),EVS.indexOf(E.st),Math.round((E.t||0)*10),E.obs.map(o=>[o.x,o.y,o.w,o.h,Math.round(o.hp*10),Math.round(o.max*10)]),E.need||0,(E.by||[]).length]:0};
+const evtEnc=()=>{const E=S.evt;return E?[EVK.indexOf(E.k),EVS.indexOf(E.st),Math.round((E.t||0)*10),E.obs.map(o=>[o.x,o.y,o.w,o.h,Math.round(o.hp*10),Math.round(o.max*10)]),E.need||0,(E.by||[]).length,(E.cows||[]).map(w=>[Math.round(w.x*100),Math.round(w.y*100),w.dx>=0?1:0])]:0};
 function evtDec(a){if(!Array.isArray(a)||!EVK[a[0]])return null;const n=v=>+v||0;
-  return {k:EVK[a[0]],st:EVS[a[1]]||'idle',t:n(a[2])/10,obs:(Array.isArray(a[3])?a[3]:[]).slice(0,8).map(r=>({x:n(r[0]),y:n(r[1]),w:Math.max(1,n(r[2])),h:Math.max(1,n(r[3])),hp:n(r[4])/10,max:Math.max(.1,n(r[5])/10)})),need:n(a[4]),by:Array(n(a[5])).fill(0)}}
+  return {k:EVK[a[0]],st:EVS[a[1]]||'idle',t:n(a[2])/10,obs:(Array.isArray(a[3])?a[3]:[]).slice(0,8).map(r=>({x:n(r[0]),y:n(r[1]),w:Math.max(1,n(r[2])),h:Math.max(1,n(r[3])),hp:n(r[4])/10,max:Math.max(.1,n(r[5])/10)})),need:n(a[4]),by:Array(n(a[5])).fill(0),cows:(Array.isArray(a[6])?a[6]:[]).slice(0,8).map(r=>({x:n(r[0])/100,y:n(r[1])/100,dx:n(r[2])?1:-1}))}}
 function drawEvt(){
   const E=S.evt;if(!E||E.st==='idle')return;
   const blink=0.5+0.5*Math.sin(S.t*8);
@@ -2385,6 +2407,7 @@ function drawEvt(){
     if(o.hp<o.max&&E.k==='tree'){const f=1-o.hp/o.max,bw=T*1.3,bx=X+W/2-bw/2,by=Y+H+3;ctx.fillStyle='rgba(0,0,0,.7)';rr(bx-2,by-2,bw+4,14,7);ctx.fill();ctx.fillStyle='#7be08a';rr(bx,by,Math.max(4,bw*f),10,5);ctx.fill()}
     else if(o.hp<o.max&&E.k==='carrot'){const f=1-o.hp/o.max;bar(X+4,Y-6,W-8,f,'#7be08a')}
   }
+  if(E.k==='cow'&&E.st==='on')for(const w of E.cows){softShadow(w.x*T,w.y*T+T*0.35,T*0.4,6,.3);emoji('🐄',w.x*T,w.y*T,T*1.0)}
   if(E.k==='cake'&&E.st==='on'){const o=E.obs[0];if(o)text('🍓 '+E.by.length+'/'+E.need,o.x*T+o.w*T/2,o.y*T-10,16,'#fff',800)}
 }
 function drawEvtBanner(){
@@ -3167,7 +3190,7 @@ function update(dt){
           // 大食い: one more dish (the empty plate stays on the table)
           if(ctypeOf(c).second&&!c.secondDone){c.secondDone=true;c.order=pickMenu();c.st='seat';c.pat=c.max;float(c.tx+.5,c.ty-0.3,'おかわり！','#ffe08a','status_refill');sfx('seat');continue}
           startLeave(c,false)}continue}
-        if(!(c.st==='follow'&&pupN(S.players[c.by],'led')))c.pat-=c.st==='wait'?dt/WAIT_PAT*(skillOn('smile')?SMILE_MUL:1)*(S._sign?SIGN_MUL:1):dt*seatMul(c);   /* まねきネコ after the refill / 呼び込み看板 */   // waiting in line to be led to a table lasts a little longer
+        if(!(c.st==='follow'&&pupN(S.players[c.by],'led')))c.pat-=c.st==='wait'?dt/WAIT_PAT*(skillOn('smile')?SMILE_MUL:1)*(S._sign?SIGN_MUL:1):dt*seatMul(c)*evtPatMul(c);   /* まねきネコ after the refill / 呼び込み看板 */   // waiting in line to be led to a table lasts a little longer
         if(c.pat<=0&&c.type==='boss'){S.toast={text:'ボス客は怒って帰ってしまった…',t:0,life:3.5};startLeave(c,true);sfx('angry');continue}
         if(c.pat<=0){const [fx,fy]=custPos(c);if(c.type==='regular'&&S.reg){S.reg.st='off';S.toast={text:REG_NAME+'は怒って、もう来なくなった…',t:0,life:3.5}}startLeave(c,true);sfx('angry');S.hearts--;S.missed++;float(fx,fy-0.6,'♥-1','#ff9c9c','status_angry');if(S.hearts<=0){gameOver();return}}
       }
@@ -3346,6 +3369,7 @@ function drawMixBadge0(ids,cx,cy,sz){   // what is in the mixer's bowl: big icon
   ids.forEach((id,k)=>drawItem({kind:'ing',id,step:0},cx-w/2+4+sz*(k+0.5),cy,sz*0.95));
 }
 function drawItem(it,cx,cy,s,inHand){
+  if(it.kind==='cow'){emoji('🐄',cx,cy,s*0.95);return}
   if(it.kind==='cw'){drawCw(it.type,cx,cy,s);if(it.item)drawItem(it.item,cx,cy-s*(it.type==='bowl'?0.03:0.06),s*(it.type==='bowl'?0.34:0.8),inHand);
     if(it.type==='bowl'&&it.item&&it.item.kind==='mix')drawMixBadge(it.item.items,cx,cy-s*0.7,Math.max(18,s*0.4));return}
   if(it.kind==='dirty'||(emptyPlate(it)&&(it.cnt||1)>1)){
@@ -6285,6 +6309,7 @@ function encItem(it){
     case 'cw':return [10,Math.max(0,CW_K.indexOf(it.type)),it.item?encItem(it.item):0,Math.round((it.cookP||0)*10),Math.round((it.cookB||0)*10)];
     case 'plate':return [1,it.bare?1:0,it.items.map(x=>[ING_K.indexOf(x.id),x.step,x.burnt?1:0,x.how==='pan'?1:x.how==='pot'?2:0]),it.cnt||1];
     case 'dirty':return [7,it.cnt||1];
+    case 'cow':return [11];
     case 'mix':return [8,it.items.map(id=>ING_K.indexOf(id))];
     case 'ext':return [9];
     case 'can':return [2,it.water,it.bonus||0,encUps(it)];
@@ -6523,6 +6548,7 @@ function decItem(a){
     case 1:{const o={kind:'plate',bare:!!a[1],items:(Array.isArray(a[2])?a[2]:[]).slice(0,3).map(x=>ing(x[0],x[1],x[2],+x[3]))};if(+a[3]>1)o.cnt=Math.min(9,+a[3]);return o}
     case 7:return {kind:'dirty',cnt:Math.max(1,Math.min(9,+a[1]||1))};
     case 9:return {kind:'ext'};
+    case 11:return {kind:'cow'};
     case 8:return {kind:'mix',items:(Array.isArray(a[1])?a[1]:[]).slice(0,3).map(i=>ING_K[i]).filter(Boolean)};
     case 2:return {kind:'can',water:+a[1]||0,bonus:+a[2]||0,ups:decUps(a[3])};
     case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean),ups:decUps(a[3])};

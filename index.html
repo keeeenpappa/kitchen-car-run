@@ -2307,11 +2307,11 @@ function spawnBoss(){
 
 // ---------- boss-fight obstacle events (forest tree / farm carrots / sweets giant cake) ----------
 // Counted from the moment the boss sits down: a warning (banner + sound + marked spots), EVT_WARN s later the obstacle appears; once solved, the next one comes 15-20 s later (2 per fight).
-const TRAIN_ROWS=[7,10], TRAIN_LEN=9, TRAIN_SP=11, TRAIN_FRZ=5;   // the rail band (rows 7-9, door-front down to the tables); the train runs right to left
-const EVT_TOWN={forest:'tree',farm:'carrot',sweets:'cake',ranch:'cow',busy:'train'}, EVT_WARN=6, EVT_FIRST=[5,12], EVT_GAP=[15,20], EVT_MAX=2;
-const EVK=['tree','carrot','cake','cow','train'], EVS=['idle','warn','on'];
-const EVT_MSG={tree:'🌳 大木が生えてくる！ 出口がふさがるよ',carrot:'🥕 にんじんが生えてくる！ 抜かないと通れないよ',cake:'🎂 巨大ショートケーキが出てくる！ みんなでいちごを載せよう',cow:'🐄 牛が畜舎から逃げ出す！',train:'🚃 電車が来る！ 線路から離れよう'};
-const EVT_HINT={tree:'作業を連打して大木を切ろう',carrot:'作業を長押しして、にんじんを抜こう',cake:'いちごを切って、持つ で載せよう（1人1つ）',cow:'牛を 持つ でつかまえて、畜舎で 持つ（逃げている間、ボスの待ち時間が速く減る）',train:'電車が通過中！ ぶつかると5秒動けない'};
+const TRAIN_ROWS=[7,10], TRAIN_LEN=9, TRAIN_SP=11, TRAIN_FRZ=5, WAVE_UP=7, WAVE_DOWN=4, WAVE_HOLD=0.7, WAVE_FRZ=8;   // the rail band (rows 7-9, door-front down to the tables); the train runs right to left
+const EVT_TOWN={forest:'tree',farm:'carrot',sweets:'cake',ranch:'cow',busy:'train',port:'wave'}, EVT_WARN=6, EVT_FIRST=[5,12], EVT_GAP=[15,20], EVT_MAX=2;
+const EVK=['tree','carrot','cake','cow','train','wave'], EVS=['idle','warn','on'];
+const EVT_MSG={tree:'🌳 大木が生えてくる！ 出口がふさがるよ',carrot:'🥕 にんじんが生えてくる！ 抜かないと通れないよ',cake:'🎂 巨大ショートケーキが出てくる！ みんなでいちごを載せよう',cow:'🐄 牛が畜舎から逃げ出す！',train:'🚃 電車が来る！ 線路から離れよう',wave:'🌊 高波が来る！ トラックの中に逃げよう'};
+const EVT_HINT={tree:'作業を連打して大木を切ろう',carrot:'作業を長押しして、にんじんを抜こう',cake:'いちごを切って、持つ で載せよう（1人1つ）',cow:'牛を 持つ でつかまえて、畜舎で 持つ（逃げている間、ボスの待ち時間が速く減る）',train:'電車が通過中！ ぶつかると5秒動けない',wave:'高波！ 外にいると流されて動けなくなる'};
 const evRand=a=>a[0]+Math.random()*(a[1]-a[0]);
 function evObsAt(x,y){const E=S&&S.evt;if(!E||E.st!=='on'||E.k==='cow')return null;for(const o of E.obs)if(x>=o.x&&x<o.x+o.w&&y>=o.y&&y<o.y+o.h)return o;return null}
 const evtPatMul=c=>c&&c.type==='boss'&&S.evt&&S.evt.k==='cow'&&S.evt.st==='on'?2:1;
@@ -2333,7 +2333,7 @@ function evtPlan(k){
     for(let y=7;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&!(y===7&&x<=DOOR_FRONT[0]&&x+1>=DOOR_FRONT[0])&&evFree(x,y,2,2))cand.push([x,y]);
     if(!cand.length)return null;const [x,y]=cand[rnd(cand.length)];
     obs.push({x,y,w:2,h:2,hp:1,max:1});return {obs,need:Math.max(1,Math.min(4,np))}}
-  if(k==='train')return {obs:[]};
+  if(k==='train'||k==='wave')return {obs:[]};
   if(k==='cow'){const bx=GOBJ.barn.x;return {obs:[{x:bx,y:GROW,w:1,h:1,hp:1,max:1}],n:Math.max(2,Math.min(5,np+1))}}
   return null}
 function evtEnd(E,msg){E.st='idle';E.obs=[];E.by=[];E.next=evRand(EVT_GAP);if(msg){S.toast={text:msg,t:0,life:2.5}}}
@@ -2342,7 +2342,7 @@ function evtUpdate(dt){
   const k=S.town&&EVT_TOWN[S.town.id];if(!k)return;
   const b=S.cust.find(c=>c.type==='boss');
   let E=S.evt;
-  if(!b||b.st!=='seat'){if(E&&k==='train'){S.evt=null;return}if(E&&E.st!=='idle'){E.st='idle';E.obs=[];E.by=[];E.cows=[];for(const q of S.players)if(q.hold&&q.hold.kind==='cow')q.hold=null}if(E)E.next=null;return}
+  if(!b||b.st!=='seat'){if(E&&(k==='train'||k==='wave')){S.evt=null;return}if(E&&E.st!=='idle'){E.st='idle';E.obs=[];E.by=[];E.cows=[];for(const q of S.players)if(q.hold&&q.hold.kind==='cow')q.hold=null}if(E)E.next=null;return}
   if(!E)E=S.evt={k,n:0,st:'idle',t:0,obs:[],by:[],need:0,next:null};
   if(E.st==='idle'){
     if(E.n>=EVT_MAX)return;
@@ -2352,10 +2352,18 @@ function evtUpdate(dt){
     E.n++;E.st='warn';E.t=EVT_WARN;E.obs=pl.obs.map(o=>Object.assign({},o));E.need=pl.need||0;E.by=[];E.cows=[];E.cn=pl.n||0;
     if(k==='cake'){const have=(S.stock.strawberry||0)+(S.seeds.strawberry||0);if(have<E.need){S.stock.strawberry=(S.stock.strawberry||0)+E.need}}   // never leave the team without a strawberry
     sfx('bell');return}
-  if(E.st==='warn'){E.t-=dt;if(E.t<=0){E.st='on';if(k==='train'){E.tx=GW+0.5;E.hit=[]}if(k==='cow'){E.obs=[];const bx=GOBJ.barn.x+.5;for(let i=0;i<E.cn;i++)E.cows.push({x:bx+(Math.random()-.5)*1.4,y:11.3,dx:(Math.random()-.5)*2,dy:-Math.random(),t:0,f:1})}sfx('mystery');S.toast={text:EVT_HINT[k],t:0,life:3.5}}return}
+  if(E.st==='warn'){E.t-=dt;if(E.t<=0){E.st='on';if(k==='train'){E.tx=GW+0.5;E.hit=[]}if(k==='wave'){E.tx=GH+0.2;E.hit=[];E.ph=0;E.pt=0}if(k==='cow'){E.obs=[];const bx=GOBJ.barn.x+.5;for(let i=0;i<E.cn;i++)E.cows.push({x:bx+(Math.random()-.5)*1.4,y:11.3,dx:(Math.random()-.5)*2,dy:-Math.random(),t:0,f:1})}sfx('mystery');S.toast={text:EVT_HINT[k],t:0,life:3.5}}return}
   if(E.st==='on'){
     for(const o of E.obs)if(o.sh>0)o.sh=Math.max(0,o.sh-dt);
     if(k==='cake'){if(E.by.length>=E.need){evtEnd(E,'🎂 ケーキ完成！ ボス客が食べ始めた');sfx('ready')}}
+    else if(k==='wave'){   // the sea rushes up to the truck (rows 7+ are under water), holds a moment, then recedes
+      if(E.ph===0){E.tx-=dt*WAVE_UP;if(E.tx<=7){E.tx=7;E.ph=1;E.pt=WAVE_HOLD}}
+      else if(E.ph===1){E.pt-=dt;if(E.pt<=0)E.ph=2}
+      else{E.tx+=dt*WAVE_DOWN}
+      S.players.forEach((q,i)=>{
+        if(E.hit.includes(i)){q.frz=WAVE_FRZ;return}   // stays frozen until the water is gone, then 8 s more
+        if(E.ph<2&&q.y>=7&&q.y>=E.tx){E.hit.push(i);q.frz=WAVE_FRZ;if(q.hold&&q.hold.kind==='plate'&&!q.hold.bare&&q.hold.items&&q.hold.items.length)q.hold={kind:'dirty',cnt:1};sfx('water');float(q.x,q.y-0.6,'🌊','#bfe6ff')}});
+      if(E.ph===2&&E.tx>GH+0.2)evtEnd(E,null)}
     else if(k==='train'){E.tx-=dt*TRAIN_SP;
       S.players.forEach((q,i)=>{if((q.frz||0)>0||E.hit.includes(i)||S.phase!=='stop')return;if(q.y>=TRAIN_ROWS[0]&&q.y<TRAIN_ROWS[1]&&q.x>=E.tx&&q.x<=E.tx+TRAIN_LEN){E.hit.push(i);q.frz=TRAIN_FRZ;sfx('nope');float(q.x,q.y-0.6,'💫','#fff')}});
       if(E.tx+TRAIN_LEN<-1){evtEnd(E,null)}}
@@ -2397,6 +2405,15 @@ function evtPick(p,tx,ty){
 const evtEnc=()=>{const E=S.evt;return E?[EVK.indexOf(E.k),EVS.indexOf(E.st),Math.round((E.t||0)*10),E.obs.map(o=>[o.x,o.y,o.w,o.h,Math.round(o.hp*10),Math.round(o.max*10)]),E.need||0,(E.by||[]).length,(E.cows||[]).map(w=>[Math.round(w.x*100),Math.round(w.y*100),w.dx>=0?1:0]),Math.round((E.tx||0)*100),S.players.map((q,i)=>(q.frz||0)>0?[i,Math.round(q.frz*10)]:null).filter(Boolean)]:0};
 function evtDec(a){if(!Array.isArray(a)||!EVK[a[0]])return null;const n=v=>+v||0;
   return {k:EVK[a[0]],st:EVS[a[1]]||'idle',t:n(a[2])/10,obs:(Array.isArray(a[3])?a[3]:[]).slice(0,8).map(r=>({x:n(r[0]),y:n(r[1]),w:Math.max(1,n(r[2])),h:Math.max(1,n(r[3])),hp:n(r[4])/10,max:Math.max(.1,n(r[5])/10)})),need:n(a[4]),by:Array(n(a[5])).fill(0),cows:(Array.isArray(a[6])?a[6]:[]).slice(0,8).map(r=>({x:n(r[0])/100,y:n(r[1])/100,dx:n(r[2])?1:-1})),tx:n(a[7])/100,frz:(Array.isArray(a[8])?a[8]:[]).map(r=>[n(r[0]),n(r[1])/10])}}
+function drawWave(E){
+  const W=GW*T,warn=E.st==='warn';
+  if(warn){ctx.save();ctx.globalAlpha=0.10+0.12*Math.sin(S.t*10);ctx.fillStyle='#3a8fd9';ctx.fillRect(0,7*T,W,(GH-7)*T);ctx.restore();return}
+  if(E.st!=='on')return;
+  const y=E.tx*T;ctx.save();ctx.fillStyle='rgba(24,98,190,.78)';ctx.beginPath();ctx.moveTo(0,GH*T+10);ctx.lineTo(0,y);
+  for(let x=0;x<=W;x+=12)ctx.lineTo(x,y+Math.sin(x*0.05+S.t*8)*7);
+  ctx.lineTo(W,GH*T+10);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=4;ctx.beginPath();for(let x=0;x<=W;x+=12){const yy=y+Math.sin(x*0.05+S.t*8)*7;x?ctx.lineTo(x,yy):ctx.moveTo(x,yy)}ctx.stroke();ctx.restore();
+}
 function drawRail(E){
   const y0=TRAIN_ROWS[0]*T,h=(TRAIN_ROWS[1]-TRAIN_ROWS[0])*T,W=GW*T,warn=E.st==='warn';
   ctx.save();ctx.fillStyle='rgba(88,80,72,.55)';ctx.fillRect(0,y0,W,h);
@@ -2420,6 +2437,8 @@ function drawTrain(E){
 }
 function drawEvt(){
   const E=S.evt;if(!E)return;
+  if(E.k==='wave'){drawWave(E);
+    S.players.forEach((q,i)=>{const f=S.guest?(E.frz&&E.frz.find(r=>r[0]===i)):((q.frz||0)>0);if(f)emoji('💫',q.x*T,(q.y-1.25)*T,T*0.8)});return}
   if(E.k==='train'){drawRail(E);if(E.st==='on')drawTrain(E);
     S.players.forEach((q,i)=>{const f=S.guest?(E.frz&&E.frz.find(r=>r[0]===i)):((q.frz||0)>0);if(f)emoji('💫',q.x*T,(q.y-1.25)*T,T*0.8)});return}
   if(E.st==='idle')return;

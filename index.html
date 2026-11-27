@@ -734,7 +734,7 @@ function presetExtras(np){
   n=cnt(c=>c.t==='table');
   while(n<T.t){const a=[];for(let y=8;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='ground'&&!c.item)a.push([x,y])}const p=pick(a);if(!p)break;put(p,'table');n++}
 }
-function newRun(np,mode,test){
+function newRun(np,mode,test,botList){
   LASTRUN=[np,mode];applyTruck(TX_FOR(np));
   S={np,money:40,hearts:HEART_MAX,fuel:FUEL_MAX,speed:1,dist:0,route:1,stop:0,stock:{bread:3,lettuce:2,tomato:2,rice:2},seeds:{lettuce:1,tomato:1},
     phase:'choose',view:'road',town:null,next:null,timer:0,sub:'',shops:[],cust:[],spawnT:0,
@@ -762,7 +762,7 @@ function newRun(np,mode,test){
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.supply=[];S.tierNp=np;addCleanPlates(TIER(np).plate);   // more players: the extra clean plates go on a sink
   // everyone picks an animal (= skill) first; then the layout or the first town choice
   // test mode: player 1 is real, everyone else is a bot (random animal, never moves or picks by hand)
-  S.bots=test?Array.from({length:np-1},(_,k)=>k+1):[];
+  S.bots=test?Array.from({length:np-1},(_,k)=>k+1):(botList||[]);
   S.startMode=mode;startSelect();
 }
 // the extinguisher stands on the floor by itself (tile 'extst'); picked up alone, set down on any free floor tile in the truck
@@ -1147,8 +1147,233 @@ if(isTouch)document.body.classList.add('touch');
   btn('bPause',()=>touch.pause=true);
 })();
 // online: this device is one player, so both key sets drive it; remote players come from the room
+// ---------- test bots: each bot has a job; the chef can change a bot's job (press 持つ / 作業 next to it) ----------
+// A bot walks (BFS over the tiles it can stand on) to the thing its job needs, faces it and presses 持つ / holds 作業.
+// Limits: bots do not handle the event obstacles (cows, trains, waves, snow, spring, the mountain's climb is the 採取 bot's only event).
+const BOT_JOBS=['採取','案内','皿洗い','菜園','提供','カット'];   // (the 調理 job is parked: its code stays below but nobody gets it)
+const BOT_ORDERS=['おまかせ','採取','案内','皿洗い','菜園','提供','カット','待機'];
+const botJob=i=>{const o=S.botS&&S.botS[i]&&S.botS[i].job;return o||BOT_JOBS[(i-1)%BOT_JOBS.length]};
+const botSt=i=>{S.botS=S.botS||{};return S.botS[i]||(S.botS[i]={pulse:0,bt:0,bo:false,tog:false,want:null,job:null,seed:null})};
+const botSetJob=(i,name)=>{botSt(i).job=name==='おまかせ'?null:name};
+const BOT_DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+const bStand=(x,y)=>!!tile(x,y)&&!solid(x,y);
+const bNear=(tx,ty)=>BOT_DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).filter(([x,y])=>bStand(x,y));
+// shortest walk over standable tiles to one of the goal tiles: [] = already there, null = no way
+function bPath(p,goals){
+  const sx=Math.floor(p.x),sy=Math.floor(p.y),K=(x,y)=>x+','+y,goal=new Set(goals.map(g=>K(g[0],g[1])));
+  if(goal.has(K(sx,sy)))return [];
+  const prev=new Map([[K(sx,sy),null]]),q=[[sx,sy]];
+  for(let h=0;h<q.length;h++){const [x,y]=q[h];
+    for(const [dx,dy] of BOT_DIRS){const nx=x+dx,ny=y+dy,k=K(nx,ny);
+      if(prev.has(k)||!bStand(nx,ny))continue;prev.set(k,K(x,y));
+      if(goal.has(k)){const path=[[nx,ny]];let cur=K(x,y);while(cur!==K(sx,sy)){const [cx,cy]=cur.split(',').map(Number);path.unshift([cx,cy]);cur=prev.get(cur)}return path}
+      q.push([nx,ny])}}
+  return null}
+// walk to a tile next to (tx,ty) and face it; true once the chef stands there facing it
+function bGo(p,b,out,tx,ty){
+  const px=Math.floor(p.x),py=Math.floor(p.y);
+  if(Math.abs(px-tx)+Math.abs(py-ty)===1){out.mx=tx-px;out.my=ty-py;return true}
+  const path=bPath(p,bNear(tx,ty));
+  if(!path||!path.length)return false;
+  const [nx,ny]=path[0];let mx=(nx+.5-p.x)*3,my=(ny+.5-p.y)*3;const m=Math.hypot(mx,my);
+  if(m>1){mx/=m;my/=m}
+  out.mx=mx;out.my=my;return false}
+const bCells=f=>{const a=[];for(let y=2;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c&&f(c,x,y))a.push([x,y])}return a};
+// nearest reachable target (the 14 nearest are checked)
+const bTo=(p,cells,mode)=>{const sorted=[...cells].sort((a,b)=>Math.hypot(a[0]+.5-p.x,a[1]+.5-p.y)-Math.hypot(b[0]+.5-p.x,b[1]+.5-p.y));
+  for(const c of sorted.slice(0,14)){if(bPath(p,bNear(c[0],c[1])))return {tx:c[0],ty:c[1],mode}}return null};
+// first reachable target in the given order (used for "shortest gauge first")
+const bToOrdered=(p,cells,mode)=>{for(const c of cells){if(bPath(p,bNear(c[0],c[1])))return {tx:c[0],ty:c[1],mode}}return null};
+const bFreeTable=(c,x,y)=>c.t==='table'&&!c.item&&!S.cust.some(q=>(q.st==='seat'||q.st==='eat')&&q.tx===x&&q.ty===y);
+const bGuestAt=(x,y)=>S.cust.some(q=>(q.st==='seat'||q.st==='eat')&&q.tx===x&&q.ty===y);
+const bNeedChop=it=>!!it&&it.kind==='ing'&&!it.burnt&&ING[it.id].steps[it.step]==='chop';
+const bCooked=it=>ING[it.id].steps.includes('cook')&&it.step>=ING[it.id].steps.length;   // fully cooked (not counted as cut food)
+const bKey=x=>x.id+':'+x.step;
+const blink=(b,period,dt)=>{b.bt-=dt;if(b.bt<=0){b.bt=period;b.bo=!b.bo}return b.bo};
+const bSinks=()=>bCells(c=>c.t==='sink');
+const townNeedList=()=>S.town?townNeeds(S.town):[];
+// the recipes the kitchen is working on: this town's menu and the seated customers' orders
+const bRecipes=()=>{const s=new Set(S.town?S.town.menu:[]);for(const c of S.cust)if(c.st==='seat')for(const o of pendingOrders(c))s.add(o);return [...s]};
+// the ingredient keys a recipe still needs after what is already on the plate / in hand (null if none fits)
+function bNeedKeys(items){
+  const have=items.map(bKey);
+  for(const r of bRecipes()){const rk=RECIPES[r].ings.map(x=>rid(x)+':'+rstep(x));const m=[...rk];let ok=true;
+    for(const k of have){const j=m.indexOf(k);if(j<0){ok=false;break}m.splice(j,1)}
+    if(ok&&m.length)return m}
+  return null}
+const bHasKey=(c,keys)=>!!c.item&&c.item.kind==='ing'&&plateOk(c.item)&&keys.includes(bKey(c.item));
+// cut food waiting on the counters / board, not counting cooked food
+const bCutWaiting=()=>bCells(c=>(c.t==='counter'||c.t==='board')&&c.item&&c.item.kind==='ing'&&c.item.step>0&&!bCooked(c.item)).length;
+// the gathering spot for the most needed item (lowest stock first, the first one listed on a tie)
+function bGatherSpot(i){
+  const need=townNeedList();const opts=[];
+  for(const k of GOBJ_K)for(const it of GOBJ[k].items)if(need.includes(it))opts.push([S.stock[it]||0,k]);
+  if(!opts.length)return GOBJ_K[i%GOBJ_K.length];
+  opts.sort((a,b)=>a[0]-b[0]);return opts[0][1]}
+// what the job needs right now: {tx,ty,mode:'pick'|'hold'} (+ want: an item to take from a menu), or null
+function botTask(i,p){
+  const job=botJob(i),h=p.hold,b=botSt(i);
+  if(job==='待機')return null;
+  if(job==='採取'){
+    if(h&&h.kind==='basket'){
+      if(h.items.length)return bTo(p,bCells(c=>c.t==='fridge'),'pick');       // 持つ at the fridge stores what was gathered
+      const k=bGatherSpot(i);return {tx:GOBJ[k].x,ty:GROW,mode:'pick'}}      // a gathering spot for what the town needs
+    if(!h){
+      if(S.evt&&S.evt.k==='mountain'&&S.evt.st==='on'&&S.evt.obs[0]&&!evtGoldExists())return {tx:S.evt.obs[0].x,ty:S.evt.obs[0].y,mode:'pick'};
+      return bTo(p,bCells(c=>(c.item&&c.item.kind==='basket')||(c.top&&c.top.kind==='basket')),'pick')}
+    return null}
+  if(job==='案内'){
+    if(h&&h.kind==='dirty')return bTo(p,bSinks(),'pick');                    // a dirty plate goes into the sink
+    if(h)return null;
+    if(S.cust.some(c=>c.st==='follow'&&c.by===i))return bTo(p,bCells(bFreeTable),'pick');   // lead the customer to a free table
+    const W=waiting(),order=W.map((c,k)=>k).sort((a,b)=>W[a].pat/W[a].max-W[b].pat/W[b].max);   // shortest gauge first
+    if(W.length&&bCells(bFreeTable).length){const q=bToOrdered(p,order.map(k=>bCells(c=>c.t==='queue'&&c.slot===k)[0]).filter(Boolean),'pick');if(q)return q}   // a free table: just lead the customer
+    const dt=bCells((c,x,y)=>c.t==='table'&&c.item&&c.item.kind==='dirty'&&!bGuestAt(x,y));   // no free table: clear a dirty plate first
+    if(dt.length)return bTo(p,dt,'pick');
+    return null}
+  if(job==='皿洗い'){
+    if(h&&h.kind==='dirty')return bTo(p,bSinks(),'pick');
+    if(h)return null;
+    const sk=bCells(c=>c.t==='sink'&&(c.dirty||0)>0);if(sk.length)return bTo(p,sk,'hold');
+    const dt=bCells((c,x,y)=>c.t==='table'&&c.item&&c.item.kind==='dirty');if(dt.length)return bTo(p,dt,'pick');
+    const dd=(S.dirtyDrops||[]).map(d=>[d.tx,d.ty]);if(dd.length)return bTo(p,dd,'pick');
+    return null}
+  if(job==='菜園'){
+    const grow=c=>c.t==='planter'&&c.plant&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow;
+    if(h&&h.kind==='can'){
+      if(h.water>0){const t=bTo(p,bCells(grow),'pick');return t}
+      if(h.water<canCap(h))return bTo(p,bSinks(),'hold');   // fill the watering can at the sink
+      return bTo(p,bCells(grow),'pick')}
+    if(h&&h.kind==='seed')return bTo(p,bCells(c=>c.t==='planter'&&!c.plant),'pick');
+    if(h)return null;
+    const rd=bCells(c=>c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow);if(rd.length)return bTo(p,rd,'hold');
+    const cans=bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='can'&&c.item.water>0);
+    if(bCells(grow).length&&cans.length)return bTo(p,cans,'pick');
+    if(bCells(c=>c.t==='planter'&&!c.plant).length){
+      const seeds=seedList().filter(k=>ING[k].grow);
+      if(!b.seed||!seeds.includes(b.seed))b.seed=seeds.find(k=>townNeedList().includes(k))||seeds[0]||null;   // a seed the town needs first, else any
+      const sb=bTo(p,bCells(c=>c.t==='seedbox'),'pick');if(sb&&b.seed){sb.want=b.seed;return sb}}
+    return null}
+  if(job==='提供'){
+    if(h&&h.kind==='plate'&&!h.bare&&h.items.length){
+      const r=matchRecipe(h.items);if(!r)return null;
+      const cs=S.cust.filter(c=>(c.st==='seat'&&pendingOrders(c).includes(r))||(c.st==='wait'&&c.type==='takeout'&&c.order===r));
+      cs.sort((a,b)=>a.pat/a.max-b.pat/b.max);
+      for(const c of cs){const [x,y]=custPos(c);const tx=Math.floor(x),ty=Math.floor(y),tc=tile(tx,ty),t=bTo(p,[[tx,ty]],tc&&tc.t==='table'&&tc.item&&tc.item.kind==='dirty'?'wait':'pick');if(t)return t}   // a dirty plate still on the table: wait there
+      return null}
+    if(h)return null;
+    const want=new Set(S.cust.filter(c=>c.st==='seat'||(c.st==='wait'&&c.type==='takeout')).flatMap(c=>c.st==='seat'?pendingOrders(c):[c.order]));
+    return bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!c.item.bare&&c.item.items.length&&want.has(matchRecipe(c.item.items))),'pick')}
+  if(job==='カット'){
+    if(h&&h.kind==='ing'){
+      if(bNeedChop(h))return bTo(p,bCells(c=>c.t==='board'&&!c.item),'pick');
+      const pan=bCells(c=>c.t==='stove'&&c.cw&&!c.item);   // food that needs cooking next goes straight into an empty pan / pot
+      if(ING[h.id].steps[h.step]==='cook'&&pan.length)return bTo(p,pan,'pick');
+      if(plateOk(h)){const pl=bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!matchRecipe(c.item.items||[])&&(bNeedKeys(c.item.items)||[]).includes(bKey(h))),'pick');if(pl)return pl}   // onto a plate it fits
+      return null}
+    if(h)return null;
+    const bd=bCells(c=>c.t==='board'&&bNeedChop(c.item));if(bd.length)return bTo(p,bd,'hold');
+    const done=bCells(c=>c.t==='board'&&c.item&&c.item.kind==='ing'&&!bNeedChop(c.item));if(done.length)return bTo(p,done,'pick');
+    if(bCutWaiting()>=1)return null;                                    // only one cut item waits at a time
+    if(!bCells(c=>c.t==='counter'&&!c.item&&!c.top).length&&!bCells(c=>c.t==='stove'&&c.cw&&!c.item).length)return null;   // nowhere to put it
+    const want=stockList().find(k=>(S.stock[k]||0)>0&&townNeedList().includes(k)&&ING[k].steps[0]==='chop');
+    if(want){const f=bTo(p,bCells(c=>c.t==='fridge'),'pick');if(f){f.want=want;return f}}
+    return null}
+  if(job==='調理'){
+    const stoves=bCells(c=>c.t==='stove'&&c.cw),empty=stoves.filter(([x,y])=>!tile(x,y).item),done=stoves.filter(([x,y])=>{const it=tile(x,y).item;return !!it&&it.kind==='ing'&&isDone(it)});
+    const cook=it=>!!it&&it.kind==='ing'&&!it.burnt&&ING[it.id].steps[it.step]==='cook';
+    if(h&&h.kind==='ing'){
+      if(cook(h))return bTo(p,empty,'pick');
+      if(plateOk(h)){const pl=bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!matchRecipe(c.item.items||[])&&(bNeedKeys(c.item.items)||[]).includes(bKey(h))),'pick');if(pl)return pl}
+      return null}
+    if(h&&h.kind==='plate'){
+      if(h.items.length&&matchRecipe(h.items))return bTo(p,bCells(c=>c.t==='counter'&&!c.item&&!c.top),'pick');   // a finished dish is set down
+      if(done.length&&h.items.length<3)return bTo(p,done,'pick');                                          // scoop the cooked food onto the plate
+      const keys=bNeedKeys(h.items);
+      if(keys){const t=bTo(p,bCells(c=>bHasKey(c,keys)),'pick');if(t)return t}
+      return null}
+    if(h)return null;
+    if(done.length){
+      const pc=bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!matchRecipe(c.item.items||[])),'pick');if(pc)return pc;   // an empty or partly filled plate on a counter
+      return bTo(p,bCells(c=>c.t==='sink'&&(c.clean||0)>0),'pick')}   // a clean plate from the sink
+    if(empty.length){const cf=bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='ing'&&cook(c.item)),'pick');if(cf)return cf;
+      const want=stockList().find(k=>(S.stock[k]||0)>0&&ING[k].steps[0]==='cook'&&townNeedList().includes(k));
+      if(want){const f=bTo(p,bCells(c=>c.t==='fridge'),'pick');if(f){f.want=want;return f}}}
+    const raw=stockList().find(k=>(S.stock[k]||0)>0&&ING[k].steps.length===0&&townNeedList().includes(k));   // bread, milk: no preparation
+    if(raw&&!bCells(c=>c.item&&c.item.kind==='ing'&&c.item.id===raw).length){const f=bTo(p,bCells(c=>c.t==='fridge'),'pick');if(f){f.want=raw;return f}}
+    const starts=bNeedKeys([]);
+    if(starts&&bCells(c=>bHasKey(c,starts)).length){const sk=bTo(p,bCells(c=>c.t==='sink'&&(c.clean||0)>0),'pick');if(sk)return sk}
+    return null}
+  return null}
+// the menu (fridge / seedbox): move the cursor to the wanted item, then 持つ
+function botMenu(p,b,out){
+  const M=MENU[p.menu.kind],list=M.list(p),cols=M.cols,want=b.want?list.indexOf(b.want):-1;
+  if(want<0){if(b.pulse<=0){out.bk=true;b.pulse=0.45}return out}
+  const sel=p.menu.sel;
+  if(sel===want){if(b.pulse<=0){out.pick=true;b.pulse=0.45}return out}
+  if(b.tog){const tc=want%cols,cc=sel%cols,tr=Math.floor(want/cols),cr=Math.floor(sel/cols);
+    if(tc!==cc)out.mx=tc>cc?1:-1;else out.my=tr>cr?1:-1}
+  return out}
+// the gathering minigames: the bot answers each one in time
+function botGather(p,b,out,dt){
+  const g=p.g,O=GOBJ[g.obj],tap=on=>on&&!p.prevAct;
+  if(g.st===2){if(b.pulse<=0){out.pick=true;b.pulse=0.45}return out}   // keep the random catch
+  if(O.act==='mash'){out.act=tap(blink(b,0.12,dt));return out}
+  if(O.act==='fish'){if(g.st===1)out.act=tap(blink(b,0.1,dt));return out}
+  if(O.act==='timing'){out.act=tap(Math.abs(g.v-0.5)<=timingZone()*0.5);return out}
+  if(O.act==='pull'){const z0=(g.seq[0]||0)/100;out.act=g.v<z0+pullW()*0.5;return out}
+  if(O.act==='arrows'){const d=ARW[g.seq[g.v]];if(b.tog&&d){out.mx=d[0];out.my=d[1]}return out}
+  return out}
+function botInput(i){
+  const out={mx:0,my:0,pick:false,act:false,sw:false,sk:false,swH:false,bk:false};
+  const p=S&&S.players&&S.players[i];
+  if(!p||S.phase!=='stop'||S.sub==='closing')return out;
+  const b=botSt(i),dt=DT_NOW||0.05;b.pulse-=dt;b.tog=!b.tog;
+  if(p.menu)return botMenu(p,b,out);
+  if(p.g)return botGather(p,b,out,dt);
+  if(p.cl){const d=ARW[p.cl.seq[p.cl.i]];if(b.tog&&d){out.mx=d[0];out.my=d[1]}return out}
+  if(p.mk||p.seat||p.bn)return out;
+  // a plate or a can the job has no use for goes down on a free counter; cut / cooked food too
+  const t=botTask(i,p)||(p.hold&&(p.hold.kind==='ing'||p.hold.kind==='can')?bTo(p,bCells(c=>c.t==='counter'&&!c.item&&!c.top),'pick'):null);
+  b.want=t&&t.want||null;
+  if(!t)return out;
+  if(!bGo(p,b,out,t.tx,t.ty))return out;
+  if(t.mode==='wait'){return out}   // stand next to the table and wait
+  if(t.mode==='pick'){if(b.pulse<=0){out.pick=true;b.pulse=0.45}}
+  else if(t.mode==='hold')out.act=!p.lock;
+  return out}
+// ----- the chef's command list for a bot: press 持つ / 作業 next to a bot, move with the cross, 持つ chooses -----
+function botCallOpen(p,inp){   // true when a bot is close enough and the chef's press opens its list
+  if(!S.botMenu&&S.phase==='stop'&&!p.menu&&!p.mk&&!p.g&&!p.seat&&!p.bn&&!p.cl&&(inp.pick||(inp.act&&!p.prevAct))){
+    let best=-1,bd=1.3;
+    S.players.forEach((q,i)=>{if(i===0||!S.bots||!S.bots.includes(i))return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best=i}});
+    if(best>=0){S.botMenu={i:best,sel:Math.max(0,BOT_ORDERS.indexOf(S.botS&&S.botS[best]&&S.botS[best].job||'おまかせ')),last:'0,0'};return true}}
+  return false}
+function botMenuStep(p,inp){   // inp = the chef's real keys   // while the list is open the chef only moves the cursor, 持つ chooses, 作業 / B closes
+  const M=S.botMenu;if(!M)return NOINP;
+  const n=BOT_ORDERS.length,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,key=dx+','+dy;
+  if(key!=='0,0'&&key!==M.last){if(dy)M.sel=(M.sel+dy+n)%n;else if(dx)M.sel=(M.sel+dx+n)%n}
+  M.last=key;
+  if(inp.pick){botSetJob(M.i,BOT_ORDERS[M.sel]);S.botMenu=null;sfx('pick');S.toast={text:'🤖 bot'+M.i+'：'+BOT_ORDERS[M.sel],t:0,life:1.6}}
+  else if(inp.bk||(inp.act&&!p.prevAct))S.botMenu=null;
+  return NOINP}
+function drawBotUI(){
+  if(!S||!S.bots||!S.bots.length)return;
+  for(const i of S.bots){const q=S.players[i];if(!q)continue;
+    const job=botJob(i)+(S.botS&&S.botS[i]&&S.botS[i].job?'*':'');
+    ctx.font=`800 10px ${FNT}`;const w=ctx.measureText(job).width+10;
+    ctx.fillStyle='rgba(16,26,30,.8)';rr(q.x*T-w/2,q.y*T+14,w,14,7);ctx.fill();text(job,q.x*T,q.y*T+21,10,'#fff',800)}
+  const M=S.botMenu;if(!M)return;
+  const q=S.players[M.i];if(!q)return;
+  const w=130,rh=20,h=BOT_ORDERS.length*rh+24,x=q.x*T-w/2,y=q.y*T-h-30;
+  ctx.fillStyle='rgba(16,26,30,.92)';rr(x,y,w,h,10);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=2;ctx.stroke();
+  text('指示：bot'+M.i,x+w/2,y+11,11,'#ffd84a',800);
+  BOT_ORDERS.forEach((n,k)=>{const yy=y+24+k*rh;if(k===M.sel){ctx.fillStyle='rgba(255,216,74,.25)';rr(x+5,yy,w-10,rh-2,6);ctx.fill()}
+    text(n,x+12,yy+rh/2-1,12,k===M.sel?'#ffd84a':'#fff',k===M.sel?800:600,'left')});
+}
+
 function readInput(i){
-  if(S&&S.bots&&S.bots.includes(i))return NOINP;   // test bots stand still
+  if(S&&S.bots&&S.bots.includes(i))return botInput(i);   // test bots play their job
   if(NET.role==='host'&&i===0&&personalPause())return NOINP;   // the host's chef stands still while the host's own menu is open
   if(NET.role==='host')return i>0?remoteInput(i):deviceInput();
   return baseInput(i);
@@ -3207,6 +3432,7 @@ function update(dt){
     NET.quietFx=NET.role==='host'&&i>0;
     let inp=(S.phase==='stop'&&S.sub==='closing')||(S.phase==='layout'&&(S.layLock||0)>0)?NOINP:readInput(i);   // closing time: everyone stands still; layout: 3 s lock after the last screen
     if((p.frz||0)>0){p.frz-=dt;inp=NOINP}
+    if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw))inp=NOINP;p.prevAct=raw.act}
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);
@@ -5850,7 +6076,7 @@ function draw(){
   if(S.players.some(q=>q.hold&&q.hold.kind==='basket')){ctx.save();ctx.beginPath();ctx.rect(0,0,GW*T,(VH-bh)*T);ctx.clip();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}for(const q of S.players)drawBasketTag(q,q.x*T,q.y*T+CHEF_DY);ctx.restore()}
   drawStartBanner();
   drawTutorial();
-  ctx.save();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawMenus();flushMixBadges();ctx.restore();
+  ctx.save();if(z!==1){ctx.scale(z,z);ctx.translate(-CAM.x*T,-CAM.y*T)}drawMenus();flushMixBadges();drawBotUI();ctx.restore();
   drawWaiting();
   drawClosing();
   if(arr)drawArrive();
@@ -6148,6 +6374,7 @@ function netAction(a,v){
   if(a==='mkroom'){NET.pwOn=false;showRoomSetup();return true}
   if(a==='pwmode'){NET.pwOn=v==='1';showRoomSetup();return true}
   if(a==='cap'){NET.cap=+v||8;showRoomSetup();return true}
+  if(a==='rbot'){const mx=Math.max(0,(NET.cap||8)-1),L=Array.from({length:mx+1},(_,k)=>k);NET.bots=L[(L.indexOf(NET.bots||0)+1)%L.length];showRoomSetup();return true}
   if(a==='rmode'){NET.mode=v==='tour'?'tour':'casual';showRoomSetup();return true}
   if(a==='host'){const el=document.getElementById('roomPw');NET.pw=NET.pwOn&&el?el.value.trim().slice(0,8):'';
     if(NET.pwOn&&!NET.pw){const e=document.getElementById('pwErr');if(e)e.textContent='パスワードを入れてください';return true}
@@ -6204,6 +6431,7 @@ function showRoomSetup(){
     <div class="row"><span style="align-self:center;min-width:6em">パスワード</span><button class="ovbtn${NET.pwOn?'':' autofocus'}" data-act="pwmode" data-v="0">${NET.pwOn?'':'✔ '}なし</button><button class="ovbtn${NET.pwOn?' autofocus':''}" data-act="pwmode" data-v="1">${NET.pwOn?'✔ ':''}あり</button></div>
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
     <div class="row"><span style="align-self:center;min-width:6em">最大人数</span>${[4,6,8].map(n=>`<button class="ovbtn${(NET.cap||8)===n?' autofocus':''}" data-act="cap" data-v="${n}">${(NET.cap||8)===n?'✔ ':''}${n}人</button>`).join('')}</div>
+    <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><button class="ovbtn" data-act="rbot">${NET.bots?NET.bots+'人':'なし'}（押すと変わる）</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn${(NET.mode||'casual')==='casual'?' autofocus':''}" data-act="rmode" data-v="casual">${(NET.mode||'casual')==='casual'?'✔ ':''}カジュアル</button><button class="ovbtn${NET.mode==='tour'?' autofocus':''}" data-act="rmode" data-v="tour">${NET.mode==='tour'?'✔ ':''}グランドツアー</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn${NET.kit==='layout'?'':' autofocus'}" data-act="rkit" data-v="preset">${NET.kit==='layout'?'':'✔ '}初期配置済み</button><button class="ovbtn${NET.kit==='layout'?' autofocus':''}" data-act="rkit" data-v="layout">${NET.kit==='layout'?'✔ ':''}自分で並べる</button></div>
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);
@@ -6342,7 +6570,8 @@ function hostStart(mode){
   g.forEach((p,i)=>bindSlot(p,i+1));
   // the room stays open: friends can still join (they watch, and come in once the town's service is over)
   NET.lobby.presence({host:{code:NET.code,n:1+g.length,open:true,cap:ROOM_CAP}}).catch(()=>{});
-  newRun(1+g.length,mode==='layout'?'layout':'preset');
+  const nb=Math.max(0,Math.min(NET.bots||0,ROOM_CAP-1-g.length)),bl=Array.from({length:nb},(_,k)=>1+g.length+k);   // bots fill the seats after the guests
+  newRun(1+g.length+nb,mode==='layout'?'layout':'preset',false,bl);
   // online: P1 is this device's pick, each guest brings its own; everyone then chooses together on the character-select screen
   g.forEach((p,i)=>{const pl=S.players[i+1];if(pl){pl.skill=guestSkill(p);if(pl.sel)pl.sel.cur=Math.max(0,SKILL_K.indexOf(pl.skill))}});
 }
@@ -6384,7 +6613,13 @@ function hostRoster(){
     S.toast={text:'P'+(k+1)+' が参加しました！',t:0,life:3};sfx('ready');
     NET.lobby.presence({host:{code:NET.code,n:S.np,open:true,cap:ROOM_CAP}}).catch(()=>{});
   }
-  S.waitN=Math.min(NET.waiting.length,ROOM_CAP-S.players.length);
+  while(canIn&&NET.waiting.length&&S.players.length>=ROOM_CAP&&S.bots&&S.bots.length){   // a full room with bots: the newcomer takes the last bot's seat
+    const peer=NET.waiting.shift(),p=NET.room.peers().find(q=>q.peer===peer);if(!p)continue;
+    const k=S.bots.pop(),q=S.players[k];bindSlot(p,k);q.skill=guestSkill(p);q.hold=null;
+    if(S.phase==='select')q.sel={cur:Math.max(0,SKILL_K.indexOf(q.skill)),ok:false,last:'0,0',rep:0};
+    S.toast={text:'P'+(k+1)+' が参加しました！（botと交代）',t:0,life:3};sfx('ready');
+  }
+  S.waitN=Math.min(NET.waiting.length,ROOM_CAP-S.players.length+(S.bots?S.bots.length:0));
 }
 function remoteInput(i){
   const r=NET.inputs[i]; if(!r)return {mx:0,my:0,pick:false,act:false,sw:false,sk:false};
@@ -6469,7 +6704,7 @@ function sendSnap(){
     ro:Math.round(S.roadOff*100),ar:S.arrT!=null&&S.arrT<ARRIVE_T?Math.round(S.arrT*100):-1,bn:S.bonus||0,pa:S.paused?1:0,pi:S.pupI==null?-1:S.pupI,o:ov.hidden||personalPause()?0:NET.ovId,
     tw:S.town?[S.town.id,Math.round(S.town.pay*100),S.town.menu.length]:0,nx:S.next?[S.next.id,Math.round(S.next.pay*100),S.next.menu.length]:0,
     up:[S.up.cook,S.up.chop,S.up.blend,S.up.burn,S.up.gatherSpd,S.up.canCap,S.up.basketCap,S.up.pay,S.up.tip].map(r2),
-    sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,ev:evtEnc(),dd:(S.dirtyDrops||[]).map(d=>[d.tx,d.ty,d.n||1]),
+    sk:ING_K.map(k=>S.stock[k]||0),sd:ING_K.map(k=>S.seeds[k]||0),gl:S.gatherLeft,ev:evtEnc(),bt:(S.bots||[]).map(i=>[i,Math.max(0,BOT_ORDERS.indexOf(S.botS&&S.botS[i]&&S.botS[i].job||''))]),dd:(S.dirtyDrops||[]).map(d=>[d.tx,d.ty,d.n||1]),
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const c=S.map[y][x],it=c.item;return [x,y,it&&it.kind==='dirty'?it.cnt||1:0,c.pro||0]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),tp:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='teapot'?[x,y]:null)).filter(Boolean),bch:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='bench'&&c.bs===0?[x,y]:null)).filter(Boolean),
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?(p.menu.kind==='vault'?p.menu.sel+100*(p.menu.tx+30*p.menu.ty):p.menu.sel):0,Math.round((p.actT||0)*100),p.cur,
@@ -6633,6 +6868,7 @@ function applySnap(d){
   ING_K.forEach((k,i)=>{S.stock[k]=n((d.sk||[])[i]);S.seeds[k]=n((d.sd||[])[i])});
   S.gatherLeft=Array.isArray(d.gl)?d.gl.map(n):[0,0];
   S.evt=evtDec(d.ev);
+  S.bots=(Array.isArray(d.bt)?d.bt:[]).map(r=>+r[0]);S.botS={};(Array.isArray(d.bt)?d.bt:[]).forEach(r=>{if(+r[1]>0)botSt(+r[0]).job=BOT_ORDERS[+r[1]]});
   S.dirtyDrops=(Array.isArray(d.dd)?d.dd:[]).slice(0,12).map(a=>({tx:n(a[0]),ty:n(a[1]),n:Math.max(1,Math.min(9,n(a[2])||1))}));
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){

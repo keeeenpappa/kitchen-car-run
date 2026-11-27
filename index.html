@@ -597,14 +597,15 @@ const basketCap=it=>S.up.basketCap+(it.bonus||0)+2*upN(it,'basket');
 const PRO_ONLY=['board','stove','planter'];
 const BENCH_P=0.1, BENCH_CD=3, VAULT_P=0.12, VAULT_MAX=3;   /* ひとやすみベンチ: 2 tiles outside, 2 chefs, skill cooldown x3 while sitting / 保管ボックス: 3 cooked foods or dishes, kept between towns */
 const TEA_P=0.1, TEA_MUL=0.85, TEA_R=3, TBL_MUL=0.7;   /* 癒しのティーポット: seated customers within 3 tiles lose patience x0.85 / ★くつろぎテーブル: x0.7 at that table (both can add up) */
-const RARE_P=0.5, LUCKY_P=0.08, LUCKY_T=2, WARP_P=0.08, FAST_MUL=1.3, WARP_OUT=[QX-1,QY], WARP_CD=3, WARP_HOLD=1;   /* WARP_HOLD: seconds standing on the gate before it sends the chef */   /* ★足速カウンター speed; the warp gate's fixed exit (one tile left of the first spot of the line) and wait */
+const warpOut=()=>[QX-1,QY-1];   /* the warp gate's exit: diagonally up-left of the start of the waiting line */
+const RARE_P=0.5, LUCKY_P=0.08, LUCKY_T=2, WARP_P=0.08, FAST_MUL=1.3, WARP_CD=3, WARP_HOLD=1;   /* WARP_HOLD: seconds standing on the gate before it sends the chef */   /* ★足速カウンター speed; the warp gate's fixed exit (one tile left of the first spot of the line) and wait */
 const nearFast=p=>{const x0=Math.floor(p.x),y0=Math.floor(p.y);for(let y=y0-1;y<=y0+1;y++)for(let x=x0-1;x<=x0+1;x++){const c=tile(x,y);if(c&&c.t==='counter'&&c.pro===4)return true}return false};
 let DT_NOW=0;
 function warpCheck(p){   /* stepping on the gate (only while stopped in a town) sends the chef to the exit; one way */
   const c=S.phase==='stop'&&!((p.wpCD||0)>0)?tile(Math.floor(p.x),Math.floor(p.y)):null;
   if(!c||c.t!=='warp'){p.wpT=0;return}
   p.wpT=(p.wpT||0)+DT_NOW;if(p.wpT<WARP_HOLD)return;p.wpT=0;
-  float(p.x,p.y-0.5,'🌌','#d6c2ff');p.x=WARP_OUT[0]+0.5;p.y=WARP_OUT[1]+0.5;p.dx=0;p.dy=1;p.wpCD=WARP_CD;sfx('mystery');float(p.x,p.y-0.6,'ワープ！','#d6c2ff')}
+  float(p.x,p.y-0.5,'🌌','#d6c2ff');p.x=warpOut()[0]+0.5;p.y=warpOut()[1]+0.5;p.dx=0;p.dy=1;p.wpCD=WARP_CD;sfx('mystery');float(p.x,p.y-0.6,'ワープ！','#d6c2ff')}
 const hasSt=st=>S.map.some(r=>r.some(c=>c.t===st||(c.item&&c.item.st===st)))||S.players.some(p=>p.hold&&p.hold.st===st)||S.pendingEquip.some(o=>o.id===st)||S.stored.some(o=>o.st===st);
 const hasWarp=()=>S.map.some(r=>r.some(c=>c.t==='warp'||(c.item&&c.item.st==='warp')))||S.players.some(p=>p.hold&&p.hold.st==='warp')||S.pendingEquip.some(o=>o.id==='warp')||S.stored.some(o=>o.st==='warp');
 const HELP_MUL=0.85;   /* お手伝いカウンター: a unit next to one works 15% faster (one counter's worth, never stacked) */
@@ -819,7 +820,9 @@ function putOutside(objs){
       if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
     }
     const free=([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item;
-    const s=(o.kind==='station'&&o.st==='table'&&free(TABLE_SPOT))?TABLE_SPOT:nearDoorSpots().find(q=>free(q));
+    let s=(o.kind==='station'&&o.st==='table'&&free(TABLE_SPOT))?TABLE_SPOT:nearDoorSpots().find(q=>free(q));
+    if(!s&&TESTGEAR){   // test link: no unit is lost when the usual places are full
+      outer:for(let y=7;y<GH-1;y++)for(let x=0;x<GW;x++){if(S.map[y][x].t==='ground'&&!S.map[y][x].item&&!(x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1)&&!(x===DOOR_FRONT[0]&&y===7)){s=[x,y];break outer}}}
     if(s)S.map[s[1]][s[0]].item=o;
   }
 }
@@ -893,6 +896,23 @@ function finishLayout(){
 }
 // ---------- equipment shop (between towns) → short layout ----------
 const eqPrice=o=>Math.round(o.price*[1,1.5,2][Math.min(2,S.eqBuys||0)]);
+// what a piece of equipment does (the shop card and the side panel while it is in hand)
+function equipDesc(id,pro){
+  const o={id,pro},E=EQUIP[id]||{};
+  return o.pro?proInfo(o.id,o.pro).d:o.id==='sprinkler'?'水の入ったじょうろを置くと、まわり3マス以内の菜園に自動で水やり（水1回分で10秒）。じょうろはいつでも取れる':o.id==='drinks'?'持つで飲むと15秒間、移動 +15%・作業時間 -10%。補充は全員で共通の20秒':o.id==='warpc'?'2個1組のカウンター。上に置いた物が、1秒後にもう1つの方へ移る（どちらからでも）':o.id==='fridge'?'食材を出し入れする':o.id==='seedbox'?'種を出し入れする':o.id==='can'?'水を汲んで、菜園に水やりをする':o.id==='basket'?'採った食材を入れて、冷蔵庫へ運ぶ':o.id==='bowl'?'ミキサーにセットして、材料を入れて混ぜる（入れた材料は取り出せない）':o.id==='bench'?'外の広場に横2マスで置く。座ると（2人まで）スキルの待ち時間が3倍の速さで減る（町にいる間だけ／1回の旅で1個）':o.id==='vault'?'調理済みの物・完成品を3個まで入れておける。皿に乗った料理は料理だけが入る。町をこえて持ち越せる。トラックの床に置く（1回の旅で1個）':o.id==='teapot'?'外の広場に置く。まわり3マス以内の席に座っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材に変わって冷蔵庫へ自動で入る（今の町の食材が出やすい・はずれは何も出ない／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(o.id==='pan'?'フライパン。コンロに乗せて「焼く」料理を作る。持ち上げて皿に盛れる（もう1つあると、同時に焼ける）':o.id==='pot'?'鍋。コンロに乗せて、米・じゃがいも・にんじんなどを煮る・炊く。持ち上げて皿に盛れる（もう1つあると、同時に煮られる）':E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
+}
+// the line shown at the top of the side panel while this device's chef carries a piece of equipment
+function holdInfo(){
+  const p=localP();if(!p||!p.hold)return '';
+  const x=p.hold;let id=null,pro=0;
+  if(x.kind==='station'){id=x.st;pro=x.pro||0}else if(x.kind==='can'||x.kind==='basket'){id=x.kind;pro=x.bonus?1:0}else if(x.kind==='cw'){id=x.type}
+  if(!id)return '';
+  const NAMES={fridge:'冷蔵庫',seedbox:'種箱',bowl:'ミキサーのボウル'},E=EQUIP[id];
+  const name=pro&&E?equipName(id,pro):(NAMES[id]||(E&&E.n)||id);
+  const em=E&&E.e?E.e+' ':'';
+  const d=id==='warpc'?equipDesc('warpc',0):(id==='counter'&&pro===6?proInfo('counter',6).d:equipDesc(id,pro));
+  return '<b style="color:#ffd84a">持っている：'+em+name+'</b><br>'+d;
+}
 function showEquipShop(){
   S.phase='equip';
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
@@ -905,7 +925,7 @@ function showEquipShop(){
   const addSpecial=o=>{const cap=3+(S.extraOffer?1:0);if(S.eqOffers.length>=cap)S.eqOffers.splice(S.eqOffers.length-1,1,o);else S.eqOffers.push(o)};
     if(!S.eqOffers.warpRolled){S.eqOffers.warpRolled=1;if(!hasWarp()&&Math.random()<WARP_P)addSpecial(equipOffer('warp',1,0));if(!hasSt('lucky')&&Math.random()<LUCKY_P)addSpecial(equipOffer('lucky',1,0));if(!hasSt('sign')&&Math.random()<SIGN_P)addSpecial(equipOffer('sign',1,0));if(!hasSt('teapot')&&Math.random()<TEA_P)addSpecial(equipOffer('teapot',1,0));if(!hasSt('bench')&&Math.random()<BENCH_P)addSpecial(equipOffer('bench',1,0));if(!hasSt('vault')&&Math.random()<VAULT_P)addSpecial(equipOffer('vault',1,0))}   /* the warp gate: its own chance, one per run */   /* one of each is enough: the mixer and sink only come as rare ★ versions */
   const cards=S.eqOffers.map((o,i)=>{const E=EQUIP[o.id],done=(S.eqBuys||0)>=3||!!o.sold,pr=eqPrice(o);
-    const desc=o.pro?proInfo(o.id,o.pro).d:o.id==='bench'?'外の広場に横2マスで置く。座ると（2人まで）スキルの待ち時間が3倍の速さで減る（町にいる間だけ／1回の旅で1個）':o.id==='vault'?'調理済みの物・完成品を3個まで入れておける。皿に乗った料理は料理だけが入る。町をこえて持ち越せる。トラックの床に置く（1回の旅で1個）':o.id==='teapot'?'外の広場に置く。まわり3マス以内の席に座っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='sign'?'外の広場に置く。列で待っているお客さんの我慢ゲージがゆっくり減る（×0.85／1回の旅で1個）':o.id==='lucky'?'生の食材を入れると、ランダムで別の食材に変わって冷蔵庫へ自動で入る（今の町の食材が出やすい・はずれは何も出ない／1回の旅で1個）':o.id==='warp'?'トラックの床に置く。町に止まっている間、乗るとお客さんの列の下へ一方通行でワープ（1回の旅で1個）':(o.id==='pan'?'フライパン。コンロに乗せて「焼く」料理を作る。持ち上げて皿に盛れる（もう1つあると、同時に焼ける）':o.id==='pot'?'鍋。コンロに乗せて、米・じゃがいも・にんじんなどを煮る・炊く。持ち上げて皿に盛れる（もう1つあると、同時に煮られる）':E.tool?'道具（台の上に置く）':E.outside?'お客さんの席（外の広場に置く）':'器具（床に置く）');
+    const desc=equipDesc(o.id,o.pro);
     return `<button class="ovbtn town hold${done?' dim':''}" data-act="eqbuy" data-v="${i}">
       ${o.pro||o.bonus?`<span class="badges">${o.pro?'<span class="rarebadge">★ 特殊</span>':''}${o.bonus?'<span class="rarebadge bonusbadge">🎯 ミッションボーナス</span>':''}</span>`:''}
       <span class="tn">${E.e} ${equipName(o.id,o.pro)}</span><span class="tn">${pr}G</span>${o.sold||done||S.money<pr?`<span class="sub">${o.sold?'売り切れ':done?'これ以上買えません':'お金が足りない'}</span>`:''}
@@ -4006,7 +4026,10 @@ function drawTables(withSeated){
   const tbs=[];for(let y=7;y<GH;y++)for(let x=0;x<GW;x++)if(S.map[y][x].t==='table')tbs.push([x,y]);
   for(const [x,y] of tbs)drawStool(x*T+T/2,y*T+T/2);
   if(withSeated)drawSeated();
-  for(const [x,y] of tbs){drawTableShape(x*T+T/2,y*T+T/2,true);drawTableDirty(S.map[y][x],x*T+T/2,y*T+T/2)}
+  for(const [x,y] of tbs){drawTableShape(x*T+T/2,y*T+T/2,true);drawTableDirty(S.map[y][x],x*T+T/2,y*T+T/2)
+    const c=S.map[y][x];if(c.pro){   // the pink ★ frame and the mark stay on a placed ★ table
+      ctx.strokeStyle='#ff4fa3';ctx.lineWidth=2;rr(x*T+3,y*T+3,T-6,T-6,5);ctx.stroke();text('★',x*T+T-9,y*T+9,12,'#ff4fa3',800);
+      const mk=proMark('table',c.pro);if(mk){ctx.globalAlpha=0.9;emoji(mk,x*T+10,y*T+T-10,13);ctx.globalAlpha=1}}}
 }
 // the stool behind a table (the customer sits here): blue cushion to match the cloth
 function drawStool(X,Y){
@@ -4387,7 +4410,7 @@ function drawWarpGate(X,Y,k){   /* a purple swirl: k=1 the gate, k<1 the faint e
   if(k<1){ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(200,170,255,.9)';ctx.beginPath();ctx.ellipse(X,Y,T*0.46,T*0.34,0,0,7);ctx.stroke();ctx.setLineDash([])}
   ctx.restore();
 }
-function drawWarpExit(){if(S.map&&S.map.some(r=>r.some(c=>c.t==='warp')))drawWarpGate(WARP_OUT[0]*T+T/2,WARP_OUT[1]*T+T/2,0.6);
+function drawWarpExit(){if(S.map&&S.map.some(r=>r.some(c=>c.t==='warp')))drawWarpGate(warpOut()[0]*T+T/2,warpOut()[1]*T+T/2,0.6);
   for(const p of S.players){const f=(p.wpT||0)/WARP_HOLD;if(!(f>0))continue;   /* the ring fills while the chef waits on the gate */
     const c=tile(Math.floor(p.x),Math.floor(p.y));if(!c||c.t!=='warp')continue;const X=Math.floor(p.x)*T+T/2,Y=Math.floor(p.y)*T+T/2;
     ctx.save();ctx.strokeStyle='#e0d0ff';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.arc(X,Y,T*0.4,-Math.PI/2,-Math.PI/2+f*Math.PI*2);ctx.stroke();ctx.restore()}}
@@ -5708,6 +5731,7 @@ function renderHud(){
   pauseBtn.style.left=S.phase==='select'?'30%':'';
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
+  {const hi=holdInfo();if(hi)info=hi+(info?'<br>':'')+info;}
   {const h=tokHtml(info.split(MK).join(''))||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=emoHtml(h);fillFood(infoEl)}}S.sideInfo=info;
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);

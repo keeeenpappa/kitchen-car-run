@@ -722,8 +722,13 @@ function newRun(np,mode,test){
   extStand();   // the extinguisher stands on its own on the floor (not on a counter)
   planTicket();
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
-  if(TESTGEAR)putOutside([{kind:'station',st:'warp',pro:0},{kind:'station',st:'lucky',pro:0},{kind:'station',st:'sign',pro:0},{kind:'station',st:'board',pro:2},
-    ...[1,2,3,4,5].map(pro=>({kind:'station',st:'counter',pro}))]);
+  if(TESTGEAR){   // every kind of equipment, ★ versions included, waits outside (also a spare pan and pot, and a pair of warp counters; the outside has room for 27 pieces)
+    const st=(s,pro,ex)=>Object.assign({kind:'station',st:s,pro:pro||0},ex||{});
+    putOutside([st('warp'),st('lucky'),st('sign'),st('teapot'),st('bench'),st('vault'),st('sprinkler'),st('drinks'),
+      st('board',1),st('board',2),st('stove',1,{cw:'pan'}),st('stove',0,{cw:'pot'}),st('blender',1,{cw:'bowl'}),st('juicer',1),st('sink',1),st('trash',1),
+      st('planter',1,{plant:null}),st('planter',2,{plant:null}),st('table',1),
+      ...[1,3,4,5].map(pro=>st('counter',pro)),st('counter',6,{wp:91}),st('counter',6,{wp:91}),
+      {kind:'cw',type:'pan',item:null},{kind:'cw',type:'pot',item:null}])}
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.supply=[];S.tierNp=np;addCleanPlates(TIER(np).plate);   // more players: the extra clean plates go on a sink

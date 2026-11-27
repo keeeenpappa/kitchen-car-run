@@ -504,6 +504,9 @@ const RECIPES={
   applepie:{n:'アップルパイ',e:'🥮',ings:['batter','apple@pot'],price:38},
   kinokogohan:{n:'キノコご飯',e:'🍚',ings:['rice','mushroom'],price:28},
   montblanc:{n:'モンブラン',e:'🧁',ings:['batter','chestnut@pot'],price:36},
+  onsentamago:{n:'温泉たまご丼',e:'🥚',ings:['rice','egg@pot'],price:30},
+  jigokumushi:{n:'地獄蒸し',e:'♨️',ings:['potato@pot','carrot@pot','shrimp@pot'],price:42},
+  onsenmanju:{n:'温泉まんじゅう',e:'🍘',ings:['batter','chestnut'],price:36},
 };
 // sell price (pay) and crowd (rate) are rolled each time a town is offered: see showChoose
 const EXTRA_FROM=2;   // casual: from the 3rd town of the trip, each town's menu has its extra dish too
@@ -518,6 +521,7 @@ const TOWNS={
   sweets:{n:'スイーツの町',e:'🍰',menu:['shortcake','bakedapple'],extra:'applepie',ground:'#e3c3b8',deco:'#c77f9a'},
   mountain:{n:'山の町',e:'⛰️',menu:['kinokogohan','yakiguri'],extra:'curry',ground:'#8fa36a',deco:'#5e6f45'},
   snow:{n:'雪の町',e:'❄️',menu:['gratin','stew'],extra:'montblanc',ground:'#dfe8ee',deco:'#7fa6c2'},
+  onsen:{n:'温泉の町',e:'♨️',menu:['onsentamago','jigokumushi'],extra:'onsenmanju',ground:'#b9a58c',deco:'#8a5a44'},
 };
 const pack=id=>({type:'pack',id,qty:3,price:Math.max(3,ING[id].price+rnd(4)-2)});
 const seedItem=id=>({type:'seed',id,qty:2,price:ING[id].seed+rnd(2)});
@@ -2169,7 +2173,7 @@ const MSN={
   g_pond:'釣り堀で採取する',g_log:'原木で採取する',g_barn:'畜舎で採取する',g_tree:'木で採取する',g_field:'畑で採取する'};
 const MSN_K=Object.keys(MSN);
 const MSN_COMMON=['serve','chop','cook','wash','plant'];
-const MSN_TOWN={port:'g_pond',forest:'g_log',ranch:'g_barn',busy:'guide',farm:'harvest',sweets:'blend',mountain:'g_tree',snow:'g_field'};
+const MSN_TOWN={port:'g_pond',forest:'g_log',ranch:'g_barn',busy:'guide',farm:'harvest',sweets:'blend',mountain:'g_tree',snow:'g_field',onsen:'g_barn'};
 const MSN_PT=60, MSN_SOLO=3;
 const msnNeed=()=>S.np===1?MSN_SOLO:1;
 function pickMission(){
@@ -2256,10 +2260,10 @@ const GRP_PAT=[0,0,150,140,130,125,120,115,110];    // how long they wait at the
 const CTYPE_K=Object.keys(CTYPE);
 const ctypeOf=c=>CTYPE[c&&c.type]||CTYPE.normal;
 const pickMenu=()=>S.town.menu[rnd(S.town.menu.length)];
-const CUST_AN={port:['penguin','seal','gull'],forest:['bear','deer','owl'],ranch:['sheep','cow','chicken'],busy:['pigeon','dog','panda'],farm:['mole','frog','pig'],sweets:['hamster','hedgehog','alpaca'],mountain:['monkey','goat','boar'],snow:['polarbear','reindeer','ermine']};
+const CUST_AN={port:['penguin','seal','gull'],forest:['bear','deer','owl'],ranch:['sheep','cow','chicken'],busy:['pigeon','dog','panda'],farm:['mole','frog','pig'],sweets:['hamster','hedgehog','alpaca'],mountain:['monkey','goat','boar'],onsen:['tanuki','fox','otter'],snow:['polarbear','reindeer','ermine']};
 // the boss customer of each town (never in the random pool); their tint is a fixed colour
-const BOSS_AN={port:'walrus',forest:'moose',ranch:'donkey',busy:'hippo',farm:'capybara',sweets:'peacock',mountain:'tiger',snow:'snowleopard'};
-const BOSS_TINT={"walrus":[208,197,255],"moose":[255,246,190],"donkey":[255,154,103],"hippo":[255,147,158],"capybara":[255,242,147],"peacock":[255,153,195],"tiger":[247,248,255],"snowleopard":[180,225,255]};
+const BOSS_AN={port:'walrus',forest:'moose',ranch:'donkey',busy:'hippo',farm:'capybara',sweets:'peacock',mountain:'tiger',snow:'snowleopard',onsen:'okami'};
+const BOSS_TINT={"walrus":[208,197,255],"moose":[255,246,190],"donkey":[255,154,103],"hippo":[255,147,158],"capybara":[255,242,147],"peacock":[255,153,195],"tiger":[247,248,255],"snowleopard":[180,225,255],"okami":[255,200,120]};
 const CUST_ALL=Object.values(CUST_AN).flat().concat(['tanuki'],Object.values(BOSS_AN));
 const REG_NAME='常連さん', REG_HUE=30;   // no personal name: just 常連
 const pickAnimal=()=>{const k=S.town&&(S.town.id||Object.keys(TOWNS).find(k=>TOWNS[k]===S.town)),l=CUST_AN[k]||CUST_ALL;return l[rnd(l.length)]};
@@ -3869,7 +3873,7 @@ function house3d(x,y,w,h,col,roof,flat){
   ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(x,y+h-3,w,3);
 }
 const hash=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v)};
-const PASS_TOWNS=['port','forest','ranch','busy','farm','sweets','mountain','snow','none'];
+const PASS_TOWNS=['port','forest','ranch','busy','farm','sweets','mountain','snow','onsen','none'];
 function drawPassingTown(ro){
   const sky=ctx.createLinearGradient(0,0,0,6.6*T);sky.addColorStop(0,'#8fcbe6');sky.addColorStop(1,'#d9f0f6');
   ctx.fillStyle=sky;ctx.fillRect(0,0,GW*T,7*T);
@@ -3980,6 +3984,7 @@ const LOOKS={
   busy:{sky:'#c9dcea',cols:['#b9c4cc','#e6e0d4','#9fb2bf','#d8c9b5'],roof:'#5b6770',mark:['🚉','🏢','🚌']},
   farm:{sky:'#cfe9f5',cols:['#f3e3b5','#e7b77f','#f6efe0','#d9a75a'],roof:'#9a5a2c',mark:['🌻','🌽','🚜']},
   mountain:{sky:'#c6e1ee',cols:['#c9b48f','#e9dcc2','#a7b88a','#d9b38a'],roof:'#6a5038',mark:['⛰️','🌰','🍁']},
+  onsen:{sky:'#e8d9cf',cols:['#c98f6a','#e9d3b4','#a8553f','#f0e2c8'],roof:'#6b3f33',mark:['♨️','🏮','🍶']},
   snow:{sky:'#dcecf6',cols:['#f4f7fa','#cfe0ec','#e9d9c9','#b9cfe0'],roof:'#5f7f9a',mark:['⛄','❄️','🌲']},
   sweets:{sky:'#ffd9e6',cols:['#fbd3e0','#fff0c9','#cfeedd','#e6d4f5'],roof:'#d0607e',mark:['🍰','🍭','🧁']},
   none:{sky:'#bfe4f2',cols:['#f6efe0','#f2d8a7','#d9eef5','#f0c9b4'],roof:'#b0603a',mark:['🌳','🏠','🌷']},

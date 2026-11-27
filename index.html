@@ -1566,6 +1566,10 @@ function placeOrTake(p,c){
     return;
   }
   if(h&&it&&h.kind==='ing'&&it.kind==='cw'&&it.type==='bowl'){bowlAdd(p,it);return}
+  if(h&&it&&h.kind==='ing'&&it.kind==='cw'){   // a pan / pot off the stove takes one ingredient too (it cooks once it is on a stove)
+    if(it.item){say(p,'もう入っている');return}
+    if(nextStep(h)!=='cook'){say(p,h.burnt?'焦げている':nextStep(h)?'先に'+STEPN[nextStep(h)]:'もう調理済み');return}
+    it.item=h;it.cookP=0;it.cookB=0;p.hold=null;sfx('put');return}
   if(h&&it&&h.kind==='plate'&&!h.bare&&it.kind==='cw'&&it.type!=='bowl'){   // a plate scoops the food out of a pan / pot set on the counter
     const x=it.item;if(!x){say(p,'からっぽ');return}
     if(!(x.kind==='ing'&&plateOk(x))){say(p,'まだ調理中');return}
@@ -4078,7 +4082,7 @@ function drawRangeFills(outside){   // layout only: a pale tint over what a plac
     const c=S.map[y][x];if(!(outside?c.t==='teapot':c.t==='sprinkler'))continue;
     const x0=Math.max(outside?0:2,x-GEAR_RANGE),x1=Math.min(outside?GW-1:IX1,x+GEAR_RANGE),y0=Math.max(outside?7:2,y-GEAR_RANGE),y1=Math.min(outside?GH-2:6,y+GEAR_RANGE);
     const col=outside?'255,170,200':'110,200,255';
-    ctx.save();ctx.fillStyle='rgba('+col+',.17)';ctx.fillRect(x0*T,y0*T,(x1-x0+1)*T,(y1-y0+1)*T);
+    ctx.save();ctx.fillStyle='rgba('+col+',.12)';ctx.fillRect(x0*T,y0*T,(x1-x0+1)*T,(y1-y0+1)*T);
     ctx.strokeStyle='rgba('+col+',.75)';ctx.lineWidth=2;ctx.setLineDash([5,4]);rr(x0*T+1,y0*T+1,(x1-x0+1)*T-2,(y1-y0+1)*T-2,6);ctx.stroke();ctx.restore()}
 }
 function drawPlazaTiles(){   // the signboard, the teapot and the bench stand on the plaza (they are tiles, not floor items)
@@ -4319,7 +4323,7 @@ function drawLayoutGround(){
   drawTables();
   drawPlazaTiles();
   drawRangeFills(true);   // layout: the reach of a placed teapot is tinted
-  drawHeldReach();drawOutsideSquares();
+  drawOutsideSquares();
   if(S.players.some(q=>q.hold&&q.hold.kind==='station'&&q.hold.st==='table')){
     ctx.strokeStyle='rgba(29,42,32,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;
     for(let y=TBL_ZONE.y0;y<=TBL_ZONE.y1;y++)for(let x=TBL_ZONE.x0;x<=TBL_ZONE.x1;x++)if(tableOK(x,y))rr(x*T+5,y*T+5,T-10,T-10,5),ctx.stroke();
@@ -5600,7 +5604,6 @@ function drawWorld(arr){
     ctx.strokeStyle='#ff4d4d';ctx.lineWidth=3;
     for(const [x,y] of unreachable()){rr(x*T+2,y*T+2,T-4,T-4,6);ctx.stroke()}
     drawRangeFills(false);   // the reach of a placed sprinkler
-    drawHeldReach();
   }
   ctx.restore();
   if(S.view==='road')drawShops();

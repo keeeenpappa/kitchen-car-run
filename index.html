@@ -1240,15 +1240,32 @@ function botTask(i,p){
     return null}
   if(job==='菜園'){
     const grow=c=>c.t==='planter'&&c.plant&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow;
+    const spr=bCells(c=>c.t==='sprinkler');   // a sprinkler waters the garden by itself while a can with water stands on it: preferred
+    const sb0=bCells(c=>c.t==='seedbox')[0];
+    const canSpot=()=>{   // the free counter nearest the seed box
+      const fr=bCells(c=>c.t==='counter'&&!c.item&&!c.top);
+      if(sb0)fr.sort((a,b)=>Math.hypot(a[0]-sb0[0],a[1]-sb0[1])-Math.hypot(b[0]-sb0[0],b[1]-sb0[1]));
+      return bToOrdered(p,fr,'pick')};
     if(h&&h.kind==='can'){
-      if(h.water>0){const t=bTo(p,bCells(grow),'pick');return t}
-      if(h.water<canCap(h))return bTo(p,bSinks(),'hold');   // fill the watering can at the sink
-      return bTo(p,bCells(grow),'pick')}
+      const free=spr.filter(([x,y])=>!tile(x,y).item);
+      if(spr.length){
+        if(h.water>0&&free.length)return bTo(p,free,'pick');                 // the can with water goes on the sprinkler
+        if(h.water<canCap(h)&&(h.water<=0||!free.length))return bTo(p,bSinks(),'hold');   // empty: fill it at the sink
+        if(h.water>0&&!free.length)return canSpot()}
+      else{
+        if(h.water>0&&bCells(grow).length)return bTo(p,bCells(grow),'pick');   // no sprinkler: water by hand
+        if(h.water<=0&&bCells(grow).length)return bTo(p,bSinks(),'hold');     // empty: fill it at the sink
+        return canSpot()}                                                      // nothing to water: leave the can by the seed box
+      return canSpot()}
     if(h&&h.kind==='seed')return bTo(p,bCells(c=>c.t==='planter'&&!c.plant),'pick');
     if(h)return null;
     const rd=bCells(c=>c.t==='planter'&&c.plant&&c.plant.t>=ING[c.plant.id].grow);if(rd.length)return bTo(p,rd,'hold');
-    const cans=bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='can'&&c.item.water>0);
-    if(bCells(grow).length&&cans.length)return bTo(p,cans,'pick');
+    const sprE=bCells(c=>c.t==='sprinkler'&&c.item&&c.item.kind==='can'&&c.item.water<=0);   // an empty can on the sprinkler comes back to be filled
+    if(sprE.length)return bTo(p,sprE,'pick');
+    const anyCan=bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='can');
+    const needWater=bCells(grow).length>0&&!bCells(c=>c.t==='sprinkler'&&c.item).length;
+    const sprNeedsCan=bCells(c=>c.t==='sprinkler'&&!c.item).length>0&&bCells(c=>c.t==='planter'&&c.plant).length>0;
+    if((needWater||sprNeedsCan)&&anyCan.length)return bTo(p,anyCan,'pick');
     if(bCells(c=>c.t==='planter'&&!c.plant).length){
       const seeds=seedList().filter(k=>ING[k].grow);
       if(!b.seed||!seeds.includes(b.seed))b.seed=seeds.find(k=>townNeedList().includes(k))||seeds[0]||null;   // a seed the town needs first, else any

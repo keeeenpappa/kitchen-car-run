@@ -724,13 +724,15 @@ function newRun(np,mode,test){
   extStand();   // the extinguisher stands on its own on the floor (not on a counter)
   planTicket();
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
-  if(TESTGEAR){   // every kind of equipment, ★ versions included, waits outside (also a spare pan and pot, and a pair of warp counters; the outside has room for 27 pieces)
+  if(TESTGEAR){   // every kind of equipment, ★ versions included, waits outside; in the self-made layout the plain board / counters / planters / sink are not handed out (the ★ ones replace them, the ★ sink carries the clean plates)
     const st=(s,pro,ex)=>Object.assign({kind:'station',st:s,pro:pro||0},ex||{});
-    putOutside([st('warp'),st('lucky'),st('sign'),st('teapot'),st('bench'),st('vault'),st('sprinkler'),st('drinks'),
-      st('board',1),st('board',2),st('stove',1,{cw:'pan'}),st('stove',0,{cw:'pot'}),st('blender',1,{cw:'bowl'}),st('juicer',1),st('sink',1),st('trash',1),
+    const tools=[];
+    if(mode==='layout'){for(let y=2;y<=6;y++)for(let x=2;x<=13+TX;x++){const c=S.map[y][x];
+      if((c.t==='board'||c.t==='counter'||c.t==='planter'||c.t==='sink')&&!c.pro){if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))tools.push(c.item);S.map[y][x]=blankTile(y)}}}
+    putOutside([...tools,st('warp'),st('lucky'),st('sign'),st('teapot'),st('bench'),st('vault'),st('sprinkler'),st('drinks'),
+      st('board',1),st('board',2),st('stove',1,{cw:'pan'}),st('blender',1,{cw:'bowl'}),st('juicer',1),st('sink',1,{clean:TIER(np).plate}),st('trash',1),
       st('planter',1,{plant:null}),st('planter',2,{plant:null}),st('table',1),
-      ...[1,3,4,5].map(pro=>st('counter',pro)),st('counter',6,{wp:91}),st('counter',6,{wp:91}),
-      {kind:'cw',type:'pan',item:null},{kind:'cw',type:'pot',item:null}])}
+      ...[1,3,4,5].map(pro=>st('counter',pro)),st('counter',6,{wp:91}),st('counter',6,{wp:91})])}
   for(let i=0;i<np;i++){const [x,y]=START_POS[i];S.players.push({i,x,y,dx:0,dy:1,hold:null,cur:0,actT:0,actKey:'',lock:false,msg:'',msgT:0,skill:PSKILL[i]})}
   rebuildStations();
   S.bonus=0;S.pendingEquip=[];S.stored=[];S.supply=[];S.tierNp=np;addCleanPlates(TIER(np).plate);   // more players: the extra clean plates go on a sink
@@ -845,8 +847,8 @@ function toolsOnCounters(objs){
 function setupLayout(){
   // how many of each the self-made kitchen gets, by player count (5+ and 7+ get more)
   const mid=S.np>=5,big=S.np>=7;
-  const objs=[{kind:'station',st:'counter',n:big?9:mid?7:COUNTERS_GIVEN},{kind:'station',st:'planter',n:big?3:PLANTERS_GIVEN}];
-  if(mid)objs.push({kind:'station',st:'board',pro:0,ups:null,dirty:0,clean:0,top:null});   // 2nd cutting board
+  const objs=TESTGEAR?[]:[{kind:'station',st:'counter',n:big?9:mid?7:COUNTERS_GIVEN},{kind:'station',st:'planter',n:big?3:PLANTERS_GIVEN}];   // (test link: no plain counters / planters / board are handed out)
+  if(mid&&!TESTGEAR)objs.push({kind:'station',st:'board',pro:0,ups:null,dirty:0,clean:0,top:null});   // 2nd cutting board
   const stv=(cw)=>objs.push({kind:'station',st:'stove',pro:0,ups:null,dirty:0,clean:0,vs:null,vsel:0,top:null,cw});
   if(mid)stv('pan');   // 5+: a 3rd stove with a frying pan; 7+: a 4th with a pot
   if(big){stv('pot');objs.push({kind:'basket',items:[]});objs.push({kind:'station',st:'table',n:1})}   // 2nd basket, 4th table

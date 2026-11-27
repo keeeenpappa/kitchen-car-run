@@ -549,12 +549,15 @@ const EQUIP={
   stove:{n:'コンロ',e:'🔥',price:30,pro:{n:'強火コンロ',d:'焼く時間 -40%'}},
   blender:{n:'ミキサー',e:'🌀',price:25,rareOnly:true,pro:{n:'高速ミキサー',d:'ミキサー時間 -50%'}},
   juicer:{n:'ジューサー',e:'🍹',price:25,rareOnly:true,pro:{n:'高速ジューサー',d:'ジューサー時間 -50%'}},
-  counter:{n:'カウンター',e:'🟫',price:8,rareOnly:true,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'（廃止）',gone:true},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'増し増しカウンター',d:'生の食材を置くと自動で10個まで増えていく（1台で1種類。手で足せば最大15個）。置いてある数が多いほど増えるのが速い（最初の1個は30秒）。1個ずつ取れて、次の町へ持ち越せる'}]},
+  counter:{n:'カウンター',e:'🟫',price:8,rareOnly:true,pros:[{n:'お手伝いカウンター',d:'上下左右のとなりの器具が少し速い（作業 -15%・菜園 1.15倍）'},{n:'持ち越しカウンター',d:'（廃止）',gone:true},{n:'透過カウンター',d:'上を歩いて通れる。物も置ける'},{n:'足速カウンター',d:'まわり1マスにいるシェフの歩く速さ 1.3倍（スキルと重ねがけOK）'},{n:'増し増しカウンター',d:'生の食材を置くと自動で10個まで増えていく（1台で1種類。手で足せば最大15個）。置いてある数が多いほど増えるのが速い（最初の1個は30秒）。1個ずつ取れて、次の町へ持ち越せる'},{n:'ワープカウンター',d:'2個1組。上に置いた物が、1秒後にもう1つの方へ移る（どちらからでも）',gone:true}]},
+  warpc:{n:'ワープカウンター（2個1組）',e:'🔮',price:30,minNp:5},   /* sold at the equipment shop from 5 players; comes as a pair of counters (pro 6) joined by a number */
+  sprinkler:{n:'自動スプリンクラー',e:'💦',price:25},
+  drinks:{n:'ドリンクサーバー',e:'🧋',price:25},
   warp:{n:'ワープゲート',e:'🌌',price:40,noShop:true},
   sign:{n:'呼び込み看板',e:'🪧',price:20,noShop:true},
   lucky:{n:'ラッキーボックス',e:'🎰',price:15,noShop:true},
   sink:{n:'シンク',e:'🚰',price:20,rareOnly:true,pro:{n:'勢いのいいシンク',d:'水を汲む時間 -60%'}},
-  trash:{n:'ゴミ箱',e:'🗑️',price:10,noShop:true},
+  trash:{n:'ゴミ箱',e:'🗑️',price:10,rareOnly:true,pro:{n:'リサイクル箱',d:'捨てた食材の80%がお金になる'}},
   table:{n:'テーブル',e:'🪑',price:12,outside:true,pro:{n:'くつろぎテーブル',d:'このテーブルに座っているお客さんの我慢ゲージがゆっくり減る（×0.7）'}},
   teapot:{n:'癒しのティーポット',e:'🫖',price:20,noShop:true},
   bench:{n:'ひとやすみベンチ',e:'🛋️',price:20,noShop:true},
@@ -565,6 +568,7 @@ const EQUIP={
   pot:{n:'鍋',e:'🍲',price:14,tool:true},
   planter:{n:'菜園',e:'🪴',price:15,pros:[{n:'豊かな菜園',d:'収穫 +1個'},{n:'日当たりのいい菜園',d:'育つ速さ 1.5倍'}]},
 };
+const GEAR_RANGE=3, SPRK_T=10, DRINK_T=15, DRINK_CD=20;   // sprinkler: reach (tiles) and seconds per water; drink server: the buff and the shared recharge
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,juicer:0.5,sink:0.4};
 const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=50, PUP_TIME=30; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
 function equipOffer(id,priceMul,proChance){
@@ -578,6 +582,7 @@ const equipName=(id,pro)=>pro?'★'+proInfo(id,pro).n:EQUIP[id].n;
 function makeEquip(id,pro){
   if(id==='can')return {kind:'can',bonus:pro?2:0,water:S.up.canCap+(pro?2:0)};
   if(id==='basket')return {kind:'basket',bonus:pro?2:0,items:[]};
+  if(id==='warpc')return {kind:'station',st:'counter',pro:6,wp:0};
   if(id==='stove')return {kind:'station',st:'stove',pro:pro||0,cw:'pan'};   /* a stove comes with its frying pan */
   if(id==='blender')return {kind:'station',st:'blender',pro:pro||0,cw:'bowl'};   /* a mixer comes with its bowl */
   if(id==='pan'||id==='pot')return {kind:'cw',type:id,item:null};
@@ -780,7 +785,7 @@ function rebuildStations(){
   S.map.forEach((r,y)=>r.forEach((c,x)=>{if(['stove','blender','juicer','planter','lucky'].includes(c.t)){c._x=x;c._y=y;S.stations.push(c)}}));
 }
 // ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
-const MOVABLE=['fridge','seedbox','sink','board','stove','blender','juicer','trash','lucky','vault'];
+const MOVABLE=['fridge','seedbox','sink','board','stove','blender','juicer','trash','lucky','vault','sprinkler','drinks'];
 const LAYOUT_TIME=90;
 const inTruck=(x,y)=>x>=2&&x<=IX1&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
@@ -838,7 +843,7 @@ function setupLayout(){
   if(big){stv('pot');objs.push({kind:'basket',items:[]});objs.push({kind:'station',st:'table',n:1})}   // 2nd basket, 4th table
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x];
-    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,vs:c.vs||null,vsel:c.vsel||0,cw:c.cw||null,top:c.item||null});
+    if(MOVABLE.includes(c.t))objs.push({kind:'station',st:c.t,pro:c.pro||0,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,vs:c.vs||null,vsel:c.vsel||0,cw:c.cw||null,wp:c.wp||0,top:c.item||null});
     if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'||c.item.kind==='cw'||c.item.kind==='ext'))objs.push(c.item);
     if(c.t==='extst')objs.push({kind:'ext'});
     if(!FIXED.has(c.t))S.map[y][x]=blankTile(y);
@@ -888,7 +893,7 @@ function showEquipShop(){
   // 3 random items per visit (a rare ★ pro version may appear); only one can be bought
   // 3 plain items; about every other visit one of them is a rare, picked evenly from ALL rare versions (each ★ is as likely as any other)
   if(!S.eqOffers){
-    S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly),3+(S.extraOffer?1:0)).map((id,i)=>{const o=equipOffer(id,1,PRO_ONLY.includes(id)?1:0);return i===3&&S.extraOffer?Object.assign(o,{bonus:1}):o});
+    S.eqOffers=pickN(Object.keys(EQUIP).filter(k=>!EQUIP[k].noShop&&!EQUIP[k].rareOnly&&!(EQUIP[k].minNp&&S.np<EQUIP[k].minNp)),3+(S.extraOffer?1:0)).map((id,i)=>{const o=equipOffer(id,1,PRO_ONLY.includes(id)?1:0);return i===3&&S.extraOffer?Object.assign(o,{bonus:1}):o});
     if(Math.random()<RARE_P){const R=[];for(const id of Object.keys(EQUIP))if(!EQUIP[id].noShop)proList(id).forEach((p0,i)=>{if(!p0.gone)R.push([id,i+1])});
       const [id,pro]=R[rnd(R.length)];S.eqOffers[rnd(3)]={type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*1.8)}}
   }
@@ -909,7 +914,7 @@ function showEquipShop(){
 }
 function startDayLayout(){
   unseatAll();
-  const objs=S.stored.concat(S.pendingEquip.map(o=>o.power?{kind:'power',up:o.power}:makeEquip(o.id,o.pro)),S.supply||[]);
+  const objs=S.stored.concat(S.pendingEquip.flatMap(o=>{if(o.power)return [{kind:'power',up:o.power}];if(o.id==='warpc'){const w=(S.wpSeq=(S.wpSeq||0)+1);return [{kind:'station',st:'counter',pro:6,wp:w},{kind:'station',st:'counter',pro:6,wp:w}]}return [makeEquip(o.id,o.pro)]}),S.supply||[]);
   S.stored=[];S.pendingEquip=[];S.supply=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
@@ -985,20 +990,20 @@ function furnPick(p,c,tx,ty){
   if(holdsFurn(p)&&h.st!=='table'&&(c.t==='floor'||c.t==='gap')&&inTruck(tx,ty)){
     if(tx===DOOR_FRONT[0]&&ty===DOOR_FRONT[1]){say(p,'ドアの前はあけておく');return true}
     if(tx===LEVER_FRONT[0]&&ty===LEVER_FRONT[1]){say(p,'運転席の前はあけておく');return true}
-    S.map[ty][tx]={t:h.st,item:h.top||null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0,vs:h.vs||null,vsel:h.vsel||0,cw:h.cw||null};p.hold=null;rebuildStations();return true;
+    S.map[ty][tx]={t:h.st,item:h.top||null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0,vs:h.vs||null,vsel:h.vsel||0,cw:h.cw||null,wp:h.wp||0};p.hold=null;rebuildStations();return true;
   }
   // holding equipment and pressing equipment that is already placed: put it there and take the old one back
   // (in layout anything; otherwise cooking equipment for cooking equipment). Tools on counters are never swapped.
   if(holdsFurn(p)&&h.st!=='table'&&FURN.includes(c.t)&&inTruck(tx,ty)&&(lay||(MOVABLE.includes(h.st)&&MOVABLE.includes(c.t)))){
     if(c.item&&!lay){say(p,'上の物をどけてから');return true}
     // a sink takes its plates (dirty and washed) along; in layout whatever is on a unit moves with it
-    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,vs:c.vs||null,vsel:c.vsel||0,cw:c.cw||null,top:c.item||null};
-    S.map[ty][tx]={t:h.st,item:h.top||null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0,vs:h.vs||null,vsel:h.vsel||0,cw:h.cw||null};
+    const old={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,vs:c.vs||null,vsel:c.vsel||0,cw:c.cw||null,wp:c.wp||0,top:c.item||null};
+    S.map[ty][tx]={t:h.st,item:h.top||null,prog:0,burn:0,plant:h.plant||null,pro:h.pro||0,ups:h.ups||null,dirty:h.dirty||0,clean:h.clean||0,vs:h.vs||null,vsel:h.vsel||0,cw:h.cw||null,wp:h.wp||0};
     p.hold=old;rebuildStations();return true;
   }
   // layout: pick up furniture from the truck; whatever sits on it (tools, plates...) moves along with it, a planter takes its crop
   if(lay&&!h&&FURN.includes(c.t)&&inTruck(tx,ty)){
-    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,vs:c.vs||null,vsel:c.vsel||0,cw:c.cw||null,top:c.item||null};
+    p.hold={kind:'station',st:c.t,pro:c.pro||0,plant:c.plant||null,ups:c.ups||null,dirty:c.dirty||0,clean:c.clean||0,vs:c.vs||null,vsel:c.vsel||0,cw:c.cw||null,wp:c.wp||0,top:c.item||null};
     S.map[ty][tx]=blankTile(ty);rebuildStations();return true;
   }
   // outside (layout, or the town stop): equipment and tools can be set down and picked up
@@ -1371,6 +1376,7 @@ const wrap=(i,n)=>((i%n)+n)%n;
 // ---------- interactions ----------
 function accepts(c,h){
   if(h.kind==='ext')return false;   // the extinguisher stands on the floor
+  if(c.t==='sprinkler')return h.kind==='can';   /* a watering can goes on / in the sprinkler (it can be taken off at any time) */
   if(c.t==='counter'||c.t==='board')return true;   // a board is a counter you can also chop on
   if(h.kind!=='ing')return false;
   if(c.t==='stove')return !!c.cw&&nextStep(h)==='cook';   /* the food goes into the pan / pot standing on the stove */
@@ -1384,6 +1390,55 @@ function accepts(c,h){
 const isDish=x=>!!x&&x.kind==='plate'&&!x.bare&&x.items.length>0;
 const emptyPlate=x=>!!x&&x.kind==='plate'&&!x.bare&&!x.items.length;
 const canAdd=(pl,it)=>it.kind==='ing'&&plateOk(it)&&!it.burnt&&pl.items.length<3;
+// ★リサイクル箱: 80% of what the thrown-away ingredients cost comes back as money
+function ingWorth(x){
+  if(!x)return 0;
+  if(x.kind==='ing'){const I=ING[x.id];const v=I.mix?mixOf(x.id).in.reduce((a,k)=>a+ING[k].price,0):(I.price||0);return v*(x.cnt||1)}
+  if(x.kind==='mix')return x.items.reduce((a,k)=>a+ING[k].price,0);
+  if(x.kind==='plate')return x.items.reduce((a,y)=>a+ingWorth(y),0);
+  if(x.kind==='basket')return x.items.reduce((a,k)=>a+ING[k].price,0);
+  return 0;
+}
+function recycleGain(p,c,x){
+  if(!c||c.pro!==1)return;
+  const g=Math.round(ingWorth(x)*0.8);if(g<=0)return;
+  S.money+=g;float(c._x!=null?c._x+.5:p.x,(c._y!=null?c._y:p.y)-0.2,'♻️ +'+g+'G','#bff2c6');sfx('coin');
+}
+// ドリンクサーバー: press 持つ and the chef gets a short boost; the server recharges for everyone together
+function drinkUse(p,c){
+  if((c.prog||0)>0){say(p,'補充中… あと'+Math.ceil(c.prog)+'秒');return}
+  p.dkT=DRINK_T;c.prog=DRINK_CD;
+  float(p.x,p.y-0.7,'🧋 ごくごく！','#ffc2d0');sfx('ready');
+}
+// the equipment that works by itself: warp counters, sprinklers, drink-server recharge
+function gearUpdate(dt){
+  if(!S||!S.map||S.phase==='layout')return;
+  const wps={};
+  for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];
+    if(c.t==='counter'&&c.pro===6&&c.wp){(wps[c.wp]=wps[c.wp]||[]).push(c)}
+    else if(c.t==='drinks'){if((c.prog||0)>0)c.prog=Math.max(0,c.prog-dt)}
+    else if(c.t==='sprinkler'){
+      const can=c.item&&c.item.kind==='can'?c.item:null;if(!can){c.prog=0;continue}
+      const targets=[];
+      for(let yy=Math.max(2,y-GEAR_RANGE);yy<=Math.min(6,y+GEAR_RANGE);yy++)for(let xx=Math.max(2,x-GEAR_RANGE);xx<=Math.min(IX1,x+GEAR_RANGE);xx++){
+        const q=S.map[yy][xx];if(q.t==='planter'&&q.plant&&!q.plant.watered&&q.plant.t<ING[q.plant.id].grow)targets.push([q,xx,yy])}
+      if((c.prog||0)>0)c.prog=Math.max(0,c.prog-dt);
+      else if(targets.length&&can.water>0){can.water--;c.prog=SPRK_T;sfx('water')}
+      if((c.prog||0)>0)for(const [q,xx,yy] of targets){q.plant.watered=true;float(xx+.5,yy,'💧','#9fd8ff')}   // everything in reach that needs water gets it while it runs
+    }
+  }
+  // warp counters: whatever stands on one moves to its partner one second later (and back)
+  for(const k in wps){
+    const L=wps[k];if(L.length<2)continue;
+    for(const a of L){
+      if(a.wpHold&&a.item!==a.wpHold)a.wpHold=null;
+      if(!a.item||a.wpHold===a.item){a.wpT=0;continue}
+      a.wpT=(a.wpT||0)+dt;if(a.wpT<1)continue;
+      const b=L.find(q=>q!==a);
+      if(b&&!b.item){b.item=a.item;b.wpHold=a.item;a.item=null;a.wpT=0;sfx('put')}else a.wpT=1;   // the other side is busy: wait
+    }
+  }
+}
 // a frying pan / pot: lifted off the stove (the food stays inside), set back on a stove, emptied onto a plate or counter, or into the trash
 // the mixer's bowl: food goes in (and cannot come out again), the bowl sits on the mixer, a counter / board, or pours into a frying pan once it is mixed
 function bowlAdd(p,b){
@@ -1467,6 +1522,7 @@ function placeOrTake(p,c){
     else if(c.t==='stove')say(p,c.cw?'焼く食材じゃない':'フライパンか鍋を乗せる');
     else if(c.t==='blender')say(p,c.cw?'この組み合わせは混ぜられない':'ボウルをセットする');
     else if(c.t==='juicer')say(p,'ジューサーに入れない');
+    else if(c.t==='sprinkler')say(p,'水の入ったじょうろを置く');
     return;
   }
   if(h&&it&&h.kind==='ing'&&it.kind==='cw'&&it.type==='bowl'){bowlAdd(p,it);return}
@@ -1552,11 +1608,11 @@ function doPick(p,c,tx,ty){
       return}
     case 'trash':
       if(p.hold){
-        if(p.hold.kind==='cw'){if(!p.hold.item){say(p,'からっぽ');return}p.hold.item=null;p.hold.cookP=0;p.hold.cookB=0;sfx('trash');return}
+        if(p.hold.kind==='cw'){if(!p.hold.item){say(p,'からっぽ');return}recycleGain(p,c,p.hold.item);p.hold.item=null;p.hold.cookP=0;p.hold.cookB=0;sfx('trash');return}
         if(p.hold.kind==='can'){say(p,'じょうろは捨てられない');return}
         if(p.hold.kind==='ext'){say(p,'消火器は捨てられない');return}
         if(emptyPlate(p.hold)||p.hold.kind==='dirty'){say(p,'皿は捨てられない');return}
-        sfx('trash');
+        sfx('trash');recycleGain(p,c,p.hold);
         if(p.hold.kind==='basket'){p.hold.items=[]}else if(p.hold.kind==='plate'&&!p.hold.bare)p.hold.items=[];else p.hold=null}
       return;
     case 'sink':
@@ -1615,8 +1671,9 @@ function doPick(p,c,tx,ty){
       else if(p.hold&&((p.hold.kind==='plate'&&p.hold.bare)||(p.hold.kind==='ing'&&plateOk(p.hold)&&!p.hold.burnt)))say(p,'お皿にのせて出す');
       else say(p,'注文は '+orderText(g));
       return}
-    case 'counter':case 'board':case 'stove':case 'blender':case 'juicer':case 'lucky':
+    case 'counter':case 'board':case 'stove':case 'blender':case 'juicer':case 'lucky':case 'sprinkler':
       placeOrTake(p,c);return;
+    case 'drinks':drinkUse(p,c);return;
     case 'vault':vaultUse(p,c,tx,ty);return;
     case 'bench':sitBench(p,c,tx,ty);return;
     case 'lever':
@@ -2302,7 +2359,7 @@ const PUPS=[
   {id:'srv',e:'💰',n:'接客上手',d:'提供で追加チップ +2G・客の食事 -10%',max:3},
 ];
 const pupN=(p,id)=>(p&&p.pup&&p.pup[id])||0;
-const pupSp=(p,id,per)=>Math.pow(1/(1-per),pupN(p,id));
+const pupSp=(p,id,per)=>Math.pow(1/(1-per),pupN(p,id))*(p&&(p.dkT||0)>0&&(id==='chp'||id==='ckb'||id==='wsh')?1/0.9:1);   /* the drink boost: work takes 10% less time */
 // everyone picks at once from the same 3 cards (PUP_TIME for all). Each player takes one card (several may take the same one);
 // a player who has picked moves their face to the wide 次へ frame and stops
 function openPersonal(){
@@ -2816,7 +2873,7 @@ function update(dt){
     for(const f of S.floats)f.t+=dt;return}
   // stations (畑のおばあちゃん's skill speeds every planter up while it works)
   // planters that were within 2 tiles of the grandma when she used her skill grow 2x until their timer runs out
-  fireUpdate(dt);helpRefresh();
+  fireUpdate(dt);helpRefresh();gearUpdate(dt);
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];   /* ★自動まな板 chops on its own at 60% of a chef's speed */
     if(c.t==='board'&&c.pro===2&&c.item&&!c.fire&&S.phase!=='layout'&&nextStep(c.item)==='chop'){c.prog+=dt*0.6;if(c.prog>=chopT(c)){c.item.step++;c.prog=0}}}
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){const c=S.map[y][x];   /* ★増やすカウンター: the more are piled up, the faster it grows (+1 per 50 / count seconds, up to 10 by itself) */
@@ -2848,7 +2905,7 @@ function update(dt){
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);
-    if(!horseWait)p.skT=Math.max(0,(p.skT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt*(p.bn?BENCH_CD:1));p.wpCD=Math.max(0,(p.wpCD||0)-dt);
+    if(!horseWait)p.skT=Math.max(0,(p.skT||0)-dt);p.dkT=Math.max(0,(p.dkT||0)-dt);p.skCD=Math.max(0,(p.skCD||0)-dt*(p.bn?BENCH_CD:1));p.wpCD=Math.max(0,(p.wpCD||0)-dt);
     if(inp.sk&&(S.phase==='drive'||S.phase==='stop'))useSkill(p);
     if(p.menu){const h0=p.hold,s0=p.menu.sel;menuInput(p,inp,dt);if(p.hold!==h0)sfx('pick');else if(p.menu&&p.menu.sel!==s0)sfx('tick');p.prevAct=inp.act;p.actT=0;p.lock=true;if(p.msgT>0)p.msgT-=dt;return}
     if(p.mk){const c0=p.cur;marketInput(p,inp,dt);if(p.mk&&p.cur!==c0)sfx('tick');if(p.msgT>0)p.msgT-=dt;return}
@@ -2858,7 +2915,7 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1);   // はやあし's skill; ★足速カウンター multiplies on top
+      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1)*((p.dkT||0)>0?1.15:1);   // はやあし's skill; ★足速カウンター multiplies on top
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);
@@ -3228,7 +3285,7 @@ function drawItem(it,cx,cy,s,inHand){
   st.forEach((k,i)=>{const px=cx-(st.length-1)*5+i*10,py=cy+s*0.38;ctx.fillStyle=i<it.step?'#7fd893':'rgba(0,0,0,.55)';ctx.beginPath();ctx.arc(px,py,4,0,7);ctx.fill()});
   if(it.step>0){const k=st[it.step-1];text(k==='chop'?'切':k==='cook'?'焼':'混',cx+s*0.34,cy-s*0.32,11,'#fff',800)}
 }
-const TCOL={sink:'#cfd8dc',counter:'#e6dcc4',board:'#e6dcc4',stove:'#5b5f66',blender:'#e6dcc4',juicer:'#e6dcc4',fridge:'#cfe5ef',seedbox:'#c9a777',trash:'#8d969c',serve:'#f6d36a',window:'#9fd2e8',planter:'#7a5434'};
+const TCOL={sprinkler:'#cfe9f5',drinks:'#ffd6dc',sink:'#cfd8dc',counter:'#e6dcc4',board:'#e6dcc4',stove:'#5b5f66',blender:'#e6dcc4',juicer:'#e6dcc4',fridge:'#cfe5ef',seedbox:'#c9a777',trash:'#8d969c',serve:'#f6d36a',window:'#9fd2e8',planter:'#7a5434'};
 // soft round shadow on the ground
 function softShadow(cx,cy,rx,ry,a){const g=ctx.createRadialGradient(cx,cy,0,cx,cy,rx);g.addColorStop(0,`rgba(30,20,10,${a||.32})`);g.addColorStop(1,'rgba(30,20,10,0)');
   ctx.save();ctx.translate(cx,cy);ctx.scale(1,ry/rx);ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,7);ctx.fill();ctx.restore()}
@@ -3426,6 +3483,25 @@ function unitBase(c,X,Y,loose){
       break}
     case 'juicer':{
       b=box3d(X,Y,'#ffd9a8','#d9893a');juicerBody(b);   // orange: not mistaken for the mixer
+      break}
+    case 'sprinkler':{   // a light-blue box with a tank and a sprinkler head; the watering can goes on top of it
+      b=box3d(X,Y,'#d8eef8','#4f93b3');
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.cx-9,b.fy+b.fh/2,2.6,0,7);ctx.fill();ctx.fillStyle='#7fd8ff';ctx.beginPath();ctx.arc(b.cx+9,b.fy+b.fh/2,2,0,7);ctx.fill();
+      let g=ctx.createLinearGradient(b.cx-9,0,b.cx+9,0);g.addColorStop(0,'#6fb4d6');g.addColorStop(0.45,'#bfe3f3');g.addColorStop(1,'#5a9cc0');
+      ctx.fillStyle=g;rr(b.cx-9,b.cy-3,18,13,5);ctx.fill();ctx.strokeStyle='rgba(40,90,120,.5)';ctx.lineWidth=0.9;rr(b.cx-9,b.cy-3,18,13,5);ctx.stroke();
+      ctx.fillStyle='#e8f6fc';cwEll(b.cx,b.cy-3,9,3.2);ctx.fill();ctx.strokeStyle='rgba(40,90,120,.5)';cwEll(b.cx,b.cy-3,9,3.2);ctx.stroke();
+      ctx.fillStyle='#3d8fb8';rr(b.cx-2,b.cy-9,4,6.5,1.5);ctx.fill();ctx.fillStyle='#2b6f93';rr(b.cx-6,b.cy-11.5,12,3.5,1.7);ctx.fill();
+      for(const dx of [-4.5,0,4.5]){ctx.fillStyle='#bfe9ff';ctx.beginPath();ctx.arc(b.cx+dx,b.cy-12.2,0.9,0,7);ctx.fill()}
+      break}
+    case 'drinks':{   // a pink drink server: a glass tank of pink drink, a tap and a cup
+      b=box3d(X,Y,'#ffd6dc','#d9657a');
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.cx-9,b.fy+b.fh/2,2.6,0,7);ctx.fill();ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(b.cx+9,b.fy+b.fh/2,2,0,7);ctx.fill();
+      ctx.save();ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=3;ctx.shadowOffsetY=2;ctx.fillStyle='#8a4a5a';rr(b.cx-10,b.cy+2,20,9,4);ctx.fill();ctx.restore();
+      let g=ctx.createLinearGradient(b.cx-9,0,b.cx+9,0);g.addColorStop(0,'rgba(255,170,195,.95)');g.addColorStop(0.4,'rgba(255,225,235,.95)');g.addColorStop(1,'rgba(240,140,170,.95)');
+      ctx.fillStyle=g;rr(b.cx-9,b.cy-15,18,19,5);ctx.fill();ctx.strokeStyle='rgba(150,60,90,.6)';ctx.lineWidth=0.9;rr(b.cx-9,b.cy-15,18,19,5);ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.6)';rr(b.cx-6.5,b.cy-13,2,13,1);ctx.fill();
+      ctx.fillStyle='#5a5e66';rr(b.cx-10.5,b.cy-18,21,4,2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(b.cx+10,b.cy+1);ctx.lineTo(b.cx+15,b.cy+1);ctx.lineTo(b.cx+14,b.cy+8);ctx.lineTo(b.cx+11,b.cy+8);ctx.closePath();ctx.fill();   // the cup
       break}
     case 'fridge':{
       // tall: a narrow top and a big front with two doors (freezer above, fridge below)
@@ -3632,6 +3708,7 @@ function drawTile(c,x,y){
   if(c.item){
     if(c.t==='blender'&&c.cw){const m=mixerGeom(b);drawItem(c.item,m.bx,m.bowlCy+0.8,T*0.27)}   // inside the bowl
     else if(c.t==='juicer')drawItem(c.item,b.cx,b.cy-6,T*0.3);   // inside the jar
+    else if(c.t==='sprinkler')drawItem(c.item,b.cx,b.cy-13,T*0.5);   // the watering can on top
     else if(c.t==='stove'&&c.cw)drawItem(c.item,X+T/2,(b&&b.cy!=null?b.cy:Y+T/2)-T*0.05,T*0.34);   // inside the pan / pot
     else drawItem(c.item,X+T/2,b&&b.cy!=null?b.cy:Y+T/2,T*0.76);
     if((c.t==='board'||c.t==='blender'||c.t==='juicer'||c.t==='stove')&&c.prog>0){
@@ -3642,7 +3719,15 @@ function drawTile(c,x,y){
       if(c.burn>bt*0.45&&Math.sin(S.t*14)>0)emoji('⚠️',X+T-8,Y+10,14);
     }
   }
-  if(t==='blender'&&c.cw)mixerWhisk(b,c.item&&c.prog>0?S.t*18:0);   // the whisk reaches into the bowl, over what is in it
+  if(t==='blender'&&c.cw)mixerWhisk(b,c.item&&c.prog>0?S.t*18:0);
+  if(t==='sprinkler'&&(c.prog||0)>0){   // spray: drops fly out of the head while it runs, and a faint ring shows the reach in layout/near
+    for(let k=0;k<10;k++){const a=k/10*Math.PI*2+S.t*2,ph=(S.t*1.6+k*0.37)%1,rad=6+ph*20;ctx.globalAlpha=(1-ph)*0.8;ctx.fillStyle='#8fd8ff';ctx.beginPath();ctx.arc(b.cx+Math.cos(a)*rad,b.cy-12+Math.sin(a)*rad*0.45+ph*8,1.6,0,7);ctx.fill()}
+    ctx.globalAlpha=1}
+  if(t==='drinks'&&(c.prog||0)>0){const f=1-c.prog/DRINK_CD;ctx.fillStyle='rgba(30,30,40,.75)';rr(X+6,Y+T-9,T-12,4,2);ctx.fill();ctx.fillStyle='#ff9bb5';rr(X+6,Y+T-9,(T-12)*f,4,2);ctx.fill()}
+  if(t==='counter'&&c.pro===6){   // the warp counter: a ring on the top in its pair's colour
+    const col=['#b48cff','#4aa8ff','#53c776','#ffb13b','#ff6f61','#2fd0c8'][((c.wp||1)-1)%6],bb=unitGeom('counter',X,Y),wa=0.55+0.25*Math.sin(S.t*4);
+    ctx.save();ctx.strokeStyle=col;ctx.globalAlpha=wa;ctx.lineWidth=2.2;ctx.beginPath();ctx.ellipse(bb.cx,bb.cy,13,7,0,0,7);ctx.stroke();ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(bb.cx,bb.cy,8,4.2,0,0,7);ctx.stroke();ctx.restore();
+    if(c.wp)text(String(c.wp),X+T-8,Y+T-14,9,col,800)}   // the whisk reaches into the bowl, over what is in it
 }
 function drawTruckShell(){
   cachedRect('truck'+TX,0,0.5*T,GW*T,7.4*T,()=>drawTruckBody());
@@ -4207,7 +4292,7 @@ function drawLuckyBox(c,X,Y){   /* a rainbow box with a ?, shaking while it work
   if(c.item&&!(c.prog>0)&&!loose)drawItem(c.item,X+T/2,Y+T*0.28,T*0.5);
   if(c.prog>0&&!loose)bar(X+6,Y+T-9,T-12,c.prog/LUCKY_T,'#ff9fd0');
 }
-const proMark=(st,pro)=>st==='planter'&&pro?['','🪺','☀️'][pro]:st==='table'&&pro?'☕':st==='counter'&&pro?['','🤝','📦','🔀','💨','➕'][pro]:st==='board'?(pro===2?'⚙️':pro===1?'🗡️':''):'';   /* the mark of a ★ unit with an effect */
+const proMark=(st,pro)=>st==='planter'&&pro?['','🪺','☀️'][pro]:st==='table'&&pro?'☕':st==='trash'&&pro?'♻️':st==='counter'&&pro?['','🤝','📦','🔀','💨','➕','🔮'][pro]:st==='board'?(pro===2?'⚙️':pro===1?'🗡️':''):'';   /* the mark of a ★ unit with an effect */
 function drawExtStand(cx,by){   /* a tall red extinguisher standing on the floor (feet at by), drawn in the game's own soft style */
   const w=T*0.36,h=T*0.74,x0=cx-w/2,top=by-h;
   softShadow(cx,by,T*0.3,5,.32);
@@ -4230,6 +4315,12 @@ function drawSignBoard(X,Y){   /* an A-frame board: OPEN in red on cream, little
   text('OPEN',X,Y-T*0.2,11,'#d04a3a',900);text('いらっしゃい',X,Y-T*0.02,7,'#7a5434',800);
   const t=S.t||0;for(let k=0;k<2;k++){const a=(t*0.6+k*0.5)%1;ctx.globalAlpha=0.8*(1-a);ctx.fillStyle='#ff8fb0';ctx.beginPath();const hx=X+(k?8:-8),hy=Y-T*0.42-a*16;
     ctx.moveTo(hx,hy+3);ctx.bezierCurveTo(hx-5,hy-1,hx-3,hy-5,hx,hy-2);ctx.bezierCurveTo(hx+3,hy-5,hx+5,hy-1,hx,hy+3);ctx.fill()}ctx.globalAlpha=1;
+}
+function drawBuffFx(p,X,Y){   /* the drink boost: a pink pulse under the chef and a few bubbles */
+  const t=(S.t||0),a=0.35+0.15*Math.sin(t*6);
+  ctx.save();ctx.translate(X,Y+4);ctx.scale(1,0.45);ctx.strokeStyle='rgba(255,140,175,'+a+')';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,17+2*Math.sin(t*5),0,7);ctx.stroke();ctx.restore();
+  for(let k=0;k<3;k++){const ph=(t*0.9+k/3)%1;ctx.globalAlpha=Math.sin(ph*Math.PI)*0.9;ctx.fillStyle='#ffb3c8';ctx.beginPath();ctx.arc(X+Math.sin(t*3+k*2.4)*10,Y-4-ph*26,2.4,0,7);ctx.fill()}
+  ctx.globalAlpha=1;
 }
 function drawRestFx(p,X,Y,front){   /* resting on the bench: a soft green glow under the chef, and little sparkles / hearts drifting up */
   const t=(S.t||0);
@@ -4419,6 +4510,7 @@ function drawPlayers(){
     skillArea(p);skillGlow(p,X,Y);
     if(p.dy===-1)holdAt();
     if(p.bn)drawRestFx(p,X,Y,0);
+    if((p.dkT||0)>0)drawBuffFx(p,X,Y);
     drawChef(p,X,Y);
     if(p.bn)drawRestFx(p,X,Y,1);
     if(p.dy!==-1)holdAt();
@@ -5626,7 +5718,7 @@ const NET={role:'off',lobby:null,room:null,code:'',lobbyPeers:[],order:[],slots:
   mySlot:0,seq:0,ovId:0,ovHtml:'',ovSentAt:0,snapT:0,mirror:false,hostPeer:null,wantOv:0,ovParts:{},shownOv:-1,
   pk:0,sw:0,ocSeq:0,lastIn:'',lastSnapAt:0,seenSnap:-1,localOv:null,snapBytes:0};
 const ING_K=Object.keys(ING),REC_K=Object.keys(RECIPES),EQ_K=Object.keys(EQUIP);
-const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp','lucky','sign','extst','teapot','bench','vault','juicer'];
+const TILE_K=['floor','gap','counter','fridge','seedbox','sink','board','stove','blender','plates','trash','planter','window','door','serve','table','warp','lucky','sign','extst','teapot','bench','vault','juicer','sprinkler','drinks'];
 const OFFER_K=['pack','seed','mystery','equip','fuel'];
 const r2=v=>Math.round(v*100)/100;
 (async function initNet(){
@@ -5958,7 +6050,7 @@ function encItem(it){
     case 'basket':return [3,it.bonus||0,it.items.map(id=>ING_K.indexOf(id)),encUps(it)];
     case 'power':return [6,UPK.indexOf(it.up)];
     case 'seed':return [4,ING_K.indexOf(it.id)];
-    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant),encUps(it),it.top?encItem(it.top):0,it.vs&&it.vs.length?it.vs.map(encItem):0,it.cw?CW_K.indexOf(it.cw)+1:0];
+    case 'station':return [5,TILE_K.indexOf(it.st),it.pro||0,it.n||0,encPlant(it.plant),encUps(it),it.top?encItem(it.top):0,it.vs&&it.vs.length?it.vs.map(encItem):0,it.cw?CW_K.indexOf(it.cw)+1:0,it.wp||0];
   }
   return 0;
 }
@@ -5969,7 +6061,7 @@ function sendSnap(){
   const tiles=[];
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const c=S.map[y][x],t=TILE_K.indexOf(c.t);
-    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0,c.fire?1:0,Math.round((c.smoke||0)*10),(c.nbT||0)>0?1:0,c.lk&&c.lk.t>0?[ING_K.indexOf(c.lk.id),c.lk.code,Math.round(c.lk.t*10),c.lk.id2?ING_K.indexOf(c.lk.id2):-1]:0,c.t==='vault'?[c.vsel||0,(c.vs||[]).map(encItem)]:0,c.cw?CW_K.indexOf(c.cw)+1:0];
+    const a=[t,encItem(c.item),Math.round((c.prog||0)*10),Math.round((c.burn||0)*10),encPlant(c.plant),c.pro||0,encUps(c),c.t==='sink'&&(c.dirty||c.clean)?[c.dirty||0,c.clean||0]:0,(c.boostT||0)>0?1:0,c.fast?1:0,c.fire?1:0,Math.round((c.smoke||0)*10),(c.nbT||0)>0?1:0,c.lk&&c.lk.t>0?[ING_K.indexOf(c.lk.id),c.lk.code,Math.round(c.lk.t*10),c.lk.id2?ING_K.indexOf(c.lk.id2):-1]:0,c.t==='vault'?[c.vsel||0,(c.vs||[]).map(encItem)]:0,c.cw?CW_K.indexOf(c.cw)+1:0,c.wp||0];
     while(a.length>1&&!a[a.length-1])a.pop();
     tiles.push(a.length===1?t:a);
   }
@@ -5984,7 +6076,7 @@ function sendSnap(){
     mp:tiles,gr:ground,tb:tablesList().map(([x,y])=>{const c=S.map[y][x],it=c.item;return [x,y,it&&it.kind==='dirty'?it.cnt||1:0,c.pro||0]}),sg:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='sign'?[x,y]:null)).filter(Boolean),tp:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='teapot'?[x,y]:null)).filter(Boolean),bch:S.map.flatMap((r,y)=>r.map((c,x)=>c.t==='bench'&&c.bs===0?[x,y]:null)).filter(Boolean),
     pl:S.players.map(p=>[Math.round(p.x*100),Math.round(p.y*100),p.dx,p.dy,encItem(p.hold),p.msgT>0?p.msg:'',Math.round(Math.max(0,p.msgT)*10),
       p.menu?mk(p.menu.kind):0,p.menu?(p.menu.kind==='vault'?p.menu.sel+100*(p.menu.tx+30*p.menu.ty):p.menu.sel):0,Math.round((p.actT||0)*100),p.cur,
-      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100),(p.pouch||[]).map(encItem),p.pouchSel?p.pouchSel.k:-1,p.bn?1:0]),
+      p.g?[GOBJ_K.indexOf(p.g.obj),p.g.st,Math.round(p.g.v*100),p.g.need,p.g.seq,p.g.item?ING_K.indexOf(p.g.item):-1]:0,p.mk?1:0,p.seat?1:0,Math.round((p.skT||0)*10),Math.round((p.skCD||0)*10),SKILL_K.indexOf(p.skill),encItem(p.hold2),p.sel?[p.sel.cur,p.sel.ok?1:0]:0,skinsOf(p).map(k=>SKIN_K.indexOf(k)),Math.round((p.wpT||0)*100),(p.pouch||[]).map(encItem),p.pouchSel?p.pouchSel.k:-1,p.bn?1:0,Math.round((p.dkT||0)*10)]),
     cu:S.cust.map(c=>[REC_K.indexOf(c.order),Math.round(c.pat/c.max*100),c.hue,CST_K.indexOf(c.st),c.by,c.tx,c.ty,Math.round((c.lx||0)*100),Math.round((c.ly||0)*100),c.mad?1:0,CTYPE_K.indexOf(c.type||'normal'),c.order2?REC_K.indexOf(c.order2):-1,c.got?(c.got[0]?1:0)+(c.got[1]?2:0):-1,c.kidAway||0,Math.round((c.kx||0)*100),Math.round((c.ky||0)*100),c.st==='eat'&&c.t<=0?1:0,CUST_ALL.indexOf(c.an),c.orders?[c.orders.map(o=>REC_K.indexOf(o)),c.got.reduce((a,g,i)=>a+(g?1<<i:0),0),c.ans.map(a=>CUST_ALL.indexOf(a)),c.hues]:0]),
     sh:S.shops.map(s=>[Math.round(s.x*100),ALLSHOPS.indexOf(s.type),Math.round((s.fade||0)*100),s.items.map(encOffer),s.fox?1:0]),
     mk:S.phase==='stop'?S.market.map(encOffer):[],
@@ -6147,7 +6239,7 @@ function applySnap(d){
   let k=0;
   for(let y=2;y<=6;y++)for(let x=2;x<=IX1;x++){
     const a=(d.mp||[])[k++],e=Array.isArray(a)?a:[a];
-    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10,nbT:e[12]?1:0,lk:Array.isArray(e[13])&&ING_K[e[13][0]]?{id:ING_K[e[13][0]],code:n(e[13][1]),t:n(e[13][2])/10,id2:e[13][3]>=0?ING_K[e[13][3]]||null:null}:null,vs:Array.isArray(e[14])?(e[14][1]||[]).map(decItem).filter(Boolean):null,vsel:Array.isArray(e[14])?n(e[14][0]):0,cw:CW_K[(+e[15]||0)-1]||null};
+    S.map[y][x]={t:TILE_K[e[0]]||'floor',item:decItem(e[1]),prog:n(e[2])/10,burn:n(e[3])/10,plant:decPlant(e[4]),pro:+e[5]||0,ups:decUps(e[6]),dirty:Array.isArray(e[7])?n(e[7][0]):0,clean:Array.isArray(e[7])?n(e[7][1]):0,boostT:e[8]?1:0,fast:!!e[9],fire:e[10]?1:0,smoke:n(e[11])/10,nbT:e[12]?1:0,lk:Array.isArray(e[13])&&ING_K[e[13][0]]?{id:ING_K[e[13][0]],code:n(e[13][1]),t:n(e[13][2])/10,id2:e[13][3]>=0?ING_K[e[13][3]]||null:null}:null,vs:Array.isArray(e[14])?(e[14][1]||[]).map(decItem).filter(Boolean):null,vsel:Array.isArray(e[14])?n(e[14][0]):0,cw:CW_K[(+e[15]||0)-1]||null,wp:+e[16]||0};
   }  syncDoor();
 
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];if(c.t==='table'||c.t==='sign'||c.t==='teapot'||c.t==='bench')S.map[y][x]={t:'ground',item:null};else if(c.t==='ground')c.item=null}
@@ -6161,7 +6253,7 @@ function applySnap(d){
     Object.assign(p,{i,nx,ny,dx:n(a[2]),dy:n(a[3]),hold:decItem(a[4]),msg:String(a[5]||''),msgT:n(a[6])/10,
       menu:a[7]===3?{kind:'vault',sel:n(a[8])%100,tx:Math.floor(n(a[8])/100)%30,ty:Math.floor(n(a[8])/3000)}:a[7]?{kind:a[7]===1?'fridge':'seedbox',sel:n(a[8])}:null,actT:n(a[9])/100,cur:n(a[10]),
       g:Array.isArray(a[11])&&GOBJ_K[a[11][0]]?{obj:GOBJ_K[a[11][0]],st:n(a[11][1]),v:n(a[11][2])/100,need:n(a[11][3]),seq:Array.isArray(a[11][4])?a[11][4].slice(0,4).map(n):[],item:ING_K[a[11][5]]||null,x:0,y:0}:null,mk:!!a[12],seat:a[13]?{x:0,y:0}:null,skT:n(a[14])/10,skCD:n(a[15])/10,skill:SKILL_K[n(a[16])]||'knife',hold2:decItem(a[17]),sel:Array.isArray(a[18])?{cur:n(a[18][0]),ok:!!a[18][1]}:null,skn:Array.isArray(a[19])?a[19].slice(0,3).map(x=>SKIN_K[n(x)]).filter(Boolean):[],wpT:n(a[20])/100});
-    p.pouch=Array.isArray(a[21])?a[21].map(decItem).filter(Boolean):[];p.pouchSel=a[22]!=null&&n(a[22])>=0?{k:n(a[22])}:null;p.bn=a[23]?{g:1}:null;
+    p.pouch=Array.isArray(a[21])?a[21].map(decItem).filter(Boolean):[];p.pouchSel=a[22]!=null&&n(a[22])>=0?{k:n(a[22])}:null;p.bn=a[23]?{g:1}:null;p.dkT=n(a[24])/10;
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
   S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])],...(Array.isArray(a[18])&&Array.isArray(a[18][0])?(()=>{const o=a[18][0].slice(0,4).map(x=>REC_K[n(x)]||'burger'),gm=n(a[18][1]);return {orders:o,got:o.map((_,i)=>!!(gm&(1<<i))),ans:(a[18][2]||[]).slice(0,3).map(x=>CUST_ALL[n(x)]),hues:(a[18][3]||[]).slice(0,3).map(n)}})():{})}));
@@ -6194,7 +6286,7 @@ function decItem(a){
     case 3:return {kind:'basket',bonus:+a[1]||0,items:(Array.isArray(a[2])?a[2]:[]).map(i=>ING_K[i]).filter(Boolean),ups:decUps(a[3])};
     case 6:return UPK[a[1]]?{kind:'power',up:UPK[a[1]]}:null;
     case 4:return {kind:'seed',id:ING_K[a[1]]||'lettuce'};
-    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4]),ups:decUps(a[5])};if(a[3])o.n=+a[3];if(a[6])o.top=decItem(a[6]);if(Array.isArray(a[7]))o.vs=a[7].map(decItem).filter(Boolean);if(a[8])o.cw=CW_K[+a[8]-1]||'pan';return o}
+    case 5:{const o={kind:'station',st:TILE_K[a[1]]||'counter',pro:+a[2]||0,plant:decPlant(a[4]),ups:decUps(a[5])};if(a[3])o.n=+a[3];if(a[6])o.top=decItem(a[6]);if(Array.isArray(a[7]))o.vs=a[7].map(decItem).filter(Boolean);if(a[8])o.cw=CW_K[+a[8]-1]||'pan';if(a[9])o.wp=+a[9];return o}
   }
   return null;
 }

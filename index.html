@@ -128,11 +128,11 @@ body.touch #pauseBtn{display:none}
 .ovbtn.sel,.ovbtn:focus-visible{border-color:var(--truck);outline:none;background:#36545f}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .town{text-align:left;display:flex;flex-direction:column;gap:6px;line-height:1.5}
-.town .tn{font-family:var(--display);font-weight:400;font-size:21px}
+.town .tn{font-family:var(--display);font-weight:400;font-size:21px;display:block;white-space:nowrap;max-width:100%;overflow:hidden}
 .town .menu{font-size:17px}
 .town .needs{font-size:15px;display:flex;flex-direction:column;gap:2px;font-weight:400}
-.town .needs>span,.town .menu{white-space:nowrap}
-.town .pay,.town>.sub{font-size:15px;white-space:nowrap}
+.town .needs>span,.town .menu{white-space:normal;overflow-wrap:anywhere}
+.town .pay,.town>.sub{font-size:15px;white-space:normal;overflow-wrap:anywhere}
 @media(max-width:760px){.town .tn{font-size:18px}.town .menu{font-size:15px}.town .needs{font-size:13px}.town .pay,.town>.sub{font-size:13px}.town .needs>span,.town .menu{white-space:normal}}
 .town .ok{color:var(--good)} .town .ng{color:var(--bad)} .town .sub{color:var(--muted)}
 .town .pay{color:var(--truck)}
@@ -380,15 +380,17 @@ const FOOD={img:{}};
   mk('stp_chop',g=>{g.rotate(-0.72);g.scale(0.92,0.92);
     g.beginPath();g.moveTo(-33,3);g.lineTo(-14,-11);g.lineTo(12,-11);g.lineTo(12,10);g.lineTo(-8,10);g.quadraticCurveTo(-26,10,-33,3);g.closePath();g.fill();   // a pointed chef's knife
     g.beginPath();g.roundRect(10,-6,21,12,6);g.fill()});
-  mk('stp_pan',g=>{   // a frying pan seen from above: round pan, the long handle pointing to the lower right
+  mk('stp_pan',g=>{   // a frying pan seen from above: a solid round pan, the long handle pointing to the lower right
     g.translate(-2,-3);g.rotate(Math.PI/4);
     g.beginPath();g.arc(-8,0,19,0,7);g.fill();
-    g.globalCompositeOperation='destination-out';g.beginPath();g.arc(-8,0,12.5,0,7);g.fill();g.globalCompositeOperation='source-over';
     g.beginPath();g.roundRect(8,-4,26,8,4);g.fill()});
-  mk('stp_juice',g=>{   // the juicer's mark: a glass with a straw (the mixer keeps the swirl)
-    g.beginPath();g.moveTo(-17,-6);g.lineTo(17,-6);g.lineTo(12,27);g.quadraticCurveTo(0,30,-12,27);g.closePath();g.fill();
-    g.globalCompositeOperation='destination-out';g.beginPath();g.moveTo(-12,1);g.lineTo(12,1);g.lineTo(9,6);g.lineTo(-9,6);g.closePath();g.fill();g.globalCompositeOperation='source-over';
-    g.lineWidth=5;g.beginPath();g.moveTo(5,-6);g.lineTo(11,-24);g.lineTo(22,-27);g.stroke()});
+  mk('stp_juice',g=>{   // the juicer's mark: the outline of a cup (wide at the top, narrow at the bottom) with one unbroken swirl inside it (drawn at 85% to match the other marks)
+    g.scale(0.85,0.85);g.lineWidth=4;
+    g.beginPath();g.moveTo(-21,-25);g.lineTo(21,-25);g.lineTo(13,23);g.lineTo(-13,23);g.closePath();g.stroke();
+    g.lineWidth=3.6;
+    g.beginPath();   // one unbroken line that swings from wall to wall of the cup, reaching right up to the outline and narrowing with the cup
+    for(let y=-19;y<=23;y+=0.7){const tt=(y+19)/42,hw=21-(y+25)/6-4.2,x=hw*Math.cos(tt*7.5*Math.PI);y===-19?g.moveTo(x,y):g.lineTo(x,y)}
+    g.stroke()});
   mk('stp_pot',g=>{   // a pot with two ear handles and a lid knob
     g.beginPath();g.roundRect(-22,-8,44,32,9);g.fill();
     g.beginPath();g.roundRect(-30,-3,10,6,3);g.fill();g.beginPath();g.roundRect(20,-3,10,6,3);g.fill();
@@ -396,7 +398,14 @@ const FOOD={img:{}};
   mk('stp_cook',g=>{
     g.beginPath();g.moveTo(1,-28);g.bezierCurveTo(10,-14,23,-6,23,9);g.bezierCurveTo(23,21,13,28,0,28);g.bezierCurveTo(-13,28,-23,21,-23,9);g.bezierCurveTo(-23,-1,-15,-8,-10,-19);g.bezierCurveTo(-7,-12,-5,-8,-2,-6);g.bezierCurveTo(-3,-14,-2,-22,1,-28);g.closePath();g.fill();
     g.globalCompositeOperation='destination-out';g.beginPath();g.moveTo(0,7);g.bezierCurveTo(6,13,9,17,9,21);g.bezierCurveTo(9,26,4,28,0,28);g.bezierCurveTo(-4,28,-9,26,-9,21);g.bezierCurveTo(-9,17,-5,13,0,7);g.closePath();g.fill()});
-  mk('stp_blend',g=>{g.lineWidth=8;g.beginPath();for(let t=0;t<=2.8*Math.PI;t+=0.12){const r=3+t*2.9,x=Math.cos(t)*r,y=Math.sin(t)*r;t===0?g.moveTo(x,y):g.lineTo(x,y)}g.stroke()});
+  mk('stp_blend',g=>{   // the mixer's mark: a whisk (a handle, then slim wire loops), tilted like the knife
+    g.rotate(Math.PI/4);g.scale(0.95,0.95);
+    g.beginPath();g.roundRect(-4,-30,8,17,4);g.fill();
+    g.beginPath();g.roundRect(-6.5,-15,13,6,2.5);g.fill();
+    g.lineWidth=3.2;
+    g.beginPath();g.ellipse(0,11,10.5,20,0,0,7);g.stroke();
+    g.beginPath();g.ellipse(0,11,5,20,0,0,7);g.stroke();
+    g.beginPath();g.moveTo(0,-9);g.lineTo(0,31);g.stroke()});
 })();
 const FTOK='';
 // status icons (status_*) live with the customer pictures
@@ -726,10 +735,9 @@ function newRun(np,mode,test){
   /* test link ?testgear=1: the new equipment waits outside from the start (pick it up at the first stop / layout) */
   if(TESTGEAR){   // every kind of equipment, ★ versions included, waits outside; in the self-made layout the plain board / counters / planters / sink are not handed out (the ★ ones replace them, the ★ sink carries the clean plates)
     const st=(s,pro,ex)=>Object.assign({kind:'station',st:s,pro:pro||0},ex||{});
-    const tools=[];
     if(mode==='layout'){for(let y=2;y<=6;y++)for(let x=2;x<=13+TX;x++){const c=S.map[y][x];
-      if((c.t==='board'||c.t==='counter'||c.t==='planter'||c.t==='sink')&&!c.pro){if(c.item&&(c.item.kind==='can'||c.item.kind==='basket'))tools.push(c.item);S.map[y][x]=blankTile(y)}}}
-    putOutside([...tools,st('warp'),st('lucky'),st('sign'),st('teapot'),st('bench'),st('vault'),st('sprinkler'),st('drinks'),
+      if((c.t==='board'||c.t==='counter'||c.t==='planter'||c.t==='sink')&&!c.pro){S.map[y][x]=blankTile(y)}}}
+    putOutside([st('counter',0,{top:{kind:'can',water:S.up.canCap}}),st('counter',0,{top:{kind:'basket',items:[]}}),st('warp'),st('lucky'),st('sign'),st('teapot'),st('bench'),st('vault'),st('sprinkler'),st('drinks'),
       st('board',1),st('board',2),st('stove',1,{cw:'pan'}),st('blender',1,{cw:'bowl'}),st('juicer',1),st('sink',1,{clean:TIER(np).plate}),st('trash',1),
       st('planter',1,{plant:null}),st('planter',2,{plant:null}),st('table',1),
       ...[1,3,4,5].map(pro=>st('counter',pro)),st('counter',6,{wp:91}),st('counter',6,{wp:91})])}
@@ -818,13 +826,16 @@ const storable=it=>!!it&&['station','can','basket','cw','power','ext','dirty','p
 function nearDoorSpots(){const dx=DOOR_FRONT[0]+0.5;return GROUND_SPOTS.filter(q=>!(q[0]===TABLE_SPOT[0]&&q[1]===TABLE_SPOT[1])&&!(q[0]===DOOR_FRONT[0]&&q[1]===7)).sort((a,b)=>Math.hypot(a[0]+0.5-dx,a[1]-6)-Math.hypot(b[0]+0.5-dx,b[1]-6))}
 function putOutside(objs){
   for(const o of objs){
+    if(o._ox!=null){   // set down here last time: it goes back to the same spot if that is still free
+      const sx=o._ox,sy=o._oy;delete o._ox;delete o._oy;
+      if(sy>=7&&sy<GH-1&&S.map[sy]&&S.map[sy][sx]&&S.map[sy][sx].t==='ground'&&!S.map[sy][sx].item){S.map[sy][sx].item=o;continue}}
     if(o.kind==='station'&&PILE.includes(o.st)&&!o.top&&!o.plant&&!o.pro&&!upTotal(o)){
       const pile=GROUND_SPOTS.map(([x,y])=>S.map[y][x].item).find(it=>it&&it.kind==='station'&&it.st===o.st&&!it.top&&!it.plant&&!it.pro&&!upTotal(it));
       if(pile){pile.n=(pile.n||1)+(o.n||1);continue}
     }
     const free=([x,y])=>S.map[y][x].t==='ground'&&!S.map[y][x].item;
     let s=(o.kind==='station'&&o.st==='table'&&free(TABLE_SPOT))?TABLE_SPOT:nearDoorSpots().find(q=>free(q));
-    if(!s&&TESTGEAR){   // test link: no unit is lost when the usual places are full
+    if(!s){   // no unit is lost when the usual places are full: any free ground (below the tables too; never the market, the gathering spots or the waiting line)
       outer:for(let y=7;y<GH-1;y++)for(let x=0;x<GW;x++){if(S.map[y][x].t==='ground'&&!S.map[y][x].item&&!(x>=TBL_ZONE.x0&&x<=TBL_ZONE.x1&&y>=TBL_ZONE.y0&&y<=TBL_ZONE.y1)&&!(x===DOOR_FRONT[0]&&y===7)){s=[x,y];break outer}}}
     if(s)S.map[s[1]][s[0]].item=o;
   }
@@ -834,7 +845,7 @@ function stashOutside(){
   for(let y=7;y<GH;y++)for(let x=0;x<GW;x++){const c=S.map[y][x];
     // a signboard left standing on the plaza stays where it is (it becomes a sign tile)
     if(c.t==='ground'&&c.item&&c.item.kind==='station'&&(c.item.st==='sign'||c.item.st==='teapot')){S.map[y][x]={t:c.item.st,item:null,prog:0,burn:0};continue}
-    if(c.t==='ground'&&c.item){if(storable(c.item))S.stored.push(c.item);c.item=null}}
+    if(c.t==='ground'&&c.item){if(storable(c.item)){c.item._ox=x;c.item._oy=y;S.stored.push(c.item)}c.item=null}}   /* remember where it stood */
 }
 // a watering can / basket comes out already standing on a plain counter: they move together anyway
 function toolsOnCounters(objs){
@@ -1039,7 +1050,7 @@ function furnPick(p,c,tx,ty){
     const it=c.item;
     if(!h&&it){
       if(it.n>1){it.n--;p.hold={kind:'station',st:it.st}}  // take one from the pile
-      else{p.hold=it;c.item=null;delete it.n}
+      else{p.hold=it;c.item=null;delete it.n;delete it._ox;delete it._oy}
       return true}
     if(h&&!it){if(!storable(h)){say(p,'外には置けない');return true}c.item=h;p.hold=null;return true}
     if(h&&it&&holdsFurn(p)&&PILE.includes(h.st)&&it.kind==='station'&&it.st===h.st&&!h.top&&!it.top&&!h.plant&&!it.plant&&!h.pro&&!it.pro&&!upTotal(h)&&!upTotal(it)){it.n=(it.n||1)+1;p.hold=null;return true}
@@ -2510,7 +2521,8 @@ function showEnd(){
 const ov=document.getElementById('ov');
 let ovSel=0, chooseOpts=[];
 function showOv(html){if(S&&S.localPause&&S.ovSave==null)S.localPause=false;paintOv(html);NET.mirror=false;if(NET.role==='host'&&S)hostOvChanged(html)}
-function paintOv(html){const wasPup=!!ov.querySelector('.pupnext');ov.innerHTML=emoHtml(html);fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();
+function fitTitles(){for(const el of ov.querySelectorAll('.town .tn')){el.style.fontSize='';let fs=parseFloat(getComputedStyle(el).fontSize)||21;while(el.scrollWidth>el.clientWidth+1&&fs>10){fs-=0.5;el.style.fontSize=fs+'px'}}}   /* card names never wrap: the font shrinks until the name fits */
+function paintOv(html){const wasPup=!!ov.querySelector('.pupnext');ov.innerHTML=emoHtml(html);fillFood(ov);fillChefs(ov);ov.hidden=false;fitOv();fitTitles();
   // while everyone picks, a repaint (someone else picked) keeps your own cursor; the first paint of the screen starts at the top
   ovSel=S&&S.phase==='pup'&&wasPup?Math.max(0,Math.min(ovSel,ovButtons().length-1)):Math.max(0,ovButtons().findIndex(b=>b.classList.contains('autofocus')));
   markSel();document.body.classList.add('ovopen');ov.scrollTop=0}
@@ -3211,7 +3223,7 @@ function drawCw(type,cx,cy,s){   // s: the size an item is drawn at (the pan is 
   else artPan(cx-s*0.02,cy,s*0.76);
 }
 function drawItem(it,cx,cy,s,inHand){
-  if(it.kind==='cw'){drawCw(it.type,cx,cy,s);if(it.item)drawItem(it.item,cx,cy-s*(it.type==='bowl'?0.03:0.08),s*(it.type==='bowl'?0.34:0.5),inHand);return}
+  if(it.kind==='cw'){drawCw(it.type,cx,cy,s);if(it.item)drawItem(it.item,cx,cy-s*(it.type==='bowl'?0.03:0.06),s*(it.type==='bowl'?0.34:0.8),inHand);return}
   if(it.kind==='dirty'||(emptyPlate(it)&&(it.cnt||1)>1)){
     const n=Math.min(6,it.cnt||1);
     for(let k=0;k<n;k++)plateDisk(cx,cy-k*3.5,s,it.kind==='dirty');
@@ -3240,6 +3252,11 @@ function drawItem(it,cx,cy,s,inHand){
     text('↑',cx+s*0.26,cy-s*0.25,13,'#c0392b',800);
     return;
   }
+  if(it.kind==='station'&&it.st==='bench'){   // two tiles wide: the left and the right half side by side
+    const k=s/T*0.8;ctx.save();ctx.translate(cx,cy-s*0.4);ctx.scale(k,k);
+    drawTile({t:'bench',bs:0,item:null,prog:0,burn:0},-1,0);drawTile({t:'bench',bs:1,item:null,prog:0,burn:0},0,0);ctx.restore();
+    {const mk=proMark('bench',it.pro);if(mk)emoji(mk,cx-s*0.6,cy+s*0.3,Math.max(9,s*0.27))}
+    return}
   if(it.kind==='station'){
     ctx.save();ctx.translate(cx-s/2,cy-s/2);ctx.scale(s/T,s/T);
     drawTile({t:it.st,pro:it.pro,ups:it.ups,item:null,prog:0,burn:0,plant:it.plant||null,cw:it.cw||null},0,0);
@@ -3738,7 +3755,7 @@ function drawTile(c,x,y){
     if(c.t==='blender'&&c.cw){const m=mixerGeom(b);drawItem(c.item,m.bx,m.bowlCy+0.8,T*0.27)}   // inside the bowl
     else if(c.t==='juicer')drawItem(c.item,b.cx,b.cy-6,T*0.3);   // inside the jar
     else if(c.t==='sprinkler')drawItem(c.item,b.cx,b.cy-13,T*0.5);   // the watering can on top
-    else if(c.t==='stove'&&c.cw)drawItem(c.item,X+T/2,(b&&b.cy!=null?b.cy:Y+T/2)-T*0.05,T*0.34);   // inside the pan / pot
+    else if(c.t==='stove'&&c.cw)drawItem(c.item,X+T/2,(b&&b.cy!=null?b.cy:Y+T/2)-T*0.02,T*0.76);   // in the pan / pot: the usual size
     else drawItem(c.item,X+T/2,b&&b.cy!=null?b.cy:Y+T/2,T*0.76);
     if((c.t==='board'||c.t==='blender'||c.t==='juicer'||c.t==='stove')&&c.prog>0){
       const tot=c.t==='board'?chopT(c):c.t==='stove'?cookT(c):blendT(c);bar(X+6,Y+T-10,T-12,c.prog/tot,'#ffd25a')}
@@ -3753,6 +3770,7 @@ function drawTile(c,x,y){
     for(let k=0;k<10;k++){const a=k/10*Math.PI*2+S.t*2,ph=(S.t*1.6+k*0.37)%1,rad=6+ph*20;ctx.globalAlpha=(1-ph)*0.8;ctx.fillStyle='#8fd8ff';ctx.beginPath();ctx.arc(b.cx+Math.cos(a)*rad,b.cy-12+Math.sin(a)*rad*0.45+ph*8,1.6,0,7);ctx.fill()}
     ctx.globalAlpha=1}
   if(t==='drinks'&&(c.prog||0)>0){const f=1-c.prog/DRINK_CD;ctx.fillStyle='rgba(30,30,40,.75)';rr(X+6,Y+T-9,T-12,4,2);ctx.fill();ctx.fillStyle='#ff9bb5';rr(X+6,Y+T-9,(T-12)*f,4,2);ctx.fill()}
+  if(t==='counter'&&c.pro===5&&c.item&&c.item.kind==='ing'&&S.phase!=='layout'&&(c.item.cnt||1)<10){const n=c.item.cnt||1,need=n===1?30:50/n;bar(X+6,Y+T-10,T-12,Math.min(1,(c.item.gt||0)/need),'#8fe39a')}   // growing: the meter fills toward the next one
   if(t==='counter'&&c.pro===6){   // the warp counter: a ring on the top in its pair's colour
     const col=['#b48cff','#4aa8ff','#53c776','#ffb13b','#ff6f61','#2fd0c8'][((c.wp||1)-1)%6],bb=unitGeom('counter',X,Y),wa=0.55+0.25*Math.sin(S.t*4);
     ctx.save();ctx.strokeStyle=col;ctx.globalAlpha=wa;ctx.lineWidth=2.2;ctx.beginPath();ctx.ellipse(bb.cx,bb.cy,13,7,0,0,7);ctx.stroke();ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(bb.cx,bb.cy,8,4.2,0,0,7);ctx.stroke();ctx.restore();
@@ -4032,6 +4050,28 @@ function drawQueueMat(){
     ctx.fillStyle='#fff6e0';rr(cx-w/2,Y-16,w,32,14);ctx.fill();ctx.strokeStyle=`rgba(226,80,74,${0.6+0.4*k})`;ctx.lineWidth=2.5;ctx.stroke();
     text(m,cx,Y,14,'#c23a34',800)}
 }
+function drawOutsideSquares(){   // layout: every cell where the piece in hand can be set down outside is outlined as a square
+  const hp=S.players.find(q=>isMine(q)&&q.hold&&(q.hold.kind==='station'||q.hold.kind==='can'||q.hold.kind==='basket'||q.hold.kind==='cw'||q.hold.kind==='ext'))||S.players.find(q=>q.hold&&(q.hold.kind==='station'||q.hold.kind==='can'||q.hold.kind==='basket'||q.hold.kind==='cw'));
+  if(!hp)return;
+  const x=hp.hold,zoneOnly=x.kind==='station'&&(x.st==='sign'||x.st==='teapot'||x.st==='bench'||x.st==='table');
+  if(x.kind==='station'&&x.st==='table')return;   // tables have their own squares
+  const free=(cx,cy)=>{const c=S.map[cy]&&S.map[cy][cx];return !!c&&c.t==='ground'&&!c.item&&cy<GH-1};
+  ctx.save();ctx.strokeStyle='rgba(29,42,32,.5)';ctx.setLineDash([4,3]);ctx.lineWidth=2;
+  for(let y=7;y<GH-1;y++)for(let cx=0;cx<GW;cx++){
+    if(!free(cx,y))continue;
+    if(zoneOnly&&!inTblZone(cx,y))continue;
+    if(x.st==='bench'&&!(free(cx+1,y)&&inTblZone(cx+1,y)))continue;
+    if(x.st==='bench'){rr(cx*T+5,y*T+5,2*T-10,T-10,5);ctx.stroke();cx++;continue}
+    rr(cx*T+5,y*T+5,T-10,T-10,5);ctx.stroke()}
+  ctx.restore();
+}
+function drawHeldReach(){   // a held teapot / sprinkler: its reach is tinted around the spot in front of the chef
+  const p=S.players.find(q=>isMine(q)&&q.hold&&q.hold.kind==='station'&&(q.hold.st==='teapot'||q.hold.st==='sprinkler'));if(!p)return;
+  const tx=Math.floor(p.x+(p.dx||0)),ty=Math.floor(p.y+(p.dy||0)),out=p.hold.st==='teapot';
+  if(out?!inTblZone(tx,ty):!inTruck(tx,ty))return;
+  const x0=Math.max(out?0:2,tx-GEAR_RANGE),x1=Math.min(out?GW-1:IX1,tx+GEAR_RANGE),y0=Math.max(out?7:2,ty-GEAR_RANGE),y1=Math.min(out?GH-2:6,ty+GEAR_RANGE),col=out?'255,170,200':'110,200,255';
+  ctx.save();ctx.fillStyle='rgba('+col+',.12)';ctx.fillRect(x0*T,y0*T,(x1-x0+1)*T,(y1-y0+1)*T);ctx.strokeStyle='rgba('+col+',.55)';ctx.lineWidth=2;ctx.setLineDash([5,4]);rr(x0*T+1,y0*T+1,(x1-x0+1)*T-2,(y1-y0+1)*T-2,6);ctx.stroke();ctx.restore();
+}
 function drawRangeFills(outside){   // layout only: a pale tint over what a placed unit reaches, with a dotted edge
   if(!S||S.phase!=='layout')return;
   for(let y=outside?7:2;y<=(outside?GH-1:6);y++)for(let x=outside?0:2;x<=(outside?GW-1:IX1);x++){
@@ -4279,6 +4319,7 @@ function drawLayoutGround(){
   drawTables();
   drawPlazaTiles();
   drawRangeFills(true);   // layout: the reach of a placed teapot is tinted
+  drawHeldReach();drawOutsideSquares();
   if(S.players.some(q=>q.hold&&q.hold.kind==='station'&&q.hold.st==='table')){
     ctx.strokeStyle='rgba(29,42,32,.45)';ctx.setLineDash([4,3]);ctx.lineWidth=2;
     for(let y=TBL_ZONE.y0;y<=TBL_ZONE.y1;y++)for(let x=TBL_ZONE.x0;x<=TBL_ZONE.x1;x++)if(tableOK(x,y))rr(x*T+5,y*T+5,T-10,T-10,5),ctx.stroke();
@@ -4466,7 +4507,7 @@ function drawExtFx(){
 }
 function drawLuckyBubble(k,X,Y){   /* what the lucky box gave: over the box, goes to the fridge by itself */
   const I=ING[k.id];if(!I)return;const a=Math.min(1,k.t*2.5,(3-k.t)*6+0.2),rise=(3-k.t)*3,win=k.code!==3;
-  const ln1=LUCKY_MSG[k.code]||'',ln2=win?I.n+(k.id2&&ING[k.id2]?'＋'+ING[k.id2].n:'')+' → 冷蔵庫':'何も出なかった';
+  const ln1=LUCKY_MSG[k.code]||'',ln2=win?I.n+(k.id2&&ING[k.id2]?'＋'+ING[k.id2].n:''):'何も出なかった';
   ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,a));ctx.font=`800 12px ${FNT}`;
   const w=Math.max(ctx.measureText(ln1).width,ctx.measureText(ln2).width)+(win?54:20),h=40,bx=X-w/2,by=Y-h-14-rise;
   ctx.fillStyle='rgba(16,26,30,.92)';rr(bx,by,w,h,10);ctx.fill();ctx.strokeStyle=k.code===2?'#ff9fd0':win?'#ffe08a':'#7a8a90';ctx.lineWidth=2;ctx.stroke();
@@ -5559,6 +5600,7 @@ function drawWorld(arr){
     ctx.strokeStyle='#ff4d4d';ctx.lineWidth=3;
     for(const [x,y] of unreachable()){rr(x*T+2,y*T+2,T-4,T-4,6);ctx.stroke()}
     drawRangeFills(false);   // the reach of a placed sprinkler
+    drawHeldReach();
   }
   ctx.restore();
   if(S.view==='road')drawShops();
@@ -6105,7 +6147,7 @@ const encPlant=pl=>pl?[ING_K.indexOf(pl.id),Math.round(pl.t*10),pl.watered?1:0]:
 function encItem(it){
   if(!it)return 0;
   switch(it.kind){
-    case 'ing':return [0,ING_K.indexOf(it.id),it.step,it.burnt?1:0,it.cnt||0,it.how==='pan'?1:it.how==='pot'?2:0];
+    case 'ing':return [0,ING_K.indexOf(it.id),it.step,it.burnt?1:0,it.cnt||0,it.how==='pan'?1:it.how==='pot'?2:0,Math.round((it.gt||0)*10)];
     case 'cw':return [10,Math.max(0,CW_K.indexOf(it.type)),it.item?encItem(it.item):0,Math.round((it.cookP||0)*10),Math.round((it.cookB||0)*10)];
     case 'plate':return [1,it.bare?1:0,it.items.map(x=>[ING_K.indexOf(x.id),x.step,x.burnt?1:0,x.how==='pan'?1:x.how==='pot'?2:0]),it.cnt||1];
     case 'dirty':return [7,it.cnt||1];
@@ -6341,7 +6383,7 @@ function decItem(a){
   if(!Array.isArray(a))return null;
   const ing=(i,s,b,w)=>{const o={kind:'ing',id:ING_K[i]||'bread',step:+s||0,burnt:!!b};if(w===1)o.how='pan';else if(w===2)o.how='pot';return o};
   switch(a[0]){
-    case 0:{const o=ing(a[1],a[2],a[3],+a[5]);if(+a[4]>1)o.cnt=Math.min(15,+a[4]);return o}
+    case 0:{const o=ing(a[1],a[2],a[3],+a[5]);if(+a[4]>1)o.cnt=Math.min(15,+a[4]);if(+a[6]>0)o.gt=+a[6]/10;return o}
     case 10:{return {kind:'cw',type:CW_K[+a[1]]||'pan',item:a[2]?decItem(a[2]):null,cookP:n0(a[3])/10,cookB:n0(a[4])/10}}
     case 1:{const o={kind:'plate',bare:!!a[1],items:(Array.isArray(a[2])?a[2]:[]).slice(0,3).map(x=>ing(x[0],x[1],x[2],+x[3]))};if(+a[3]>1)o.cnt=Math.min(9,+a[3]);return o}
     case 7:return {kind:'dirty',cnt:Math.max(1,Math.min(9,+a[1]||1))};

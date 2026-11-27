@@ -2302,11 +2302,12 @@ function spawnCust(){
 // ボス客: after the last order of the last town (grand tour: of every town); the 3 dishes are drawn from the menu that town is serving (3 or 4 dishes). 3 dishes, one patience gauge (2x an ordinary customer's) that is not refilled by serving.
 // Win: score +BOSS_PT and sometimes a gacha ticket. Lose (the gauge runs out): nothing (no heart lost).
 const BOSS_PT=150, BOSS_TICKET_P=0.3;   // the ticket chance is rolled for every dish served to the boss
+const bossN=()=>(S.np||1)>=7?5:(S.np||1)>=5?4:3;   // the boss orders more dishes when there are more chefs
 function spawnBoss(){
   S.bossDone=true;S.sub='boss';
-  const CT=CTYPE.boss,max=(S.np===1?85:70)*S.up.pat*CT.pat,orders=[...S.town.menu].sort(()=>Math.random()-0.5);while(orders.length<3)orders.push(pickMenu());orders.length=3;orders.sort(()=>Math.random()-0.5);
-  S.cust.push({type:'boss',orders,got:[false,false,false],order:orders[0],pat:max,max,hue:rnd(360),an:BOSS_AN[S.town.id]||pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0,ans:[],hues:[]});
-  sfx('bell');S.toast={text:'🎩 ボス客が来た！ 3品を出そう（待ち時間は共通・出してもリセットされない）',t:0,life:4.5};
+  const CT=CTYPE.boss,NB0=bossN(),max=(S.np===1?85:70)*S.up.pat*CT.pat*(1+0.2*(NB0-3)),orders=[...S.town.menu].sort(()=>Math.random()-0.5);const NB=bossN();while(orders.length<NB)orders.push(pickMenu());orders.length=NB;orders.sort(()=>Math.random()-0.5);
+  S.cust.push({type:'boss',orders,got:Array(NB).fill(false),order:orders[0],pat:max,max,hue:rnd(360),an:BOSS_AN[S.town.id]||pickAnimal(),st:'wait',by:-1,tx:0,ty:0,t:0,ans:[],hues:[]});
+  sfx('bell');S.toast={text:'🎩 ボス客が来た！ '+bossN()+'品を出そう（待ち時間は共通・出してもリセットされない）',t:0,life:4.5};
 }
 
 // ---------- boss-fight obstacle events (forest tree / farm carrots / sweets giant cake) ----------
@@ -2328,7 +2329,7 @@ const evFree=(x,y,w,h)=>{
 function evtPlan(k){
   const np=S.np||1,obs=[];
   if(k==='tree'){const x=DOOR_FRONT[0],y=7,need=Math.max(20,25*np);obs.push({x,y,w:1,h:1,hp:need,max:need});return {obs}}
-  if(k==='carrot'){const n=Math.max(2,Math.min(5,np+1)),cand=[];
+  if(k==='carrot'){const n=Math.max(2,Math.min(8,np+1)),cand=[];
     for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&evFree(x,y,1,1))cand.push([x,y]);
     cand.sort(()=>Math.random()-0.5);
     for(const [x,y] of cand){if(obs.length>=n)break;if(obs.some(o=>Math.abs(o.x-x)+Math.abs(o.y-y)<3))continue;obs.push({x,y,w:1,h:1,hp:1.6,max:1.6})}
@@ -2336,14 +2337,14 @@ function evtPlan(k){
   if(k==='cake'||k==='spring'||k==='snow'){const cand=[];
     for(let y=7;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&!(y===7&&x<=DOOR_FRONT[0]&&x+1>=DOOR_FRONT[0])&&evFree(x,y,2,2))cand.push([x,y]);
     if(!cand.length)return null;const [x,y]=cand[rnd(cand.length)];
-    obs.push({x,y,w:2,h:2,hp:1,max:1,k:k==='snow'?'fire':undefined});return {obs,need:k==='cake'?Math.max(1,Math.min(4,np)):0}}
+    obs.push({x,y,w:2,h:2,hp:1,max:1,k:k==='snow'?'fire':undefined});return {obs,need:k==='cake'?Math.max(1,Math.min(8,np)):0}}
   if(k==='train'||k==='wave')return {obs:[]};
   if(k==='mountain'){
     const bs=S.cust.find(c=>c.type==='boss');if(!bs)return null;
     const left=bs.orders.filter((o,i)=>!bs.got[i]&&RECIPES[o].ings.some(x=>rid(x)==='mushroom'));if(!left.length)return null;
     const cand=[];for(let y=8;y<=10;y++)if(evFree(0,y,2,2))cand.push(y);if(!cand.length)return null;
     const need=Math.max(15,15*np);return {obs:[{x:0,y:cand[rnd(cand.length)],w:2,h:2,hp:need,max:need}],goldRid:left[rnd(left.length)]}}
-  if(k==='cow'){const bx=GOBJ.barn.x;return {obs:[{x:bx,y:GROW,w:1,h:1,hp:1,max:1}],n:Math.max(2,Math.min(5,np+1))}}
+  if(k==='cow'){const bx=GOBJ.barn.x;return {obs:[{x:bx,y:GROW,w:1,h:1,hp:1,max:1}],n:Math.max(2,Math.min(8,np+1))}}
   return null}
 function evtEnd(E,msg){evtClearClimb();E.st='idle';E.obs=[];E.by=[];E.next=evRand(EVT_GAP);if(msg){S.toast={text:msg,t:0,life:2.5}}}
 function evtUpdate(dt){
@@ -2371,7 +2372,7 @@ function evtUpdate(dt){
       for(const o of E.obs)if(o.k==='ice'){o.hp-=dt*melt;if(o.sh>0)o.sh=Math.max(0,o.sh-dt)}
       E.obs=E.obs.filter(o=>o.k==='fire'||o.hp>0);
       E.ice-=dt;if(E.ice<=0){E.ice=4+10*E.fire;
-        if(E.fire<0.8&&E.obs.filter(o=>o.k==='ice').length<6){const cand=[];for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&evFree(x,y,1,1))cand.push([x,y]);
+        if(E.fire<0.8&&E.obs.filter(o=>o.k==='ice').length<8){const cand=[];for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&evFree(x,y,1,1))cand.push([x,y]);
           if(cand.length){const [x,y]=cand[rnd(cand.length)];E.obs.push({x,y,w:1,h:1,hp:8,max:8,k:'ice'})}}}
       if(E.dur<=0){evtEnd(E,'❄️ 吹雪がやんだ！');sfx('ready')}}
     else if(k==='mountain'){if(E.gdone){evtEnd(E,'⛰️ 黄金キノコの料理が出せた！');sfx('ready')}}
@@ -2466,7 +2467,7 @@ function evtPick(p,tx,ty){
   p.hold=null;E.by.push(p.i);sfx('put');float(o.x+1,o.y+.4,'🍓 '+E.by.length+'/'+E.need,'#ffd0e0');return true}
 const evtEnc=()=>{const E=S.evt;return E?[EVK.indexOf(E.k),EVS.indexOf(E.st),Math.round((E.t||0)*10),E.obs.map(o=>[o.x,o.y,o.w,o.h,Math.round(o.hp*10),Math.round(o.max*10),o.k==='fire'?1:o.k==='ice'?2:0]),E.need||0,(E.by||[]).length,(E.cows||[]).map(w=>[Math.round(w.x*100),Math.round(w.y*100),w.dx>=0?1:0]),Math.round((E.tx||0)*100),S.players.map((q,i)=>(q.frz||0)>0?[i,Math.round(q.frz*10)]:null).filter(Boolean),Math.round((E.warm||0)*10),E.goldRid?REC_K.indexOf(E.goldRid):-1,Math.round((E.fire||0)*100),S.players.map((q,i)=>q.cl?[i,q.cl.set,q.cl.i,q.cl.seq.join('')]:null).filter(Boolean)]:0};
 function evtDec(a){if(!Array.isArray(a)||!EVK[a[0]])return null;const n=v=>+v||0;
-  return {k:EVK[a[0]],st:EVS[a[1]]||'idle',t:n(a[2])/10,obs:(Array.isArray(a[3])?a[3]:[]).slice(0,8).map(r=>({x:n(r[0]),y:n(r[1]),w:Math.max(1,n(r[2])),h:Math.max(1,n(r[3])),hp:n(r[4])/10,max:Math.max(.1,n(r[5])/10),k:n(r[6])===1?'fire':n(r[6])===2?'ice':undefined})),need:n(a[4]),by:Array(n(a[5])).fill(0),cows:(Array.isArray(a[6])?a[6]:[]).slice(0,8).map(r=>({x:n(r[0])/100,y:n(r[1])/100,dx:n(r[2])?1:-1})),tx:n(a[7])/100,frz:(Array.isArray(a[8])?a[8]:[]).map(r=>[n(r[0]),n(r[1])/10]),warm:n(a[9])/10,goldRid:n(a[10])>=0&&a[10]!=null?REC_K[n(a[10])]:null,fire:n(a[11])/100,cl:(Array.isArray(a[12])?a[12]:[]).map(r=>({i:n(r[0]),set:n(r[1]),k:n(r[2]),seq:String(r[3]||'').split('').map(n)}))}}
+  return {k:EVK[a[0]],st:EVS[a[1]]||'idle',t:n(a[2])/10,obs:(Array.isArray(a[3])?a[3]:[]).slice(0,12).map(r=>({x:n(r[0]),y:n(r[1]),w:Math.max(1,n(r[2])),h:Math.max(1,n(r[3])),hp:n(r[4])/10,max:Math.max(.1,n(r[5])/10),k:n(r[6])===1?'fire':n(r[6])===2?'ice':undefined})),need:n(a[4]),by:Array(n(a[5])).fill(0),cows:(Array.isArray(a[6])?a[6]:[]).slice(0,8).map(r=>({x:n(r[0])/100,y:n(r[1])/100,dx:n(r[2])?1:-1})),tx:n(a[7])/100,frz:(Array.isArray(a[8])?a[8]:[]).map(r=>[n(r[0]),n(r[1])/10]),warm:n(a[9])/10,goldRid:n(a[10])>=0&&a[10]!=null?REC_K[n(a[10])]:null,fire:n(a[11])/100,cl:(Array.isArray(a[12])?a[12]:[]).map(r=>({i:n(r[0]),set:n(r[1]),k:n(r[2]),seq:String(r[3]||'').split('').map(n)}))}}
 function drawWave(E){
   const W=GW*T,warn=E.st==='warn';
   if(warn){ctx.save();ctx.globalAlpha=0.10+0.12*Math.sin(S.t*10);ctx.fillStyle='#3a8fd9';ctx.fillRect(0,7*T,W,(GH-7)*T);ctx.restore();return}
@@ -4522,7 +4523,7 @@ function drawCustBody(X,Y,c){
     drawMem(true);
     if(c.type==='vip'&&HY!=null)drawVip(X,HY,FY);
     if(c.type==='boss')drawBossSparkles(X,FY);
-    if(c.type==='boss'&&HY!=null){const m='ボス '+Math.min(3,(c.got?c.got.filter(Boolean).length:0)+1)+'/3';ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;const bx=X+30,by=HY+2;ctx.fillStyle='rgba(196,48,48,.95)';rr(bx,by,w,15,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();text(m,bx+w/2,by+7.5,11,'#fff',800)}
+    if(c.type==='boss'&&HY!=null){const m='ボス '+Math.min(3,(c.got?c.got.filter(Boolean).length:0)+1)+'/'+(c.orders?c.orders.length:3);ctx.font=`800 11px ${FNT}`;const w=ctx.measureText(m).width+12;const bx=X+30,by=HY+2;ctx.fillStyle='rgba(196,48,48,.95)';rr(bx,by,w,15,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();text(m,bx+w/2,by+7.5,11,'#fff',800)}
     if(c.type==='regular'&&HY!=null){ctx.font=`800 10px ${FNT}`;const w=ctx.measureText('常連').width+10;ctx.fillStyle='rgba(124,74,180,.9)';rr(X-w/2,FY+2,w,14,7);ctx.fill();text('常連',X,FY+9,10,'#fff',800)}
     if(CT.e&&!custIcon(X,HY,c.type)){ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(X-16,HY-12,7.5,0,7);ctx.fill();emoji(CT.e,X-16,HY-11.5,10)}
     return}
@@ -6653,7 +6654,7 @@ function applySnap(d){
     p.pouch=Array.isArray(a[21])?a[21].map(decItem).filter(Boolean):[];p.pouchSel=a[22]!=null&&n(a[22])>=0?{k:n(a[22])}:null;p.bn=a[23]?{g:1}:null;p.dkT=n(a[24])/10;
     if(Math.hypot(p.x-nx,p.y-ny)>1.5){p.x=nx;p.y=ny}
     p.tx=Math.floor(nx)+p.dx;p.ty=Math.floor(ny)+p.dy;return p});
-  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])],...(Array.isArray(a[18])&&Array.isArray(a[18][0])?(()=>{const o=a[18][0].slice(0,4).map(x=>REC_K[n(x)]||'burger'),gm=n(a[18][1]);return {orders:o,got:o.map((_,i)=>!!(gm&(1<<i))),ans:(a[18][2]||[]).slice(0,3).map(x=>CUST_ALL[n(x)]),hues:(a[18][3]||[]).slice(0,3).map(n)}})():{})}));
+  S.cust=(Array.isArray(d.cu)?d.cu:[]).map(a=>({order:REC_K[a[0]]||'burger',pat:n(a[1]),max:100,hue:n(a[2]),st:CST_K[a[3]]||'wait',by:n(a[4]),tx:n(a[5]),ty:n(a[6]),lx:n(a[7])/100,ly:n(a[8])/100,mad:!!a[9],type:CTYPE_K[n(a[10])]||'normal',order2:n(a[11])>=0&&a[11]!=null?REC_K[a[11]]:undefined,got:a[12]!=null&&n(a[12])>=0?[!!(n(a[12])&1),!!(n(a[12])&2)]:undefined,kidAway:n(a[13]),kx:n(a[14])/100,ky:n(a[15])/100,t:n(a[16])?0:1,an:CUST_ALL[n(a[17])],...(Array.isArray(a[18])&&Array.isArray(a[18][0])?(()=>{const o=a[18][0].slice(0,6).map(x=>REC_K[n(x)]||'burger'),gm=n(a[18][1]);return {orders:o,got:o.map((_,i)=>!!(gm&(1<<i))),ans:(a[18][2]||[]).slice(0,3).map(x=>CUST_ALL[n(x)]),hues:(a[18][3]||[]).slice(0,3).map(n)}})():{})}));
   S.shops=(Array.isArray(d.sh)?d.sh:[]).map(a=>({x:n(a[0])/100,type:ALLSHOPS[a[1]]||SHOPTYPES[0],fade:n(a[2])/100,items:(a[3]||[]).map(decOffer),fox:!!a[4]}));
   S.market=(Array.isArray(d.mk)?d.mk:[]).map(decOffer);
   S.floats=(Array.isArray(d.fl)?d.fl:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,text:String(a[2]||''),col:String(a[3]||'#fff').slice(0,20),t:n(a[4])/100,ic:/^status_[a-z_]{1,20}$/.test(a[5])?a[5]:''}));

@@ -1253,9 +1253,10 @@ const bCooked=it=>ING[it.id].steps.includes('cook')&&it.step>=ING[it.id].steps.l
 const bKey=x=>x.id+':'+x.step;
 const blink=(b,period,dt)=>{b.bt-=dt;if(b.bt<=0){b.bt=period;b.bo=!b.bo}return b.bo};
 const bSinks=()=>bCells(c=>c.t==='sink');
-const townNeedList=()=>S.town?townNeeds(S.town):[];
+const botTown=()=>(S.phase==='stop'||!S.next)?S.town:S.next;   // on the road the bots prepare for the town ahead
+const townNeedList=()=>{const t=botTown();return t?townNeeds(t):[]};
 // the recipes the kitchen is working on: this town's menu and the seated customers' orders
-const bRecipes=()=>{const s=new Set(S.town?S.town.menu:[]);for(const c of S.cust)if(c.st==='seat')for(const o of pendingOrders(c))s.add(o);return [...s]};
+const bRecipes=()=>{const t=botTown(),s=new Set(t?t.menu:[]);for(const c of S.cust)if(c.st==='seat')for(const o of pendingOrders(c))s.add(o);return [...s]};
 // the ingredient keys a recipe still needs after what is already on the plate / in hand (null if none fits)
 function bNeedKeys(items){
   const have=items.map(bKey);

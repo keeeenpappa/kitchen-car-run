@@ -921,7 +921,9 @@ function showItemPicker(sel){
   const rows=cat.map((g,i)=>{const n=lyCount(g),red=n===0&&[...g.prov].some(x=>miss.includes(x));
     return `<div class="row" style="align-items:center;gap:.4em;${red?'color:#ff6b6b;font-weight:800':''}"><span style="min-width:11em;text-align:left">${g.name}${red?'（必須）':''}</span>
       <button class="ovbtn" data-act="ditem" data-v="${i}|-1" style="min-width:2.4em">−</button><b style="min-width:3.2em;text-align:center">${n} / ${g.max}</b><button class="ovbtn" data-act="ditem" data-v="${i}|1" style="min-width:2.4em">＋</button></div>`}).join('');
-  showOv(`<div class="box tbox" style="max-height:92vh;overflow:auto"><h2>デバッグ：出す物</h2>
+  showOv(`<div class="box tbox" style="max-height:92vh;overflow:auto"><h2>デバッグ</h2>
+    <div class="row"><button class="ovbtn" data-act="dbgtog" style="min-width:12em;${TSET.dbg?'background:#2f8f4e;color:#fff':''}">デバッグ：${TSET.dbg?'ON':'OFF'}</button></div>
+    <p style="font-size:.85em;color:var(--muted)">ONのあいだ、「自分で並べる」で下で選んだ物だけが出て、配置フェーズの足が1.5倍になります。</p>
     <p style="font-size:.85em;color:var(--muted)">「自分で並べる」で、外に出てくる物を選びます（${1+TSET.bot}人用）。</p>
     ${miss.length?`<p style="color:#ff6b6b;font-weight:800">出発に必要で選んでいない：${miss.map(reqName).join('・')}</p>`:'<p class="good">出発に必要な物はそろっています</p>'}
     ${rows}
@@ -932,11 +934,11 @@ function showItemPicker(sel){
 function setupLayout(){
   let objs=layoutObjs(S.map,S.np,true);
   const more=[];
-  if(TSET.items){const have={},sample={};for(const o of objs){const k=lyKey(o);have[k]=(have[k]||0)+(o.n||1);sample[k]=sample[k]||o}
+  if(TSET.dbg&&TSET.items){const have={},sample={};for(const o of objs){const k=lyKey(o);have[k]=(have[k]||0)+(o.n||1);sample[k]=sample[k]||o}
     for(const k in have){if(k.indexOf('+')>=0)continue;const want=TSET.items[k];if(want>have[k]){const sm=sample[k];for(let n=have[k];n<want;n++){const c=Object.assign({},sm);delete c.n;more.push(c)}}}}   // more than the usual number (up to 4)
-  if(TSET.items){const left={};objs=objs.filter(o=>{const k=lyKey(o),g=left[k]==null?(left[k]=TSET.items[k]==null?1e9:TSET.items[k]):left[k],n=o.n||1;if(g<=0)return false;if(n>g)o.n=g;left[k]=g-Math.min(n,g);return true})}   // debug: only the chosen things appear
+  if(TSET.dbg&&TSET.items){const left={};objs=objs.filter(o=>{const k=lyKey(o),g=left[k]==null?(left[k]=TSET.items[k]==null?1e9:TSET.items[k]):left[k],n=o.n||1;if(g<=0)return false;if(n>g)o.n=g;left[k]=g-Math.min(n,g);return true})}   // debug: only the chosen things appear
   objs.push(...more);
-  if(TSET.items)for(const o of lyExtras(S.np)){const n=TSET.items['x:'+lyKey(o)]||0;for(let k=0;k<n;k++)objs.push(Object.assign({},o,o.plant===null?{plant:null}:{}))}   // debug: the chosen special equipment
+  if(TSET.dbg&&TSET.items)for(const o of lyExtras(S.np)){const n=TSET.items['x:'+lyKey(o)]||0;for(let k=0;k<n;k++)objs.push(Object.assign({},o,o.plant===null?{plant:null}:{}))}   // debug: the chosen special equipment
   putOutside(objs);
   rebuildStations();
   S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layMax=90;S.layLock=3;   // ignore 持つ/作業 for 3 s so the last long press does not carry over
@@ -3260,7 +3262,8 @@ function ovAction(a,v){
   if(a==='tcyc'){   // title settings: each is a plain button (stick/keys can reach it), pressing it steps to the next value
     if(v==='mode')MODE=MODE==='casual'?'tour':MODE==='tour'?'quick':'casual';else if(v==='kit')TSET.kit=TSET.kit==='layout'?'preset':'layout';else if(v==='bot'){const L=[0,2,3,4,5,6,7];TSET.bot=L[(L.indexOf(TSET.bot)+1)%L.length]}
     showTitle();const i=ovButtons().findIndex(b=>b.dataset.act==='tcyc'&&b.dataset.v===v);ovSel=Math.max(0,i);markSel();play('confirm');return}
-  if(a==='ditems'){TSET.kit='layout';showItemPicker();return}
+  if(a==='ditems'){showItemPicker();return}
+  if(a==='dbgtog'){TSET.dbg=!TSET.dbg;if(TSET.dbg)TSET.kit='layout';showItemPicker(ovButtons().findIndex(b=>b.dataset.act==='dbgtog'));return}
   if(a==='dbgback'){showTitle();return}
   if(a==='dall'||a==='dnone'){const cat=layoutCatalog(1+TSET.bot);TSET.items=a==='dall'?null:Object.fromEntries(cat.map(g=>[g.key,0]));showItemPicker();return}
   if(a==='ditem'){const [i,d]=String(v).split('|').map(Number),cat=layoutCatalog(1+TSET.bot),g=cat[i];if(g){TSET.items=TSET.items||Object.fromEntries(cat.map(q=>[q.key,lyCount(q)]));TSET.items[g.key]=Math.max(0,Math.min(g.max,lyCount(g)+d))}showItemPicker(ovButtons().findIndex(b=>b.dataset.act==='ditem'&&b.dataset.v===String(v)));return}
@@ -3339,7 +3342,7 @@ function playAgain(){
   if(NET.role==='guest')return;
   newRun(LASTRUN[0],LASTRUN[1]);
 }
-const TSET={kit:'preset',bot:0,items:null};   // title settings: kitchen layout and number of bots (the mode is MODE)
+const TSET={kit:'preset',bot:0,items:null,dbg:false};   // dbg: debug on = the chosen items appear and the layout phase is 1.5x fast   // title settings: kitchen layout and number of bots (the mode is MODE)
 function showTitle(){
   scanStop();
   if(NET.role!=='off')leaveOnline();
@@ -3351,7 +3354,7 @@ function showTitle(){
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn" data-act="tcyc" data-v="kit">${TSET.kit==='layout'?'自分で並べる':'初期配置済み'}</button>
       <label class="ovbtn" style="display:inline-flex;gap:.5em;align-items:center">bot人数<select onchange="TSET.bot=+this.value;showTitle()" style="font:inherit;padding:.1em .3em">${[0,1,2,3,4,5,6,7].map(n=>`<option value="${n}"${n===TSET.bot?' selected':''}>${n}人</option>`).join('')}</select></label>
       <button class="ovbtn" data-act="tstart" style="min-width:150px">はじめる</button></div>
-    <div class="row"><button class="ovbtn" data-act="ditems">🛠 デバッグ：出す物を選ぶ${TSET.items?'（設定中）':''}</button></div>
+    <div class="row"><button class="ovbtn" data-act="ditems">🛠 デバッグ(${TSET.dbg?'ON':'OFF'})</button></div>
     <div class="row"><button class="ovbtn" data-act="ghelp" style="width:180px">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button>${/[?&]lang=1/.test(location.search)?`<button class="ovbtn" data-act="lang">🌐 ${langName()}</button>`:''}</div>
     <div class="row"><button class="ovbtn" data-act="tut">📘 チュートリアル（1人・約5分）</button></div>
     ${GIFT_MSG?`<p class="good">${GIFT_MSG}</p>`:''}
@@ -3574,7 +3577,7 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1)*((p.dkT||0)>0?1.15:1)*(TESTGEAR&&S.phase==='layout'?1.5:1);   // debug (?testgear=1): 1.5x speed during the layout phase only; はやあし's skill; ★足速カウンター multiplies on top
+      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1)*((p.dkT||0)>0?1.15:1)*((TESTGEAR||(TSET.dbg&&!S.tut))&&S.phase==='layout'?1.5:1);   // debug (?testgear=1 or the debug switch on the title): 1.5x speed during the layout phase only; はやあし's skill; ★足速カウンター multiplies on top
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);

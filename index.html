@@ -6515,12 +6515,22 @@ function netTitleHtml(){
     ${btns?'':'<p class="mut">だれかが部屋を作ると、ここに「参加」ボタンが出ます。</p>'}`;
 }
 function refreshNetTitle(){const el=document.getElementById('netTitle');if(el&&!S&&NET.role==='off'){el.innerHTML=netTitleHtml();markSel()}}
+// redraw the room-setup screen but keep the cursor (and the scroll) on the button that was just pressed
+function keepSelDo(fn){
+  const bs=ovButtons(),cur=bs[ovSel],key=cur?cur.dataset.act+'|'+(cur.dataset.v||''):null,sc=ov.scrollTop;
+  fn();
+  if(key){const i=ovButtons().findIndex(x=>x.dataset.act+'|'+(x.dataset.v||'')===key);if(i>=0){ovSel=i;markSel();ov.scrollTop=sc}}
+}
 function netAction(a,v){
   if(a==='mkroom'){NET.pwOn=false;showRoomSetup();return true}
-  if(a==='pwmode'){NET.pwOn=v==='1';showRoomSetup();return true}
-  if(a==='cap'){NET.cap=+v||8;showRoomSetup();return true}
-  if(a==='rbot'){const mx=Math.max(0,(NET.cap||8)-1),L=Array.from({length:mx+1},(_,k)=>k);NET.bots=L[(L.indexOf(NET.bots||0)+1)%L.length];showRoomSetup();return true}
-  if(a==='rmode'){NET.mode=v==='tour'?'tour':v==='quick'?'quick':'casual';showRoomSetup();return true}
+  if(a==='pwmode'){NET.pwOn=v==='1';keepSelDo(showRoomSetup);return true}
+  if(a==='cap'){NET.cap=+v||8;if((NET.bots||0)>NET.cap-1)NET.bots=NET.cap-1;keepSelDo(showRoomSetup);return true}
+  if(a==='rbot'){   // the bot count list (like the title): 上下 to move, the button to choose
+    const mx=Math.max(0,(NET.cap||8)-1);
+    paintOv(`<div class="box tbox"><h2>bot人数</h2>${Array.from({length:mx+1},(_,n)=>`<div class="row"><button class="ovbtn" data-act="rbotset" data-v="${n}" style="min-width:9em">${n}人${n===(NET.bots||0)?'　✓':''}</button></div>`).join('')}</div>`);
+    ovSel=Math.max(0,Math.min(NET.bots||0,mx));markSel();return true}
+  if(a==='rbotset'){NET.bots=+v||0;showRoomSetup();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='rbot'));markSel();return true}
+  if(a==='rmode'){NET.mode=v==='tour'?'tour':v==='quick'?'quick':'casual';keepSelDo(showRoomSetup);return true}
   if(a==='host'){const el=document.getElementById('roomPw');NET.pw=NET.pwOn&&el?el.value.trim().slice(0,8):'';
     if(NET.pwOn&&!NET.pw){const e=document.getElementById('pwErr');if(e)e.textContent='パスワードを入れてください';return true}
     startHosting();return true}
@@ -6532,7 +6542,7 @@ function netAction(a,v){
   if(a==='pjoin'){const el=document.getElementById('joinCode');joinRoom(String(el?el.value:'').toUpperCase());return true}
   if(a==='hstart'){hostStart(v);return true}
   if(a==='hgo'){hostStart(NET.kit==='layout'?'layout':'preset');return true}
-  if(a==='rkit'){NET.kit=v==='layout'?'layout':'preset';showRoomSetup();return true}
+  if(a==='rkit'){NET.kit=v==='layout'?'layout':'preset';keepSelDo(showRoomSetup);return true}
   if(a==='hcancel'){showTitle();return true}
   return false;
 }
@@ -6576,7 +6586,7 @@ function showRoomSetup(){
     <div class="row"><span style="align-self:center;min-width:6em">パスワード</span><button class="ovbtn${NET.pwOn?'':' autofocus'}" data-act="pwmode" data-v="0">${NET.pwOn?'':'✔ '}なし</button><button class="ovbtn${NET.pwOn?' autofocus':''}" data-act="pwmode" data-v="1">${NET.pwOn?'✔ ':''}あり</button></div>
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
     <div class="row"><span style="align-self:center;min-width:6em">最大人数</span>${[4,6,8].map(n=>`<button class="ovbtn${(NET.cap||8)===n?' autofocus':''}" data-act="cap" data-v="${n}">${(NET.cap||8)===n?'✔ ':''}${n}人</button>`).join('')}</div>
-    <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><button class="ovbtn" data-act="rbot">${NET.bots?NET.bots+'人':'なし'}（押すと変わる）</button></div>
+    <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><button class="ovbtn" data-act="rbot">${NET.bots||0}人 ▾</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn${(NET.mode||'casual')==='casual'?' autofocus':''}" data-act="rmode" data-v="casual">${(NET.mode||'casual')==='casual'?'✔ ':''}カジュアル</button><button class="ovbtn${NET.mode==='tour'?' autofocus':''}" data-act="rmode" data-v="tour">${NET.mode==='tour'?'✔ ':''}グランドツアー</button><button class="ovbtn${NET.mode==='quick'?' autofocus':''}" data-act="rmode" data-v="quick">${NET.mode==='quick'?'✔ ':''}クイック</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn${NET.kit==='layout'?'':' autofocus'}" data-act="rkit" data-v="preset">${NET.kit==='layout'?'':'✔ '}初期配置済み</button><button class="ovbtn${NET.kit==='layout'?' autofocus':''}" data-act="rkit" data-v="layout">${NET.kit==='layout'?'✔ ':''}自分で並べる</button></div>
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);

@@ -6601,6 +6601,7 @@ function bindSlot(p,k){
   const pr=p.presence||{};
   for(const peer in NET.slots)if(NET.slots[peer]===k)delete NET.slots[peer];
   NET.slots[p.peer]=k;if(typeof pr.uid==='string')NET.uidSlot[pr.uid]=k;
+  if(NET.tapS)NET.tapS[k]=null;
   NET.inputs[k]=Array.isArray(pr.in)?pr.in:null;NET.lastPk[k]=pr.in?pr.in[3]:0;NET.lastSw[k]=pr.in?pr.in[4]:0;(NET.lastSk=NET.lastSk||[])[k]=pr.in?+pr.in[5]||0:0;(NET.lastBk=NET.lastBk||[])[k]=pr.in?+pr.in[9]||0:0;NET.lastOc[p.peer]=pr.oc?pr.oc[0]:0;
 }
 // a free spot on the truck floor near the slot's start position
@@ -6648,7 +6649,17 @@ function remoteInput(i){
   const pick=r[3]!==NET.lastPk[i], sw=r[4]!==NET.lastSw[i], sk=(+r[5]||0)!==(NET.lastSk[i]||0);
   NET.lastPk[i]=r[3];NET.lastSw[i]=r[4];NET.lastSk[i]=+r[5]||0;
   const cl=v=>Math.max(-1,Math.min(1,+v||0));
-  const gv=+r[8];return {mx:cl(r[0]),my:cl(r[1]),pick,act:!!r[2],sw,bk,sk,swH:!!r[6],gv:gv>=0&&gv<=1?gv:-1};
+  let act=!!r[2],mx=cl(r[0]),my=cl(r[1]);
+  // press counters (act and the four directions): every counted press becomes its own edge for the host, even when the
+  // press and the release both arrived between two host reads. (An old guest without counters falls back to the plain state.)
+  const ak=+r[10],dc=[+r[11],+r[12],+r[13],+r[14]];
+  if(Number.isFinite(ak)&&dc.every(Number.isFinite)){
+    const TS=NET.tapS||(NET.tapS=[]),q=TS[i]||(TS[i]={ak,dc:dc.slice(),pa:0,pd:[],ea:false,ed:false});
+    if(ak>q.ak)q.pa=Math.min(4,q.pa+ak-q.ak);q.ak=ak;
+    for(let d=0;d<4;d++){const n=dc[d]-q.dc[d];if(n>0)for(let k=0;k<Math.min(n,3);k++)if(q.pd.length<4)q.pd.push(d);q.dc[d]=dc[d]}
+    if(q.pa>0){if(!q.ea){act=true;q.pa--;q.ea=true}else{act=false;q.ea=false}}else q.ea=act;
+    if(q.pd.length){if(!q.ed){const D=[[0,-1],[0,1],[-1,0],[1,0]][q.pd.shift()];mx=D[0];my=D[1];q.ed=true}else{mx=0;my=0;q.ed=false}}else q.ed=mx!==0||my!==0}
+  const gv=+r[8];return {mx,my,pick,act,sw,bk,sk,swH:!!r[6],gv:gv>=0&&gv<=1?gv:-1};
 }
 const GUEST_OK=new Set(['resume']);   // choices on the host's screens are the host's; guests may only resume a pause
 function guestAction(a,v,slot){
@@ -6794,6 +6805,9 @@ function guestFrame(dt){
   const inp=deviceInput();
   if(ov.hidden&&S){
     if(inp.pick)NET.pk++; if(inp.sw)NET.sw++; if(inp.bk)NET.bk=(NET.bk||0)+1;
+    {const a=!!inp.act;if(a&&!NET._pa)NET.ak=(NET.ak||0)+1;NET._pa=a;   // press counters: a quick tap is never lost on the way to the host
+     const dx=inp.mx>0.5?1:inp.mx<-0.5?-1:0,dy=inp.my>0.5?1:inp.my<-0.5?-1:0,ax=Math.abs(inp.mx)>=Math.abs(inp.my),d=ax&&dx?(dx>0?3:2):!ax&&dy?(dy>0?1:0):-1;
+     if(d>=0&&d!==NET._pd)(NET.dc=NET.dc||[0,0,0,0])[d]++;NET._pd=d}
     if(pressed.has('Escape')||pressed.has('KeyP')||touch.pause||(pads[0]&&pads[0].edge('st')))pauseGame();
   } else if(!ov.hidden){
     // the pause screen: Esc / Start again resumes, like on the host
@@ -6804,7 +6818,7 @@ function guestFrame(dt){
   const cl=v=>Math.round(Math.max(-1,Math.min(1,v))*100)/100;
   if(ov.hidden&&S&&inp.sk)NET.sk=(NET.sk||0)+1;
   const gq=S?localP():null,gv=gq&&gq.g&&GOBJ[gq.g.obj]&&GOBJ[gq.g.obj].act==='timing'?Math.round(gq.g.v*100)/100:-1;
-  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv,NET.bk||0]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,S&&S.phase==='pup'?ovSel:guestLocked()?GSEL:-1,gv,NET.bk||0];
+  const ins=ov.hidden?[cl(inp.mx),cl(inp.my),inp.act?1:0,NET.pk,NET.sw,NET.sk||0,inp.swH?1:0,-1,gv,NET.bk||0,NET.ak||0,...(NET.dc||[0,0,0,0])]:[0,0,0,NET.pk,NET.sw,NET.sk||0,0,S&&S.phase==='pup'?ovSel:guestLocked()?GSEL:-1,gv,NET.bk||0,NET.ak||0,...(NET.dc||[0,0,0,0])];
   const key=ins.join(',');
   if(key!==NET.lastIn){NET.lastIn=key;NET.room.presence({in:ins}).catch(()=>{})}
   // the host's state

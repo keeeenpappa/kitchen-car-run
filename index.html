@@ -893,7 +893,7 @@ function setupLayout(){
   toolsOnCounters(objs);
   putOutside(objs);
   rebuildStations();
-  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layMax=90;S.layLock=1;   // ignore 持つ/作業 for 1 s so the last long press does not carry over
+  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layMax=90;S.layLock=3;   // ignore 持つ/作業 for 3 s so the last long press does not carry over
   hideOv();
 }
 const REQUIRED=['sink','planter','can','seedbox','fridge','board','stove','blender','juicer','trash','basket','pan','pot','bowl'];
@@ -976,7 +976,7 @@ function startDayLayout(){
   S.stored=[];S.pendingEquip=[];S.supply=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
-  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;S.layMax=30;S.layLock=1;
+  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;S.layMax=30;S.layLock=3;
   hideOv();
 }
 function layoutLeft(){
@@ -3490,7 +3490,8 @@ function update(dt){
   // players
   S.players.forEach((p,i)=>{
     NET.quietFx=NET.role==='host'&&i>0;
-    let inp=(S.phase==='stop'&&S.sub==='closing')||(S.phase==='layout'&&(S.layLock||0)>0)?NOINP:readInput(i);   // closing time: everyone stands still; layout: 3 s lock after the last screen
+    let inp=(S.phase==='stop'&&S.sub==='closing')?NOINP:readInput(i);   // closing time: everyone stands still
+    if(S.phase==='layout'&&(S.layLock||0)>0)inp={...inp,pick:false,act:false,sw:false,sk:false};   // layout: 持つ/作業 ignored for 3 s after the last screen (movement still works)
     if((p.frz||0)>0){p.frz-=dt;inp=NOINP}
     if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw,dt))inp=NOINP;p.prevAct=raw.act}
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});

@@ -1153,8 +1153,8 @@ if(isTouch)document.body.classList.add('touch');
 // ---------- test bots: each bot has a job; the chef can change a bot's job (press 持つ / 作業 next to it) ----------
 // A bot walks (BFS over the tiles it can stand on) to the thing its job needs, faces it and presses 持つ / holds 作業.
 // Limits: bots do not handle the event obstacles (cows, trains, waves, snow, spring, the mountain's climb is the 採取 bot's only event).
-const BOT_JOBS=['採取','案内','皿洗い','菜園','提供','カット'];   // (the 調理 job is parked: its code stays below but nobody gets it)
-const BOT_ORDERS=['おまかせ','採取','案内','皿洗い','菜園','提供','カット','待機'];
+const BOT_JOBS=['採取','案内','皿洗い','菜園','提供','カット','市場'];   // (the 調理 job is parked: its code stays below but nobody gets it)
+const BOT_ORDERS=['おまかせ','採取','案内','皿洗い','菜園','提供','カット','市場','待機'];
 const botJob=i=>{const o=S.botS&&S.botS[i]&&S.botS[i].job;return o||BOT_JOBS[(i-1)%BOT_JOBS.length]};
 const botSt=i=>{S.botS=S.botS||{};return S.botS[i]||(S.botS[i]={pulse:0,bt:0,bo:false,tog:false,want:null,job:null,seed:null})};
 const botSetJob=(i,name)=>{botSt(i).job=name==='おまかせ'?null:name};
@@ -1300,6 +1300,10 @@ function botTask(i,p){
     const want=stockList().find(k=>(S.stock[k]||0)>0&&townNeedList().includes(k)&&ING[k].steps[0]==='chop');
     if(want){const f=bTo(p,bCells(c=>c.t==='fridge'),'pick');if(f){f.want=want;return f}}
     return null}
+  if(job==='市場'){   // buys at the market what the town needs once its stock is 1 or less: until there are 3 (packs of 2; seeds too)
+    if(!b.mk){const w=bMarketWant();if(w)b.mk=w}
+    if(!b.mk)return null;
+    return bTo(p,bCells(c=>c.t==='market'),'pick')}
   if(job==='調理'){
     const stoves=bCells(c=>c.t==='stove'&&c.cw),empty=stoves.filter(([x,y])=>!tile(x,y).item),done=stoves.filter(([x,y])=>{const it=tile(x,y).item;return !!it&&it.kind==='ing'&&isDone(it)});
     const cook=it=>!!it&&it.kind==='ing'&&!it.burnt&&ING[it.id].steps[it.step]==='cook';
@@ -1326,6 +1330,27 @@ function botTask(i,p){
     if(starts&&bCells(c=>bHasKey(c,starts)).length){const sk=bTo(p,bCells(c=>c.t==='sink'&&(c.clean||0)>0),'pick');if(sk)return sk}
     return null}
   return null}
+// the market: what to buy next (an ingredient pack, or the seeds of a growable one), or null
+function bMarketWant(){
+  const m=S.market||[];
+  for(const id of townNeedList()){
+    const pi=m.findIndex(o=>o.type==='pack'&&o.id===id);
+    if(pi>=0&&(S.stock[id]||0)<=1&&S.money>=m[pi].price)return {i:pi,id,kind:'pack'};
+    if(pi<0&&ING[id].grow){const si=m.findIndex(o=>o.type==='seed'&&o.id===id);
+      if(si>=0&&(S.seeds[id]||0)<=1&&(S.stock[id]||0)<=1&&S.money>=m[si].price)return {i:si,id,kind:'seed'}}}
+  return null}
+// the market list: move to the wanted offer (left / right), hold 作業 to buy until there are 3, then 持つ closes the list
+function botMarket(p,b,out){
+  const m=S.market||[],w=b.mk;
+  if(w&&m[w.i]){
+    const have=w.kind==='seed'?(S.seeds[w.id]||0):(S.stock[w.id]||0);
+    if(have>=3||S.money<m[w.i].price)b.mk=null;
+    else{const n=m.length,cur=wrap(p.cur,n);
+      if(cur!==w.i){if(b.tog)out.mx=((w.i-cur+n)%n)<=n/2?1:-1;return out}
+      out.act=!p.lock;return out}}
+  else b.mk=null;
+  if(b.pulse<=0){out.pick=true;b.pulse=0.45}   // done: 持つ closes the list
+  return out}
 // the menu (fridge / seedbox): move the cursor to the wanted item, then 持つ
 function botMenu(p,b,out){
   const M=MENU[p.menu.kind],list=M.list(p),cols=M.cols,want=b.want?list.indexOf(b.want):-1;
@@ -1353,7 +1378,8 @@ function botInput(i){
   if(p.menu)return botMenu(p,b,out);
   if(p.g)return botGather(p,b,out,dt);
   if(p.cl){const d=ARW[p.cl.seq[p.cl.i]];if(b.tog&&d){out.mx=d[0];out.my=d[1]}return out}
-  if(p.mk||p.seat||p.bn)return out;
+  if(p.mk)return botMarket(p,b,out);
+  if(p.seat||p.bn)return out;
   // a plate or a can the job has no use for goes down on a free counter; cut / cooked food too
   const t=botTask(i,p)||(p.hold&&(p.hold.kind==='ing'||p.hold.kind==='can')?bTo(p,bCells(c=>c.t==='counter'&&!c.item&&!c.top),'pick'):null);
   b.want=t&&t.want||null;

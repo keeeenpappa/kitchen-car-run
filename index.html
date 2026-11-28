@@ -6273,6 +6273,15 @@ function sideOverlap(x0,y0,w,h){
   const sx=z!==1?(wx-CAM.x)*z*T:wx*T,sy=z!==1?(wy-CAM.y)*z*T:wy*T;
   return sx+T*0.7>L&&sx-T*0.7<R&&sy+T*0.5>Tp&&sy-T*1.3<B;
 }
+// phones (landscape) hide the stock strip under the game: the stock and the seeds go at the bottom of the side panel instead
+function phoneStockHtml(){
+  if(!S||!phoneView()||S.phase==='select'||!(window.matchMedia&&matchMedia('(pointer:coarse) and (orientation:landscape)').matches))return '';
+  const twn=(S.phase==='stop'||!S.next)?S.town:S.next,ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
+  const rd=twn&&regDish()?regNeeds(regDish()):[],all=[...new Set(ids.concat(rd))];
+  const st=all.map(k=>{const n=S.stock[k]||0;return (n?'':'<span class="dim">')+ING[k].e+ING[k].n+' '+n+(n?'':'</span>')}).join('　');
+  const sd=Object.keys(ING).filter(k=>(S.seeds[k]||0)>0).map(k=>'🌱'+ING[k].n+' '+S.seeds[k]).join('　');
+  return '<br><b style="color:#9fd8ff">'+(twn?twn.e+twn.n+'の在庫':'在庫')+'</b><br>'+(st||'なし')+(sd?'<br><b style="color:#9fd893">種</b><br>'+sd:'');
+}
 function drawSidePanel(px,py,pw,phh){
   const html=S.sideInfo||'';if(!html.replace(/<[^>]*>|　/g,'').trim())return;
   const x0=px!=null?px:18.2*T,y0=py!=null?py:2.25*T,w=pw!=null?pw:GW*T-x0-8,h=phh!=null?phh:6.85*T-y0,pad=9;
@@ -6455,7 +6464,7 @@ function renderHud(){
   if(!isTouch){const rt='準備完了（'+BTN_N.act+'（'+keyName(0,'act')+'）長押し）',pt='中断（'+keyName(0,'menu')+'）';
     if(readyBtn.textContent!==rt)readyBtn.textContent=rt;if(pauseBtn.textContent!==pt)pauseBtn.textContent=pt}
   {const hi=holdInfo();if(hi)info=info.slice(0,recLen)+hi+(info.length>recLen?'<br>':'')+info.slice(recLen)}   // the held unit's power-up sits under the recipes, above the rest
-  {const h=tokHtml(info.split(MK).join(''))||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=emoHtml(h);fillFood(infoEl)}}S.sideInfo=info;
+  {const h=tokHtml(info.split(MK).join(''))||'　';if(infoEl._h!==h){infoEl._h=h;infoEl.innerHTML=emoHtml(h);fillFood(infoEl)}}S.sideInfo=info+phoneStockHtml();
   const twn=(S.phase==='stop'||!S.next)?S.town:S.next;
   const ids=twn?townNeeds(twn):Object.keys(ING).filter(k=>(S.stock[k]||0)>0);
   const rd=twn&&regDish()?regNeeds(regDish()):[],menuIds=twn?ids.filter(k=>!rd.includes(k)||twn.menu.some(r=>RECIPES[r].ings.some(i0=>{const i=rid(i0);return i===k||(ING[i].mix&&mixOf(i).in.includes(k))}))):ids;

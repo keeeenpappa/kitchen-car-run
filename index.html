@@ -3467,7 +3467,7 @@ function update(dt){
     p.prevAct=inp.act;
     const len=Math.hypot(inp.mx,inp.my);
     if(len>0.1){
-      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1)*((p.dkT||0)>0?1.15:1);   // はやあし's skill; ★足速カウンター multiplies on top
+      const run=Math.max((p.skT||0)>0&&p.skill==='dash'?1.5:1,herdMul(p))*(nearFast(p)?FAST_MUL:1)*(1+0.05*pupN(p,'spd'))*(follower(p)?1+0.05*pupN(p,'led'):1)*((p.dkT||0)>0?1.15:1)*(TESTGEAR&&S.phase==='layout'?1.5:1);   // debug (?testgear=1): 1.5x speed during the layout phase only; はやあし's skill; ★足速カウンター multiplies on top
       const k=Math.max(1,len),vx=inp.mx/k*4.2*S.up.speed*run*dt,vy=inp.my/k*4.2*S.up.speed*run*dt;
       const stuck=hit(p.x,p.y); // e.g. a customer appeared where the player stands
       const okX=stuck||!hit(p.x+vx,p.y),okY=stuck||!hit(p.x,p.y+vy);

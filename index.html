@@ -919,10 +919,10 @@ function showItemPicker(sel){
   const b0=ov.querySelector('.box'),sc0=[ov.scrollTop,b0?b0.scrollTop:0];   // keep the scroll position when the list is redrawn
   const cat=layoutCatalog(1+TSET.bot),miss=lyMissing(cat);
   const rows=cat.map((g,i)=>{const n=lyCount(g),red=n===0&&[...g.prov].some(x=>miss.includes(x));
-    return `<div class="row" style="align-items:center;gap:.4em;${red?'color:#ff6b6b;font-weight:800':''}"><span style="min-width:11em;text-align:left">${g.name}${red?'（必須）':''}</span>
+    return `<div class="row" style="align-items:center;gap:.4em;${red?'color:#ff6b6b;font-weight:800':''}"><span style="min-width:11em;text-align:left">${g.name}</span>
       <button class="ovbtn" data-act="ditem" data-v="${i}|-1" style="min-width:2.4em">−</button><b style="min-width:3.2em;text-align:center">${n} / ${g.max}</b><button class="ovbtn" data-act="ditem" data-v="${i}|1" style="min-width:2.4em">＋</button></div>`}).join('');
   showOv(`<div class="box tbox" style="max-height:92vh;overflow:auto"><h2>デバッグ</h2>
-    <div class="row"><button class="ovbtn" data-act="dbgtog" style="min-width:12em;${TSET.dbg?'background:#2f8f4e;color:#fff':''}">デバッグ：${TSET.dbg?'ON':'OFF'}</button></div>
+    <div class="row"><button class="ovbtn" data-act="dbgtog" style="min-width:12em;${TSET.dbg?'background:#2f8f4e;color:#fff':''}">デバッグ：${TSET.dbg?'ON':'OFF'}</button><button class="ovbtn" data-act="dall">全部出す</button><button class="ovbtn" data-act="dnone">すべて0</button><button class="ovbtn" data-act="dbgback">戻る</button></div>
     <p style="font-size:.85em;color:var(--muted)">ONのあいだ、「自分で並べる」で下で選んだ物だけが出て、配置フェーズの足が1.5倍になります。</p>
     <p style="font-size:.85em;color:var(--muted)">「自分で並べる」で、外に出てくる物を選びます（${1+TSET.bot}人用）。</p>
     ${miss.length?`<p style="color:#ff6b6b;font-weight:800">出発に必要で選んでいない：${miss.map(reqName).join('・')}</p>`:'<p class="good">出発に必要な物はそろっています</p>'}
@@ -3175,7 +3175,7 @@ function lobbySelUpdate(dt){
 }
 function hideOv(){ov.hidden=true;ov.innerHTML='';document.body.classList.remove('ovopen');NET.mirror=false;if(NET.role==='host')hostOvChanged('')}
 function ovButtons(){return [...ov.querySelectorAll('.ovbtn')]}
-function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel))}
+function markSel(){const b=ovButtons();b.forEach((x,i)=>x.classList.toggle('sel',i===ovSel));const c=b[ovSel];if(c&&c.scrollIntoView)try{c.scrollIntoView({block:'nearest',inline:'nearest'})}catch(_){}}   // the chosen button stays in view (a long list scrolls with the pad)
 // online: on the host's screens a guest moves its own cursor; everyone's pick shows as a coloured dot under the button
 let GSEL=0;
 function ovDots(arr){
@@ -3262,6 +3262,10 @@ function ovAction(a,v){
   if(a==='tcyc'){   // title settings: each is a plain button (stick/keys can reach it), pressing it steps to the next value
     if(v==='mode')MODE=MODE==='casual'?'tour':MODE==='tour'?'quick':'casual';else if(v==='kit')TSET.kit=TSET.kit==='layout'?'preset':'layout';else if(v==='bot'){const L=[0,2,3,4,5,6,7];TSET.bot=L[(L.indexOf(TSET.bot)+1)%L.length]}
     showTitle();const i=ovButtons().findIndex(b=>b.dataset.act==='tcyc'&&b.dataset.v===v);ovSel=Math.max(0,i);markSel();play('confirm');return}
+  if(a==='botpick'){   // the bot count list: 上下 to move, the button to choose
+    showOv(`<div class="box tbox"><h2>bot人数</h2>${[0,1,2,3,4,5,6,7].map(n=>`<div class="row"><button class="ovbtn" data-act="botset" data-v="${n}" style="min-width:9em">${n}人${n===TSET.bot?'　✓':''}</button></div>`).join('')}</div>`);
+    ovSel=Math.max(0,TSET.bot);markSel();return}
+  if(a==='botset'){TSET.bot=+v;showTitle();ovSel=Math.max(0,ovButtons().findIndex(b=>b.dataset.act==='botpick'));markSel();return}
   if(a==='ditems'){showItemPicker();return}
   if(a==='dbgtog'){TSET.dbg=!TSET.dbg;if(TSET.dbg)TSET.kit='layout';showItemPicker(ovButtons().findIndex(b=>b.dataset.act==='dbgtog'));return}
   if(a==='dbgback'){showTitle();return}
@@ -3352,7 +3356,7 @@ function showTitle(){
     <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><button class="ovbtn" data-act="tchar">${(()=>{const k=SKILLS[PSKILL[0]]?PSKILL[0]:'knife',an=SKILL_ANIMAL[k],src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_icon']:null;return (src?`<img src="${src}" alt="" style="width:26px;height:26px;vertical-align:middle"> `:SKILLS[k].e+' ')+SKILLS[k].n})()}（変える）</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn" data-act="tcyc" data-v="mode">${MODE==='tour'?'グランドツアー（全'+Object.keys(TOWNS).length+'町）':MODE==='quick'?'クイック（1町だけ）':'カジュアル（4町）'}</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn" data-act="tcyc" data-v="kit">${TSET.kit==='layout'?'自分で並べる':'初期配置済み'}</button>
-      <label class="ovbtn" style="display:inline-flex;gap:.5em;align-items:center">bot人数<select onchange="TSET.bot=+this.value;showTitle()" style="font:inherit;padding:.1em .3em">${[0,1,2,3,4,5,6,7].map(n=>`<option value="${n}"${n===TSET.bot?' selected':''}>${n}人</option>`).join('')}</select></label>
+      <button class="ovbtn" data-act="botpick">bot人数：${TSET.bot}人 ▾</button>
       <button class="ovbtn" data-act="tstart" style="min-width:150px">はじめる</button></div>
     <div class="row"><button class="ovbtn" data-act="ditems">🛠 デバッグ(${TSET.dbg?'ON':'OFF'})</button></div>
     <div class="row"><button class="ovbtn" data-act="ghelp" style="width:180px">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button>${/[?&]lang=1/.test(location.search)?`<button class="ovbtn" data-act="lang">🌐 ${langName()}</button>`:''}</div>
@@ -3441,7 +3445,7 @@ function overlayInput(){
     if(mv){ovSel=wrap(ovSel+mv,b.length);markSel();play('tick')}
   }
   const sy=p0?p0.ay:0,vsd=sy>0.6?1:sy<-0.6?-1:0;if(Math.abs(sy)<0.3)OVSTICKY=0;let vy=vsd&&vsd!==OVSTICKY?vsd:0;if(vsd)OVSTICKY=vsd;
-  if(pressed.has('ArrowDown')||pressed.has('KeyS'))vy=1;if(pressed.has('ArrowUp')||pressed.has('KeyW'))vy=-1;
+  if(pressed.has('ArrowDown')||pressed.has('KeyS')||(p0&&p0.edge('d')))vy=1;if(pressed.has('ArrowUp')||pressed.has('KeyW')||(p0&&p0.edge('u')))vy=-1;
   if(vy&&!ovVyHeld&&!pupNow){   // up / down: the nearest button in the row above / below (nearest by horizontal position), one step per press
     const R=b.map(x=>x.getBoundingClientRect()),cur=R[ovSel]||R[0],cx=cur.left+cur.width/2,cyc=cur.top+cur.height/2;
     let best=-1,bd=1e9;

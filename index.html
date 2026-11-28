@@ -1214,6 +1214,12 @@ const bHasKey=(c,keys)=>!!c.item&&c.item.kind==='ing'&&plateOk(c.item)&&keys.inc
 // cut food waiting on the counters / board, not counting cooked food
 const bCutWaiting=()=>bCells(c=>(c.t==='counter'||c.t==='board')&&c.item&&c.item.kind==='ing'&&c.item.step>0&&!bCooked(c.item)).length;
 // the gathering spot for the most needed item (lowest stock first, the first one listed on a tie)
+// where cut food goes next: an empty pan / pot (if it needs cooking) or a plate it fits; null if nowhere
+function bCutDest(h){
+  const pan=bCells(c=>c.t==='stove'&&c.cw&&!c.item);
+  if(ING[h.id].steps[h.step]==='cook'&&pan.length)return pan;
+  if(plateOk(h)){const pl=bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!matchRecipe(c.item.items||[])&&(bNeedKeys(c.item.items)||[]).includes(bKey(h)));if(pl.length)return pl}
+  return null}
 function bGatherSpot(i){
   const need=townNeedList();const opts=[];
   for(const k of GOBJ_K)for(const it of GOBJ[k].items)if(need.includes(it))opts.push([S.stock[it]||0,k]);
@@ -1243,9 +1249,9 @@ function botTask(i,p){
   if(job==='皿洗い'){
     if(h&&h.kind==='dirty')return bTo(p,bSinks(),'pick');
     if(h)return null;
-    const sk=bCells(c=>c.t==='sink'&&(c.dirty||0)>0);if(sk.length)return bTo(p,sk,'hold');
-    const dt=bCells((c,x,y)=>c.t==='table'&&c.item&&c.item.kind==='dirty');if(dt.length)return bTo(p,dt,'pick');
+    const dt=bCells((c,x,y)=>c.t==='table'&&c.item&&c.item.kind==='dirty');if(dt.length)return bTo(p,dt,'pick');   // collecting dirty plates comes first
     const dd=(S.dirtyDrops||[]).map(d=>[d.tx,d.ty]);if(dd.length)return bTo(p,dd,'pick');
+    const sk=bCells(c=>c.t==='sink'&&(c.dirty||0)>0);if(sk.length)return bTo(p,sk,'hold');
     return null}
   if(job==='菜園'){
     const grow=c=>c.t==='planter'&&c.plant&&!c.plant.watered&&c.plant.t<ING[c.plant.id].grow;
@@ -1283,27 +1289,28 @@ function botTask(i,p){
     return null}
   if(job==='提供'){
     if(h&&h.kind==='plate'&&!h.bare&&h.items.length){
-      const r=matchRecipe(h.items);if(!r)return null;
-      const cs=S.cust.filter(c=>(c.st==='seat'&&pendingOrders(c).includes(r))||(c.st==='wait'&&c.type==='takeout'&&c.order===r));
+      const r=matchRecipe(h.items);
+      const cs=r?S.cust.filter(c=>(c.st==='seat'&&pendingOrders(c).includes(r))||(c.st==='wait'&&c.type==='takeout'&&c.order===r)):[];
       cs.sort((a,b)=>a.pat/a.max-b.pat/b.max);
-      for(const c of cs){const [x,y]=custPos(c);const tx=Math.floor(x),ty=Math.floor(y),tc=tile(tx,ty),t=bTo(p,[[tx,ty]],tc&&tc.t==='table'&&tc.item&&tc.item.kind==='dirty'?'wait':'pick');if(t)return t}   // a dirty plate still on the table: wait there
+      for(const c of cs){const [x,y]=custPos(c);const tx=Math.floor(x),ty=Math.floor(y),tc=tile(tx,ty),t=bTo(p,[[tx,ty]],tc&&tc.t==='table'&&tc.item&&tc.item.kind==='dirty'?'wait':'pick');if(t){b.stuck=0;return t}}   // a dirty plate still on the table: wait there
+      // a plate nobody wants: after 3 s it is set down on the nearest empty counter
+      if(!b.stuck)b.stuck=S.t||0.001;
+      if((S.t||0)-b.stuck>=3)return bTo(p,bCells(c=>c.t==='counter'&&!c.item&&!c.top),'pick');
       return null}
+    b.stuck=0;
     if(h&&h.kind==='dirty')return bTo(p,bCells(c=>c.t==='sink'),'pick');   // the plate that comes back from a takeout goes to the sink
     if(h)return null;
     const want=new Set(S.cust.filter(c=>c.st==='seat'||(c.st==='wait'&&c.type==='takeout')).flatMap(c=>c.st==='seat'?pendingOrders(c):[c.order]));
-    return bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!c.item.bare&&c.item.items.length&&want.has(matchRecipe(c.item.items))),'pick')}
+    return bTo(p,bCells(c=>(c.t==='counter'||c.t==='board')&&c.item&&c.item.kind==='plate'&&!c.item.bare&&c.item.items.length&&want.has(matchRecipe(c.item.items))),'pick')}
   if(job==='カット'){
     if(h&&h.kind==='ing'){
-      if(bNeedChop(h))return bTo(p,bCells(c=>c.t==='board'&&!c.item),'pick');
-      const pan=bCells(c=>c.t==='stove'&&c.cw&&!c.item);   // food that needs cooking next goes straight into an empty pan / pot
-      if(ING[h.id].steps[h.step]==='cook'&&pan.length)return bTo(p,pan,'pick');
-      if(plateOk(h)){const pl=bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!matchRecipe(c.item.items||[])&&(bNeedKeys(c.item.items)||[]).includes(bKey(h))),'pick');if(pl)return pl}   // onto a plate it fits
-      return null}
+      if(bNeedChop(h))return bTo(p,bCells(c=>c.t==='board'&&!c.item),'pick');   // raw food only ever goes on a cutting board
+      const d=bCutDest(h);return d?bTo(p,d,'pick'):null}
     if(h)return null;
-    const bd=bCells(c=>c.t==='board'&&bNeedChop(c.item));if(bd.length)return bTo(p,bd,'hold');
-    const done=bCells(c=>c.t==='board'&&c.item&&c.item.kind==='ing'&&!bNeedChop(c.item));if(done.length)return bTo(p,done,'pick');
+    const bd=bCells(c=>c.t==='board'&&c.pro!==2&&bNeedChop(c.item));if(bd.length)return bTo(p,bd,'hold');   // an auto-cut board (pro 2) is only loaded: it cuts by itself
+    const done=bCells(c=>c.t==='board'&&c.item&&c.item.kind==='ing'&&!bNeedChop(c.item)&&!!bCutDest(c.item));if(done.length)return bTo(p,done,'pick');   // only picked up when it has somewhere to go
     if(bCutWaiting()>=1)return null;                                    // only one cut item waits at a time
-    if(!bCells(c=>c.t==='counter'&&!c.item&&!c.top).length&&!bCells(c=>c.t==='stove'&&c.cw&&!c.item).length)return null;   // nowhere to put it
+    if(!bCells(c=>c.t==='board'&&!c.item).length)return null;           // no free cutting board
     const want=stockList().find(k=>(S.stock[k]||0)>0&&townNeedList().includes(k)&&ING[k].steps[0]==='chop');
     if(want){const f=bTo(p,bCells(c=>c.t==='fridge'),'pick');if(f){f.want=want;return f}}
     return null}

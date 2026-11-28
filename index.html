@@ -2604,24 +2604,26 @@ const evFree=(x,y,w,h)=>{
     if((S.dirtyDrops||[]).some(d=>d.tx===x+i&&d.ty===y+j))return false;
     if(S.players.some(q=>q.x>x+i-0.6&&q.x<x+i+1.6&&q.y>y+j-0.6&&q.y<y+j+1.6))return false}
   return true};
+// an obstacle never goes on or next to the table where the boss sits (the way to the table stays open)
+const evNearBoss=(x,y,w,h)=>{const b=S.cust.find(c=>c.type==='boss'&&(c.st==='seat'||c.st==='eat'));return !!b&&b.tx>=x-1&&b.tx<=x+w&&b.ty>=y-1&&b.ty<=y+h};
 function evtPlan(k){
   const np=S.np||1,obs=[];
   if(k==='tree'){const x=DOOR_FRONT[0],y=7,need=Math.max(20,25*np);obs.push({x,y,w:1,h:1,hp:need,max:need});return {obs}}
   if(k==='carrot'){const n=Math.max(2,Math.min(8,np+1)),cand=[];
-    for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&evFree(x,y,1,1))cand.push([x,y]);
+    for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&!evNearBoss(x,y,1,1)&&evFree(x,y,1,1))cand.push([x,y]);
     cand.sort(()=>Math.random()-0.5);
     for(const [x,y] of cand){if(obs.length>=n)break;if(obs.some(o=>Math.abs(o.x-x)+Math.abs(o.y-y)<3))continue;obs.push({x,y,w:1,h:1,hp:1.6,max:1.6})}
     return obs.length?{obs}:null}
   if(k==='cake'||k==='spring'||k==='snow'){const cand=[];
-    for(let y=7;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&!(y===7&&x<=DOOR_FRONT[0]&&x+1>=DOOR_FRONT[0])&&evFree(x,y,2,2))cand.push([x,y]);
+    for(let y=7;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&!(y===7&&x<=DOOR_FRONT[0]&&x+1>=DOOR_FRONT[0])&&!evNearBoss(x,y,2,2)&&evFree(x,y,2,2))cand.push([x,y]);
     if(!cand.length)return null;const [x,y]=cand[rnd(cand.length)];
     obs.push({x,y,w:2,h:2,hp:1,max:1,k:k==='snow'?'fire':undefined});return {obs,need:k==='cake'?Math.max(1,Math.min(8,np)):0}}
   if(k==='train'||k==='wave')return {obs:[]};
   if(k==='mountain'){
     const bs=S.cust.find(c=>c.type==='boss');if(!bs)return null;
     const left=bs.orders.filter((o,i)=>!bs.got[i]&&RECIPES[o].ings.some(x=>rid(x)==='mushroom'));if(!left.length)return null;
-    const cand=[];for(let y=8;y<=10;y++)if(evFree(0,y,2,2))cand.push(y);if(!cand.length)return null;
-    const need=Math.max(15,15*np);return {obs:[{x:0,y:cand[rnd(cand.length)],w:2,h:2,hp:need,max:need}],goldRid:left[rnd(left.length)]}}
+    const cand=[];for(let y=7;y<=10;y++)for(let x=1;x+1<=17;x++)if(!(y+1>=QY&&x+1>=QX-1)&&!(y===7&&x<=DOOR_FRONT[0]&&x+1>=DOOR_FRONT[0])&&!evNearBoss(x,y,2,2)&&evFree(x,y,2,2))cand.push([x,y]);if(!cand.length)return null;
+    const need=Math.max(15,15*np);const [mx,my]=cand[rnd(cand.length)];return {obs:[{x:mx,y:my,w:2,h:2,hp:need,max:need}],goldRid:left[rnd(left.length)]}}
   if(k==='cow'){const bx=GOBJ.barn.x;return {obs:[{x:bx,y:GROW,w:1,h:1,hp:1,max:1}],n:Math.max(2,Math.min(8,np+1))}}
   return null}
 function evtEnd(E,msg){evtClearClimb();E.st='idle';E.obs=[];E.by=[];E.next=evRand(EVT_GAP);if(msg){S.toast={text:msg,t:0,life:2.5}}}
@@ -2650,7 +2652,7 @@ function evtUpdate(dt){
       for(const o of E.obs)if(o.k==='ice'){o.hp-=dt*melt;if(o.sh>0)o.sh=Math.max(0,o.sh-dt)}
       E.obs=E.obs.filter(o=>o.k==='fire'||o.hp>0);
       E.ice-=dt;if(E.ice<=0){E.ice=4+10*E.fire;
-        if(E.fire<0.8&&E.obs.filter(o=>o.k==='ice').length<8){const cand=[];for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&evFree(x,y,1,1))cand.push([x,y]);
+        if(E.fire<0.8&&E.obs.filter(o=>o.k==='ice').length<8){const cand=[];for(let y=8;y<=12;y++)for(let x=1;x<=17;x++)if(!(y===QY&&x>=QX-1)&&!evNearBoss(x,y,1,1)&&evFree(x,y,1,1))cand.push([x,y]);
           if(cand.length){const [x,y]=cand[rnd(cand.length)];E.obs.push({x,y,w:1,h:1,hp:8,max:8,k:'ice'})}}}
       if(E.dur<=0){evtEnd(E,'❄️ 吹雪がやんだ！');sfx('ready')}}
     else if(k==='mountain'){if(E.gdone){evtEnd(E,'⛰️ 黄金キノコの料理が出せた！');sfx('ready')}}
@@ -2679,7 +2681,12 @@ function cowMove(w,dt){
   if(solid(Math.floor(nx),Math.floor(ny))){w.dx=-w.dx;w.dy=-w.dy;w.t=0.3;return}
   w.x=nx;w.y=ny;
 }
-function evtGoldSpawn(o){const fx=o.x+o.w;for(let y=o.y;y<o.y+o.h;y++){const c=tile(fx,y);if(c&&c.t==='ground'&&!c.item){c.item={kind:'ing',id:'gmushroom',step:0,burnt:false};sfx('mystery');float(fx+.5,o.y,'🍄 黄金キノコ！','#ffe08a');return true}}return false}
+function evtGoldSpawn(o){   // the golden mushroom appears on a free tile around the mountain (the right side first)
+  const ring=[];for(let y=o.y;y<o.y+o.h;y++)ring.push([o.x+o.w,y]);
+  for(let y=o.y;y<o.y+o.h;y++)ring.push([o.x-1,y]);
+  for(let x=o.x;x<o.x+o.w;x++){ring.push([x,o.y+o.h]);ring.push([x,o.y-1])}
+  for(const [x,y] of ring){const c=tile(x,y);if(c&&c.t==='ground'&&!c.item&&y>=7&&y<GH-1&&!S.players.some(q=>Math.floor(q.x)===x&&Math.floor(q.y)===y)){c.item={kind:'ing',id:'gmushroom',step:0,burnt:false};sfx('mystery');float(x+.5,y,'🍄 黄金キノコ！','#ffe08a');return true}}
+  return false}
 const CLIMB_SETS=3, CLIMB_LEN=4;
 const climbSeq=()=>Array.from({length:CLIMB_LEN},()=>rnd(4));
 function climbInput(p,inp){

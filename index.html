@@ -596,7 +596,7 @@ const EQUIP={
 };
 const GEAR_RANGE=3, SPRK_T=10, DRINK_T=15, DRINK_CD=20;   // sprinkler: reach (tiles) and seconds per water; drink server: the buff and the shared recharge
 const PRO_MUL={board:0.6,stove:0.6,blender:0.5,juicer:0.5,sink:0.4};
-const DAY_LAYOUT_TIME=30, UP_TIME=40, EQ_TIME=50, PUP_TIME=30; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
+const DAY_LAYOUT_TIME=60, UP_TIME=40, EQ_TIME=50, PUP_TIME=30; // seconds to pick an upgrade / shop; nothing is chosen when time runs out
 function equipOffer(id,priceMul,proChance){
   const L=proList(id),pro=L.length&&Math.random()<proChance?1+rnd(L.length):0;
   return {type:'equip',id,pro,qty:1,price:Math.round(EQUIP[id].price*priceMul*(pro?1.8:1))};
@@ -821,7 +821,7 @@ function rebuildStations(){
 }
 // ---------- layout phase: kitchen equipment starts outside and is placed onto the truck's counters ----------
 const MOVABLE=['fridge','seedbox','sink','board','stove','blender','juicer','trash','lucky','vault','sprinkler','drinks'];
-const LAYOUT_TIME=90;
+const LAYOUT_TIME=150;   // the first layout (the bonus time carried into service is still capped at the old 90 s; a day layout at 30 s)
 const inTruck=(x,y)=>x>=2&&x<=IX1&&y>=2&&y<=6;
 // door, windows and the serving hatch are fixed. Counters, planters and cooking equipment all stand on the floor;
 // only tools (watering can, basket) and food go on top of a counter.
@@ -893,7 +893,7 @@ function setupLayout(){
   toolsOnCounters(objs);
   putOutside(objs);
   rebuildStations();
-  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layLock=1;   // ignore 持つ/作業 for 1 s so the last long press does not carry over
+  S.phase='layout';S.view='layout';S.timer=LAYOUT_TIME;S.layMax=90;S.layLock=1;   // ignore 持つ/作業 for 1 s so the last long press does not carry over
   hideOv();
 }
 const REQUIRED=['sink','planter','can','seedbox','fridge','board','stove','blender','juicer','trash','basket','pan','pot','bowl'];
@@ -921,7 +921,7 @@ function finishLayout(){
   const left=layoutLeft();
   stashOutside();
   if(left)S.toast={text:'外に置いた'+left+'個は置いていきます（次の配置でまた出てきます）',t:0,life:3};
-  S.bonus=Math.max(0,Math.ceil(S.timer));
+  S.bonus=Math.max(0,Math.min(S.layMax||90,Math.ceil(S.timer)));   // time left becomes extra service time (capped)
   bringInside();
   if(MODE==='quick'&&!S.tut){if(S.qDay)arrive();else{S.qDay=false;openPersonal()};sfx('ready')}   // quick: the first layout → shopping; the day layout → straight to the town (no driving)
   else if(S.stop===0&&!S.tut){showChoose();sfx('ready')}   // first layout of the run → pick the first town
@@ -976,7 +976,7 @@ function startDayLayout(){
   S.stored=[];S.pendingEquip=[];S.supply=[];S.eqOffers=null;S.eqBought=null;S.eqBuys=0;S.eqRerolled=false;S.extraOffer=false;
   toolsOnCounters(objs);
   putOutside(objs);
-  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;S.layLock=1;
+  S.phase='layout';S.view='layout';S.timer=DAY_LAYOUT_TIME;S.layMax=30;S.layLock=1;
   hideOv();
 }
 function layoutLeft(){

@@ -1393,7 +1393,7 @@ function botInput(i){
 const BOT_CALL_DIST=0.65, BOT_CALL_HOLD=0.45;   // the chef must overlap the bot and hold 持つ / 作業 for a moment
 const pickHeldNow=()=>KB.some(k=>k.pick.some(c=>held.has(c)))||!!(pads[0]&&pads[0].now.a);
 function botCallOpen(p,inp,dt){   // true when the chef has held 持つ / 作業 long enough on top of a bot
-  const ok=!S.botMenu&&(S.phase==='stop'||S.phase==='drive')&&!p.menu&&!p.mk&&!p.g&&!p.seat&&!p.bn&&!p.cl&&(inp.act||pickHeldNow());
+  const ok=!S.botMenu&&(S.phase==='stop'||S.phase==='drive'||(S.phase==='layout'&&!p.hold))&&!p.menu&&!p.mk&&!p.g&&!p.seat&&!p.bn&&!p.cl&&(inp.act||pickHeldNow());
   let best=-1,bd=BOT_CALL_DIST;
   if(ok)S.players.forEach((q,i)=>{if(i===0||!S.bots||!S.bots.includes(i))return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best=i}});
   if(best<0){S.botHold=null;return false}

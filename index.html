@@ -2813,7 +2813,7 @@ function drawEvt(){
   }
   if(E.k==='cow'&&E.st==='on')for(const w of E.cows){softShadow(w.x*T,w.y*T+T*0.35,T*0.4,6,.3);emoji('🐄',w.x*T,w.y*T,T*1.0)}
   if(E.k==='mountain')S.players.forEach((q,i)=>{
-    const c=S.guest?(E.cl&&E.cl.find(r=>r.i===i)):q.cl;if(!c)return;const seq=S.guest?c.seq:c.seq,cur=S.guest?c.k:c.i,set=c.set;
+    const c=S.guest?(E.cl&&E.cl.find(r=>r.i===i)):q.cl;if(!c||isBotP(q))return;const seq=S.guest?c.seq:c.seq,cur=S.guest?c.k:c.i,set=c.set;
     const w=170,h=62,x=q.x*T-w/2,y=(q.y-2.2)*T;
     ctx.fillStyle='rgba(16,26,30,.9)';rr(x,y,w,h,10);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=2;ctx.stroke();
     text('⛰️ この順に入力（'+set+'/'+CLIMB_SETS+'セット）',x+w/2,y+12,10,'#fff',800);
@@ -6086,10 +6086,11 @@ function drawCustBoard(y0,h){
   for(let i=0;i<QMAX;i++){const c=wait[i]||null;card(xq+i*(cw+gap),c,!!(c&&c.type==='takeout'),false)}
   for(const [lx,lab] of [[13,'テーブル席'],[xq-12,'待ち列']]){const ch=[...lab],lh=12,top0=y0+h/2-(ch.length-1)*lh/2;ch.forEach((c2,i)=>text(c2==='ー'?'｜':c2,lx,top0+i*lh,11,'#cfe0e2',800))   /* vertical writing: the long-vowel mark stands upright */}
 }
+const isBotP=p=>!!S.bots&&S.bots.includes(p.i);   // the windows of a test bot stay hidden (they covered the screen)
 function drawMenus(){
-  for(const p of S.players)if(p.g&&isMine(p))drawGather(p);
+  for(const p of S.players)if(p.g&&isMine(p)&&!isBotP(p))drawGather(p);
   for(const p of S.players){
-    if(!p.menu||!isMine(p))continue;
+    if(!p.menu||!isMine(p)||isBotP(p))continue;
     const M=MENU[p.menu.kind],list=M.list(p),cols=Math.max(1,Math.min(M.cols,list.length)),rows=Math.ceil(list.length/cols),cw=44;
     if(!list.length)continue;
     const w=cols*cw+16,h=rows*cw+40;

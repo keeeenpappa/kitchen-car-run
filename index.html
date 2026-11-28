@@ -3285,7 +3285,7 @@ function showTitle(){
     <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><button class="ovbtn" data-act="tchar">${(()=>{const k=SKILLS[PSKILL[0]]?PSKILL[0]:'knife',an=SKILL_ANIMAL[k],src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_icon']:null;return (src?`<img src="${src}" alt="" style="width:26px;height:26px;vertical-align:middle"> `:SKILLS[k].e+' ')+SKILLS[k].n})()}（変える）</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn" data-act="tcyc" data-v="mode">${MODE==='tour'?'グランドツアー（全'+Object.keys(TOWNS).length+'町）':MODE==='quick'?'クイック（1町だけ）':'カジュアル（4町）'}</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn" data-act="tcyc" data-v="kit">${TSET.kit==='layout'?'自分で並べる':'初期配置済み'}</button>
-      <button class="ovbtn" data-act="tcyc" data-v="bot">bot人数：${TSET.bot+'人'}</button>
+      <label class="ovbtn" style="display:inline-flex;gap:.5em;align-items:center">bot人数<select onchange="TSET.bot=+this.value;showTitle()" style="font:inherit;padding:.1em .3em">${[0,1,2,3,4,5,6,7].map(n=>`<option value="${n}"${n===TSET.bot?' selected':''}>${n}人</option>`).join('')}</select></label>
       <button class="ovbtn" data-act="tstart" style="min-width:150px">はじめる</button></div>
     <div class="row"><button class="ovbtn" data-act="ghelp" style="width:180px">遊び方・設定</button><button class="ovbtn" data-act="gacha">🎫 ガチャ・スキン（チケット ${SV.t}枚）</button>${/[?&]lang=1/.test(location.search)?`<button class="ovbtn" data-act="lang">🌐 ${langName()}</button>`:''}</div>
     <div class="row"><button class="ovbtn" data-act="tut">📘 チュートリアル（1人・約5分）</button></div>

@@ -2946,7 +2946,7 @@ function showUpgrade(){
   const owned=UPS.filter(u=>S.upCount[u.id]).map(u=>`${u.e}${u.n}${S.upCount[u.id]>1?'×'+S.upCount[u.id]:''}`).join('　');
   const cards=S.offers.map((u,i)=>`<button class="ovbtn town hold" data-act="up" data-v="${i}">
       ${u.bonus?'<span class="badges"><span class="rarebadge bonusbadge">🎯 ミッションボーナス</span></span>':''}
-      <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}</span>
+      <span class="tn">${upIcHtml(u)} ${u.n}</span><span class="menu">${u.d}${u.id==='heart'?`<br><b style="color:#ff8a8a">今の評判：${'♥'.repeat(Math.max(0,S.hearts))}${'♡'.repeat(Math.max(0,HEART_MAX-S.hearts))}（${S.hearts}/${HEART_MAX}）</b>`:''}</span>
       <span class="needs">${u.tgt?`<span class="pay">↑ ブロックが配置のときに外に出ます。${TGTN[u.tgt]}に重ねて使う</span>`:''}<span class="sub">${S.upCount[u.id]?'もらった数 '+S.upCount[u.id]+' / '+u.max:'新しい強化'}</span></span></button>`).join('');
   showOv(`<div class="box big"><h2>強化を1つ選ぶ</h2><p class="ovtp">残り <span class="ovtime${Math.ceil(S.ovT||0)<=10?' low':''}">${Math.max(0,Math.ceil(S.ovT||0))}</span> 秒 <span class="mut">（時間切れは選ばずに次へ）</span></p>
     <p>無料で1つもらえます。${isTouch?'カードを長押しで決定。':`←→で選んで <b>${OVK()}</b> で決定。`}</p>${moneyBig()}

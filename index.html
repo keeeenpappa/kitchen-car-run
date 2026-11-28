@@ -523,7 +523,7 @@ const RECIPES={
 };
 // sell price (pay) and crowd (rate) are rolled each time a town is offered: see showChoose
 const EXTRA_FROM=2;   // casual: from the 3rd town of the trip, each town's menu has its extra dish too
-const extraFrom=()=>MODE==='tour'?4:EXTRA_FROM;   // grand tour (8 towns): from the 5th town
+const extraFrom=()=>MODE==='tour'?4:MODE==='quick'?0:EXTRA_FROM;   // quick: the 4th dish from the start   // grand tour (8 towns): from the 5th town
 const townMenuOn=(k,withExtra)=>withExtra&&TOWNS[k].extra?TOWNS[k].menu.concat([TOWNS[k].extra]):TOWNS[k].menu.slice();
 const TOWNS={
   port:{n:'港町',e:'⚓',menu:['fishset','soup','paella'],extra:'kaisendon',ground:'#cdb886',deco:'#4f97b8'},
@@ -6881,7 +6881,7 @@ function applySnap(d){
   S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;
   S.waitN=Math.max(0,Math.min(ROOM_CAP-1,n(d.wt)));if(Array.isArray(d.cb)){const nc=n(d.cb[0]);if(nc>(S.combo||0))S.comboPop=0;else if(!nc&&S.combo)S.comboBreak=0;S.combo=nc;S.comboT=n(d.cb[1])/10;S.comboMax=n(d.cb[2])/10}S.spawnT=n(d.ns)/10;S.selT=n(d.sc)>0?n(d.sc)/10:0;S.selHold=n(d.sh2)/100;
   S.fuel=n(d.fu)/10;S.speed=n(d.sp)===2?2:1;S.dist=n(d.di)/10;S.route=n(d.rt)/10||1;
-  const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>2)}):null;
+  const town=a=>Array.isArray(a)&&Object.hasOwn(TOWNS,a[0])?Object.assign({},TOWNS[a[0]],{id:a[0],pay:n(a[1])/100,menu:townMenuOn(a[0],n(a[2])>3)}):null;   // (a base menu is 3 dishes; a 4th means the extra is on)
   S.town=town(d.tw);S.next=town(d.nx);
   const u=Array.isArray(d.up)?d.up:[];
   S.up={cook:n(u[0])||1,chop:n(u[1])||1,blend:n(u[2])||1,burn:n(u[3]),gatherSpd:n(u[4])||1,canCap:n(u[5])||3,basketCap:n(u[6])||4,pay:n(u[7])||1,tip:n(u[8])||1};

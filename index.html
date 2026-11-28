@@ -1229,7 +1229,12 @@ function bPath(p,goals){
 // walk to a tile next to (tx,ty) and face it; true once the chef stands there facing it
 function bGo(p,b,out,tx,ty){
   const px=Math.floor(p.x),py=Math.floor(p.y);
-  if(Math.abs(px-tx)+Math.abs(py-ty)===1){out.mx=tx-px;out.my=ty-py;return true}
+  if(Math.abs(px-tx)+Math.abs(py-ty)===1){
+    // next to the target: first stand on the middle of this tile across the facing direction, otherwise the corner sliding
+    // of the walls pushes the chef sideways into a free lane (a sink beside the door: the bot jerks back and forth)
+    const cx=px+.5,cy=py+.5,off=tx!==px?p.y-cy:p.x-cx;
+    if(Math.abs(off)>0.12){const k=Math.max(-1,Math.min(1,-off*4));if(tx!==px)out.my=k;else out.mx=k;return false}
+    out.mx=tx-px;out.my=ty-py;return true}
   const path=bPath(p,bNear(tx,ty));
   if(!path||!path.length)return false;
   const [nx,ny]=path[0];let mx=(nx+.5-p.x)*3,my=(ny+.5-p.y)*3;const m=Math.hypot(mx,my);

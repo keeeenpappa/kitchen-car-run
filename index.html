@@ -1421,7 +1421,7 @@ function botMenuStep(p,inp){   // inp = the chef's real keys   // while the list
   if(key!=='0,0'&&key!==M.last){if(dy)M.sel=(M.sel+dy+n)%n;else if(dx)M.sel=(M.sel+dx+n)%n}
   M.last=key;
   if(inp.pick){botSetJob(M.i,BOT_ORDERS[M.sel]);S.botMenu=null;sfx('pick');S.toast={text:'🤖 bot'+M.i+'：'+BOT_ORDERS[M.sel],t:0,life:1.6}}
-  else if(inp.bk||(inp.act&&!p.prevAct))S.botMenu=null;
+  else if(inp.bk||(inp.act&&!p.bPrevAct))S.botMenu=null;
   return NOINP}
 function drawBotUI(){
   if(!S||!S.bots||!S.bots.length)return;
@@ -3507,7 +3507,7 @@ function update(dt){
     let inp=(S.phase==='stop'&&S.sub==='closing')?NOINP:readInput(i);   // closing time: everyone stands still
     if(S.phase==='layout'&&(S.layLock||0)>0)inp={...inp,act:false};   // layout: 作業 ignored (持つ still works, so the bot menu can open) for 3 s after the last screen (movement still works)
     if((p.frz||0)>0){p.frz-=dt;inp=NOINP}
-    if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw,dt))inp=NOINP;p.prevAct=raw.act}
+    if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw,dt))inp=NOINP;p.bPrevAct=raw.act}
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);

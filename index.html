@@ -1219,7 +1219,7 @@ function botTask(i,p){
   if(job==='待機')return null;
   if(job==='採取'){
     if(h&&h.kind==='basket'){
-      if(h.items.length)return bTo(p,bCells(c=>c.t==='fridge'),'pick');       // 持つ at the fridge stores what was gathered
+      if(h.items.length>=basketCap(h)+pupN(p,'hand'))return bTo(p,bCells(c=>c.t==='fridge'),'pick');       // gather until the basket is full, then 持つ at the fridge stores it
       const k=bGatherSpot(i);return {tx:GOBJ[k].x,ty:GROW,mode:'pick'}}      // a gathering spot for what the town needs
     if(!h){
       if(S.evt&&S.evt.k==='mountain'&&S.evt.st==='on'&&S.evt.obs[0]&&!evtGoldExists())return {tx:S.evt.obs[0].x,ty:S.evt.obs[0].y,mode:'pick'};
@@ -1282,6 +1282,7 @@ function botTask(i,p){
       cs.sort((a,b)=>a.pat/a.max-b.pat/b.max);
       for(const c of cs){const [x,y]=custPos(c);const tx=Math.floor(x),ty=Math.floor(y),tc=tile(tx,ty),t=bTo(p,[[tx,ty]],tc&&tc.t==='table'&&tc.item&&tc.item.kind==='dirty'?'wait':'pick');if(t)return t}   // a dirty plate still on the table: wait there
       return null}
+    if(h&&h.kind==='dirty')return bTo(p,bCells(c=>c.t==='sink'),'pick');   // the plate that comes back from a takeout goes to the sink
     if(h)return null;
     const want=new Set(S.cust.filter(c=>c.st==='seat'||(c.st==='wait'&&c.type==='takeout')).flatMap(c=>c.st==='seat'?pendingOrders(c):[c.order]));
     return bTo(p,bCells(c=>c.t==='counter'&&c.item&&c.item.kind==='plate'&&!c.item.bare&&c.item.items.length&&want.has(matchRecipe(c.item.items))),'pick')}

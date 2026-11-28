@@ -916,6 +916,7 @@ function layoutCatalog(np){
 function lyCount(g){return TSET.items&&TSET.items[g.key]!=null?Math.max(0,Math.min(g.max,TSET.items[g.key])):(g.def!=null?g.def:g.max)}
 function lyMissing(cat){const have=new Set();for(const g of cat)if(lyCount(g)>0)g.prov.forEach(x=>have.add(x));return REQUIRED.filter(id=>!have.has(id))}
 function showItemPicker(sel){
+  const b0=ov.querySelector('.box'),sc0=[ov.scrollTop,b0?b0.scrollTop:0];   // keep the scroll position when the list is redrawn
   const cat=layoutCatalog(1+TSET.bot),miss=lyMissing(cat);
   const rows=cat.map((g,i)=>{const n=lyCount(g),red=n===0&&[...g.prov].some(x=>miss.includes(x));
     return `<div class="row" style="align-items:center;gap:.4em;${red?'color:#ff6b6b;font-weight:800':''}"><span style="min-width:11em;text-align:left">${g.name}${red?'（必須）':''}</span>
@@ -926,6 +927,7 @@ function showItemPicker(sel){
     ${rows}
     <div class="row"><button class="ovbtn" data-act="dall">全部出す</button><button class="ovbtn" data-act="dnone">すべて0</button><button class="ovbtn" data-act="dback">戻る</button></div></div>`);
   if(sel!=null){ovSel=Math.max(0,sel);markSel()}
+  ov.scrollTop=sc0[0];const b1=ov.querySelector('.box');if(b1)b1.scrollTop=sc0[1];
 }
 function setupLayout(){
   let objs=layoutObjs(S.map,S.np,true);

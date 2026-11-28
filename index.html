@@ -7350,7 +7350,18 @@ function auFrame(dt){
 
 // ---------- loop ----------
 let last=performance.now();
-function frame(now){
+// an error inside one frame must not stop the whole game: it is shown in a small red bar and the loop goes on
+let ERRN=0,ERRLAST='';
+function reportErr(e,where){
+  ERRN++;const msg=(where||'frame')+': '+String(e&&e.message||e)+' @ '+String((e&&e.stack||'').split(String.fromCharCode(10))[1]||'').trim().slice(-90);
+  if(msg===ERRLAST&&ERRN>1){const b=document.getElementById('errBar');if(b)b.firstChild.nodeValue='⚠ '+msg+'（'+ERRN+'回）';return}
+  ERRLAST=msg;try{console.error(e)}catch(_){}
+  let b=document.getElementById('errBar');
+  if(!b){b=document.createElement('div');b.id='errBar';b.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99;background:rgba(160,20,20,.94);color:#fff;font:12px/1.4 sans-serif;padding:6px 10px;border-radius:8px;word-break:break-all';b.appendChild(document.createTextNode(''));const x=document.createElement('button');x.textContent='×';x.style.cssText='float:right;margin-left:8px;font-size:14px';x.onclick=()=>b.remove();b.appendChild(x);document.body.appendChild(b)}
+  b.firstChild.nodeValue='⚠ '+msg+'（'+ERRN+'回）';
+}
+function frame(now){try{frame0(now)}catch(e){reportErr(e);try{pressed.clear();touch.pick=false;touch.sw=false;touch.sk=false;touch.pause=false}catch(_){}}requestAnimationFrame(frame)}
+function frame0(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   pollPads();
   if(LSEL&&!S)lobbySelUpdate(dt);
@@ -7376,7 +7387,6 @@ function frame(now){
   draw();
   hudT-=dt;if(hudT<=0){renderHud();hudT=0.1}
   pressed.clear();touch.pick=false;touch.sw=false;touch.sk=false;touch.pause=false;
-  requestAnimationFrame(frame);
 }
 showTitle();
 requestAnimationFrame(frame);

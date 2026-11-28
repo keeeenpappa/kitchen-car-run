@@ -1149,7 +1149,7 @@ if(isTouch)document.body.classList.add('touch');
     const off=()=>{b.classList.remove('on');if(up)up()};
     b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);
     b.addEventListener('contextmenu',e=>e.preventDefault())};
-  btn('bPick',()=>touch.pick=true);
+  btn('bPick',()=>{touch.pick=true;touch.pickH=true},()=>touch.pickH=false);
   btn('bAct',()=>touch.act=true,()=>touch.act=false);
   btn('bSw',()=>{touch.sw=true;touch.swH=true},()=>touch.swH=false);
   btn('bSkill',()=>touch.sk=true);
@@ -1405,7 +1405,7 @@ function botInput(i){
   return out}
 // ----- the chef's command list for a bot: press 持つ / 作業 next to a bot, move with the cross, 持つ chooses -----
 const BOT_CALL_DIST=0.65, BOT_CALL_HOLD=0.45;   // the chef must overlap the bot and hold 持つ / 作業 for a moment
-const pickHeldNow=()=>KB.some(k=>k.pick.some(c=>held.has(c)))||!!(pads[0]&&pads[0].now.a);
+const pickHeldNow=()=>KB.some(k=>k.pick.some(c=>held.has(c)))||!!(pads[0]&&pads[0].now.a)||!!touch.pickH;
 function botCallOpen(p,inp,dt){   // true when the chef has held 持つ / 作業 long enough on top of a bot
   const ok=!S.botMenu&&(S.phase==='stop'||S.phase==='drive'||(S.phase==='layout'&&!p.hold))&&!p.menu&&!p.mk&&!p.g&&!p.seat&&!p.bn&&!p.cl&&(inp.act||pickHeldNow());
   let best=-1,bd=BOT_CALL_DIST;
@@ -1432,7 +1432,8 @@ function drawBotUI(){
   if(S.botHold&&!S.botMenu){const q=S.players[S.botHold.i];if(q)bar(q.x*T-18,q.y*T-34,36,S.botHold.t/BOT_CALL_HOLD,'#ffd84a')}
   const M=S.botMenu;if(!M)return;
   const q=S.players[M.i];if(!q)return;
-  const w=130,rh=20,h=BOT_ORDERS.length*rh+24,x=q.x*T-w/2,y=q.y*T-h-30;
+  const w=130,rh=20,h=BOT_ORDERS.length*rh+24,top=camZoom()!==1?CAM.y*T:0;let x=q.x*T-w/2,y=q.y*T-h-30;if(y<top+4)y=q.y*T+34;   // near the top of the screen the list opens below the bot
+  x=Math.max(4,Math.min(GW*T-w-4,x));
   ctx.fillStyle='rgba(16,26,30,.92)';rr(x,y,w,h,10);ctx.fill();ctx.strokeStyle='#ffd84a';ctx.lineWidth=2;ctx.stroke();
   text('指示：bot'+M.i,x+w/2,y+11,11,'#ffd84a',800);
   BOT_ORDERS.forEach((n,k)=>{const yy=y+24+k*rh;if(k===M.sel){ctx.fillStyle='rgba(255,216,74,.25)';rr(x+5,yy,w-10,rh-2,6);ctx.fill()}
@@ -3505,7 +3506,7 @@ function update(dt){
   S.players.forEach((p,i)=>{
     NET.quietFx=NET.role==='host'&&i>0;
     let inp=(S.phase==='stop'&&S.sub==='closing')?NOINP:readInput(i);   // closing time: everyone stands still
-    if(S.phase==='layout'&&(S.layLock||0)>0)inp={...inp,act:false};   // layout: 作業 ignored (持つ still works, so the bot menu can open) for 3 s after the last screen (movement still works)
+    if(S.phase==='layout'){if((S.layLock||0)>0)p.actWait=true;if(p.actWait){if(inp.act)inp={...inp,act:false};else if(!((S.layLock||0)>0))p.actWait=false}}   // a button held over from the last screen stays ignored until it is let go   // layout: 作業 ignored (持つ still works, so the bot menu can open) for 3 s after the last screen (movement still works)
     if((p.frz||0)>0){p.frz-=dt;inp=NOINP}
     if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw,dt))inp=NOINP;p.bPrevAct=raw.act}
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});

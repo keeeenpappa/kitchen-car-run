@@ -328,7 +328,8 @@ const ARRIVE_T=2.6; // seconds of the arrival scene (nothing runs meanwhile)
 const DRIVE=65, PREP=15, SERVICE=150, SPEED=0.45, STOPS=4, WMARGIN=1.2;
 // game modes: カジュアル (a trip of STOPS towns) and グランドツアー (every town once, then the trip ends)
 let MODE='casual';
-const stopsN=()=>MODE==='tour'?Object.keys(TOWNS).length:STOPS;
+const QUICK_MONEY=150;   // the quick mode (one town) starts with more money: shopping comes before the layout
+const stopsN=()=>MODE==='tour'?Object.keys(TOWNS).length:MODE==='quick'?1:STOPS;
 const MAXP=8;   // most players in one room (more than 4 only online)
 let ROOM_CAP=MAXP;   // this room's player limit (4 / 6 / 8, chosen by the host when the room is made)
 const PCOL=['#ff6f61','#4aa8ff','#53c776','#b48cff','#ffb13b','#2fd0c8','#ff8ad1','#c3d84a'];
@@ -743,6 +744,7 @@ function newRun(np,mode,test,botList){
     up:{cook:1,chop:1,blend:1,burn:0,pat:1,tip:1,pay:1,grow:1,yieldPlus:0,shopExtra:0,shopDisc:1,speed:1,gatherSpd:1,gatherPlus:0,drive:0,canCap:3,basketCap:4},
     upCount:{},offers:[],rerollCost:8,perfect:0,townStars:[],townIds:[],reg:null};
   S.map[4][8].item={kind:'can',water:3};
+  if(MODE==='quick')S.money=QUICK_MONEY;
   S.map[2][7].item={kind:'basket',items:[]};
   // the ready-made kitchen gets the same equipment counts as a self-made one (2+ players; the 1-player tutorial stays as it is)
   if(np>=2&&mode!=='layout')presetExtras(np);
@@ -921,7 +923,8 @@ function finishLayout(){
   if(left)S.toast={text:'外に置いた'+left+'個は置いていきます（次の配置でまた出てきます）',t:0,life:3};
   S.bonus=Math.max(0,Math.ceil(S.timer));
   bringInside();
-  if(S.stop===0&&!S.tut){showChoose();sfx('ready')}   // first layout of the run → pick the first town
+  if(MODE==='quick'&&!S.tut){if(S.qDay)arrive();else{S.qDay=false;openPersonal()};sfx('ready')}   // quick: the first layout → shopping; the day layout → straight to the town (no driving)
+  else if(S.stop===0&&!S.tut){showChoose();sfx('ready')}   // first layout of the run → pick the first town
   else startDrive();             // between towns the town was already chosen
 }
 // ---------- equipment shop (between towns) → short layout ----------
@@ -2997,8 +3000,8 @@ function chefPic(p,size){
 function fillChefs(root){for(const el of root.querySelectorAll('span.rch')){const m=/rp(\d)/.exec(el.className),p=m&&S&&S.players[+m[1]];const u=p&&chefPic(p,192);if(u)el.style.backgroundImage=`url("${u}")`}}
 function resultScreen(title,lead,clear){
   const sc=runScore(clear), stars=tripStars();
-  const old=BEST[S.np], rec=!old||sc.total>old.score;
-  if(rec){BEST[S.np]={score:sc.total,stars};try{localStorage.setItem('kcr-best',JSON.stringify(BEST))}catch(_){}}
+  const bk=MODE==='quick'?'q'+S.np:S.np,old=BEST[bk], rec=!old||sc.total>old.score;
+  if(rec){BEST[bk]={score:sc.total,stars};try{localStorage.setItem('kcr-best',JSON.stringify(BEST))}catch(_){}}
   const nxt=stars>=5?'<p class="perf">最高評価！</p>':'';
   const tst=S.townStars.length?`<p class="mut">町ごとの評価</p><p class="townstars">${S.townStars.map((v,i)=>{const T0=TOWNS[(S.townIds||[])[i]];return `<span>${T0?T0.e+' '+T0.n:(i+1)+'つ目の町'}　<span class="stars sm">${starsHtml(v)}</span></span>`}).join('')}</p>`:'';
   showOv(`<div class="box"><h2>${title}</h2><p>${lead}</p>
@@ -3154,10 +3157,10 @@ function ovAction(a,v){
   if(netAction(a,v))return;
   if(a==='np'){const [n,m]=String(v).split('|');newRun(+n,m||'preset')}
   if(a==='tcyc'){   // title settings: each is a plain button (stick/keys can reach it), pressing it steps to the next value
-    if(v==='mode')MODE=MODE==='tour'?'casual':'tour';else if(v==='kit')TSET.kit=TSET.kit==='layout'?'preset':'layout';else if(v==='bot'){const L=[0,2,3,4,5,6,7];TSET.bot=L[(L.indexOf(TSET.bot)+1)%L.length]}
+    if(v==='mode')MODE=MODE==='casual'?'tour':MODE==='tour'?'quick':'casual';else if(v==='kit')TSET.kit=TSET.kit==='layout'?'preset':'layout';else if(v==='bot'){const L=[0,2,3,4,5,6,7];TSET.bot=L[(L.indexOf(TSET.bot)+1)%L.length]}
     showTitle();const i=ovButtons().findIndex(b=>b.dataset.act==='tcyc'&&b.dataset.v===v);ovSel=Math.max(0,i);markSel();play('confirm');return}
   if(a==='tstart'){newRun(1+TSET.bot,TSET.kit,TSET.bot>0)}   // player 1 + the chosen number of bots
-  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();if(S.stop===0)startDrive();else startDayLayout()}
+  else if(a==='town'){S.next=chooseOpts[+v];confirmSeats();if(MODE==='quick'){S.qDay=true;startDayLayout()}else if(S.stop===0)startDrive();else startDayLayout()}
   else if(a==='eqbuy'){
     if((S.eqBuys||0)>=3)return;
     const o=S.eqOffers[+v];if(!o||o.sold)return;const pr=eqPrice(o);o.sold=1;   /* bought: sold out, no second copy of the same card */
@@ -3239,7 +3242,7 @@ function showTitle(){
   // the title truck is drawn behind: keep this box low and short so it stays in view
   showOv(`<div class="box tbox">
     <div class="row"><span style="align-self:center;min-width:6em">キャラ</span><button class="ovbtn" data-act="tchar">${(()=>{const k=SKILLS[PSKILL[0]]?PSKILL[0]:'knife',an=SKILL_ANIMAL[k],src=typeof CHEF_IMG_SRC==='object'?CHEF_IMG_SRC[an+'_icon']:null;return (src?`<img src="${src}" alt="" style="width:26px;height:26px;vertical-align:middle"> `:SKILLS[k].e+' ')+SKILLS[k].n})()}（変える）</button></div>
-    <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn" data-act="tcyc" data-v="mode">${MODE==='tour'?'グランドツアー（全'+Object.keys(TOWNS).length+'町）':'カジュアル（4町）'}</button></div>
+    <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn" data-act="tcyc" data-v="mode">${MODE==='tour'?'グランドツアー（全'+Object.keys(TOWNS).length+'町）':MODE==='quick'?'クイック（1町だけ）':'カジュアル（4町）'}</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn" data-act="tcyc" data-v="kit">${TSET.kit==='layout'?'自分で並べる':'初期配置済み'}</button>
       <button class="ovbtn" data-act="tcyc" data-v="bot">bot人数：${TSET.bot?TSET.bot+'人':'なし（1人）'}</button>
       <button class="ovbtn" data-act="tstart" style="min-width:150px">はじめる</button></div>
@@ -3280,7 +3283,7 @@ function showChoose(){
   // a town already visited on this trip is never offered again
   const been=new Set([...(S.townIds||[]),S.town&&S.town.id].filter(Boolean));
   let ids=Object.keys(TOWNS).filter(k=>!been.has(k));if(!ids.length)ids=Object.keys(TOWNS).filter(k=>!S.town||k!==S.town.id);
-  const n=Math.random()<0.5?2:3;
+  const n=MODE==='quick'?ids.length:Math.random()<0.5?2:3;   // quick: every town is offered
   // sell-price rate is rolled each time a town is offered: 0.9 – 1.5
   chooseOpts=pickN(ids,n).map(k=>{
     // the station town is busy by nature: it never rolls a quiet mood
@@ -3293,11 +3296,11 @@ function showChoose(){
       <span class="menu">${t.menu.map(r=>dishOv(r)+' '+RECIPES[r].n).join('<br>')}</span>
       <span class="needs">${townNeeds(t).map(id=>needLine(id,t)).join('')}</span>
       <span class="pay">${MOOD[Math.round((t.pay-1)*100)]||""}<br>${payLabel(t.pay,true).replace(/^[^（]*/,"")}</span>${t.lively?'<span class="sub">駅前なので、にぎわいやすい</span>':''}</button>`).join('');
-  showOv(`<div class="box big"><h2>${S.stop+1}つ目の町を選ぶ（全${stopsN()}町）</h2>
+  showOv(`<div class="box big"><h2>${MODE==='quick'?'遊ぶ町を選ぶ（1つの町だけ）':S.stop+1+'つ目の町を選ぶ（全'+stopsN()+'町）'}</h2>
     <p>メニューは町で決まっています。今の在庫で回せそうな町を選びましょう。</p>${moneyBig()}
     ${regDish()?`<p>常連：${dishOv(regDish())} ${RECIPES[regDish()].n}</p>`:''}
     ${S.bonus?`<p class="good">レイアウトボーナス：次の町の営業時間 +${S.bonus}秒</p>`:''}
-    ${S.stop>0?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
+    ${MODE==='quick'?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 営業 → ボス客 の順に進みます。</p>`:S.stop>0?`<p class="mut">町を選んだら、配置（${DAY_LAYOUT_TIME}秒）→ 走行 の順に進みます。</p>`:''}
     <div class="cards">${cards}</div>
     <p class="mut">${isTouch?'カードを長押しで決定':`←→（または <kbd>1</kbd>〜<kbd>${n}</kbd>）で選んで <b>${OVK()}</b> で決定`}</p></div>`);
 }
@@ -5353,7 +5356,7 @@ function finishSelect(){
   for(const p of S.players){p.sel=null;p.skCD=0;p.skT=0}
   sfx('confirm');
   if(S.tut){startTutorial();return}
-  if(S.startMode==='layout')setupLayout();else showChoose();
+  if(S.startMode==='layout')setupLayout();else if(MODE==='quick'){S.qDay=false;openPersonal()}else showChoose();   // quick: shop first, then pick the town
 }
 // layout of the screen (canvas units)
 const SELG={x0:GW*T/2-SEL_COLS*136/2,y0:62,cw:136,ch:126,icon:88};   // 16 chefs: 8 x 2   // the grid is centred on the screen
@@ -6392,7 +6395,7 @@ function netAction(a,v){
   if(a==='pwmode'){NET.pwOn=v==='1';showRoomSetup();return true}
   if(a==='cap'){NET.cap=+v||8;showRoomSetup();return true}
   if(a==='rbot'){const mx=Math.max(0,(NET.cap||8)-1),L=Array.from({length:mx+1},(_,k)=>k);NET.bots=L[(L.indexOf(NET.bots||0)+1)%L.length];showRoomSetup();return true}
-  if(a==='rmode'){NET.mode=v==='tour'?'tour':'casual';showRoomSetup();return true}
+  if(a==='rmode'){NET.mode=v==='tour'?'tour':v==='quick'?'quick':'casual';showRoomSetup();return true}
   if(a==='host'){const el=document.getElementById('roomPw');NET.pw=NET.pwOn&&el?el.value.trim().slice(0,8):'';
     if(NET.pwOn&&!NET.pw){const e=document.getElementById('pwErr');if(e)e.textContent='パスワードを入れてください';return true}
     startHosting();return true}
@@ -6427,7 +6430,7 @@ function myUid(){
 async function startHosting(){
   if(!NET.lobby)return;
   const code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rnd(32)]).join('');
-  ROOM_CAP=NET.cap||MAXP;MODE=NET.mode==='tour'?'tour':'casual';
+  ROOM_CAP=NET.cap||MAXP;MODE=NET.mode==='tour'?'tour':NET.mode==='quick'?'quick':'casual';
   Object.assign(NET,{role:'host',code,order:[],slots:{},inputs:[],lastPk:[],lastSw:[],lastOc:{},mySlot:0,ovId:0,ovHtml:'',err:''});
   if(NET.peer)paintOv(`<div class="box"><h2>部屋を作っています…</h2></div>`);
   try{
@@ -6449,7 +6452,7 @@ function showRoomSetup(){
     ${NET.pwOn?'<div class="row"><input id="roomPw" class="pwin" maxlength="8" placeholder="パスワード" autocomplete="off" spellcheck="false" aria-label="パスワード"></div><p class="ng" id="pwErr"></p>':''}
     <div class="row"><span style="align-self:center;min-width:6em">最大人数</span>${[4,6,8].map(n=>`<button class="ovbtn${(NET.cap||8)===n?' autofocus':''}" data-act="cap" data-v="${n}">${(NET.cap||8)===n?'✔ ':''}${n}人</button>`).join('')}</div>
     <div class="row"><span style="align-self:center;min-width:6em">bot人数</span><button class="ovbtn" data-act="rbot">${NET.bots?NET.bots+'人':'なし'}（押すと変わる）</button></div>
-    <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn${(NET.mode||'casual')==='casual'?' autofocus':''}" data-act="rmode" data-v="casual">${(NET.mode||'casual')==='casual'?'✔ ':''}カジュアル</button><button class="ovbtn${NET.mode==='tour'?' autofocus':''}" data-act="rmode" data-v="tour">${NET.mode==='tour'?'✔ ':''}グランドツアー</button></div>
+    <div class="row"><span style="align-self:center;min-width:6em">モード</span><button class="ovbtn${(NET.mode||'casual')==='casual'?' autofocus':''}" data-act="rmode" data-v="casual">${(NET.mode||'casual')==='casual'?'✔ ':''}カジュアル</button><button class="ovbtn${NET.mode==='tour'?' autofocus':''}" data-act="rmode" data-v="tour">${NET.mode==='tour'?'✔ ':''}グランドツアー</button><button class="ovbtn${NET.mode==='quick'?' autofocus':''}" data-act="rmode" data-v="quick">${NET.mode==='quick'?'✔ ':''}クイック</button></div>
     <div class="row"><span style="align-self:center;min-width:6em">キッチン</span><button class="ovbtn${NET.kit==='layout'?'':' autofocus'}" data-act="rkit" data-v="preset">${NET.kit==='layout'?'':'✔ '}初期配置済み</button><button class="ovbtn${NET.kit==='layout'?' autofocus':''}" data-act="rkit" data-v="layout">${NET.kit==='layout'?'✔ ':''}自分で並べる</button></div>
     <div class="row"><button class="ovbtn" data-act="host">この設定で部屋を作る</button><button class="ovbtn" data-act="title">やめる</button></div></div>`);
 }
@@ -6458,7 +6461,7 @@ function roomInfo(){
   let n,ch,where='',ph='メンバー待ち';
   if(S){n=S.players.length;ch=S.players.map(p=>SKILL_ANIMAL[p.skill]);where=`町 ${Math.min(S.stop+1,stopsN())}/${stopsN()}`;ph=S.phase==='stop'?(S.sub==='prep'?'準備中':'営業中'):(PHASE_N[S.phase]||'')}
   else{const g=hostGuests().slice(0,ROOM_CAP-1);n=1+g.length;ch=[SKILL_ANIMAL[PSKILL[0]]].concat(g.map(p=>SKILL_ANIMAL[p.presence.skill]||'beaver'))}
-  return {pw:!!NET.pw,n,ch,where,ph,cap:ROOM_CAP,md:MODE==='tour'?'グランドツアー':'カジュアル'};
+  return {pw:!!NET.pw,n,ch,where,ph,cap:ROOM_CAP,md:MODE==='tour'?'グランドツアー':MODE==='quick'?'クイック':'カジュアル'};
 }
 function beaconStart(){
   beaconStop();const my=NET.beaconRun=(NET.beaconRun||0)+1;
@@ -6576,7 +6579,7 @@ function showHostLobby(){
   NET.lobby.presence({host:{code:NET.code,n:1+Math.min(ROOM_CAP-1,g.length),open:true,cap:ROOM_CAP}}).catch(()=>{});
   if(NET.room)NET.room.presence({s:null,lb:1+Math.min(ROOM_CAP-1,g.length),cap:ROOM_CAP,lc:list}).catch(()=>{});
   paintOv(`<div class="box"><h2>${NET.peer?'部屋'+(NET.pw?' 🔒':''):'部屋 '+NET.code}</h2>
-    <p>あなたは P1（ホスト）です。（最大${ROOM_CAP}人・${MODE==='tour'?'グランドツアー':'カジュアル'}・${NET.kit==='layout'?'自分で並べる':'初期配置済み'}）</p><div id="hostSlots">${lobbySlots(list,ROOM_CAP)}</div>
+    <p>あなたは P1（ホスト）です。（最大${ROOM_CAP}人・${MODE==='tour'?'グランドツアー':MODE==='quick'?'クイック':'カジュアル'}・${NET.kit==='layout'?'自分で並べる':'初期配置済み'}）</p><div id="hostSlots">${lobbySlots(list,ROOM_CAP)}</div>
     <p class="mut">${NET.peer?(NET.beaconSlot!=null?`ロビーに部屋を出しました。フレンドはタイトルの「ロビーへ入る」から参加できます。${NET.pw?'パスワード：<b>'+NET.pw.replace(/[<>&"]/g,'')+'</b>':'パスワードなし'}`:'ロビーに部屋を出しています…'):`友だちはこのページを開き、タイトルの「部屋 ${NET.code} に参加」を押します。`}</p>
     <div class="row"><button class="ovbtn autofocus" data-act="hgo">キャラ選択へ（みんなで選ぶ）</button><button class="ovbtn" data-act="hcancel">やめる</button></div></div>`);
 }
@@ -6736,7 +6739,7 @@ function sendSnap(){
     fu:Math.round(S.fuel*10),sp:S.speed,di:Math.round(S.dist*10),rt:Math.round(S.route*10),sl:NET.slots,ot:(S.phase==='upgrade'||S.phase==='equip')?Math.max(0,Math.ceil(S.ovT||0)):-1};
   d.gp=S.grp?[S.grp.st,Math.round(S.grp.ann*10),S.grp.orders.map(o=>REC_K.indexOf(o))]:0;
   d.ms=S.msn?[S.msn.k,S.msn.d,S.msn.ok?1:0]:0;
-  d.wt=S.waitN||0;d.tx=TX;d.cap=ROOM_CAP;d.md=MODE==='tour'?1:0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
+  d.wt=S.waitN||0;d.tx=TX;d.cap=ROOM_CAP;d.md=MODE==='tour'?1:MODE==='quick'?2:0;d.cb=[S.combo||0,Math.round((S.comboT||0)*10),Math.round((S.comboMax||0)*10)];d.ns=S.phase==='stop'&&S.sub==='service'?Math.round(Math.max(0,S.spawnT)*10):0;
   d.os=ov.hidden||S.localPause?0:[ovSel,ovHold.btn?Math.round(Math.min(1,ovHold.t/HOLD)*100):0];   // the host's cursor and long-press on its screen
   d.oc=ov.hidden||personalPause()||S.players.length<2?0:S.players.map((p,i)=>i===0?(S.localPause?-1:ovSel):(NET.inputs[i]&&NET.inputs[i][7]!=null?+NET.inputs[i][7]:-1));ovDots(d.oc||[]);
   const nowMs=performance.now();NET.fx=(NET.fx||[]).filter(e=>nowMs-e[2]<1500).slice(-24);d.fx=NET.fx.map(e=>[e[0],e[1]]);d.bu=(S.bursts||[]).map(b=>[Math.round(b.x*100),Math.round(b.y*100),Math.round(b.t*100),b.k]);
@@ -6872,7 +6875,7 @@ function applySnap(d){
   const n=v=>+v||0;
   // a guest remembers the animal it played once the select screen is over
   if(S.phase==='select'&&String(d.ph)!=='select'&&NET.mySlot>=0&&S.players[NET.mySlot]){PSKILL[0]=S.players[NET.mySlot].skill;try{localStorage.setItem('kcr-skill',JSON.stringify(PSKILL))}catch(_){}}
-  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(d.cap)ROOM_CAP=n(d.cap);MODE=n(d.md)?'tour':'casual';{const ntx=d.tx!=null?n(d.tx):TX_FOR(S.np);if(ntx!==TX){applyTruck(ntx);S.map=buildMap()}}
+  S.phase=String(d.ph);S.view=String(d.v);S.sub=String(d.sb);S.timer=n(d.tm)/10;S.money=n(d.m);S.hearts=n(d.h);S.stop=n(d.st);S.np=n(d.np);if(d.cap)ROOM_CAP=n(d.cap);MODE=n(d.md)===2?'quick':n(d.md)?'tour':'casual';{const ntx=d.tx!=null?n(d.tx):TX_FOR(S.np);if(ntx!==TX){applyTruck(ntx);S.map=buildMap()}}
   S.roadOff=n(d.ro)/100;S.arrT=n(d.ar)>=0?n(d.ar)/100:null;S.bonus=n(d.bn);S.paused=!!d.pa;S.bursts=(Array.isArray(d.bu)?d.bu:[]).map(a=>({x:n(a[0])/100,y:n(a[1])/100,t:n(a[2])/100,k:n(a[3])}));S.pupI=n(d.pi)>=0?n(d.pi):null;
   S.grp=Array.isArray(d.gp)?{st:n(d.gp[0]),ann:n(d.gp[1])/10,orders:(d.gp[2]||[]).slice(0,4).map(x=>REC_K[n(x)]||'burger')}:null;
   S.msn=Array.isArray(d.ms)&&MSN[d.ms[0]]?{k:d.ms[0],d:(Array.isArray(d.ms[1])?d.ms[1]:[]).slice(0,4).map(n),ok:!!d.ms[2]}:null;

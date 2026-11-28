@@ -3491,7 +3491,7 @@ function update(dt){
   S.players.forEach((p,i)=>{
     NET.quietFx=NET.role==='host'&&i>0;
     let inp=(S.phase==='stop'&&S.sub==='closing')?NOINP:readInput(i);   // closing time: everyone stands still
-    if(S.phase==='layout'&&(S.layLock||0)>0)inp={...inp,pick:false,act:false,sw:false,sk:false};   // layout: 持つ/作業 ignored for 3 s after the last screen (movement still works)
+    if(S.phase==='layout'&&(S.layLock||0)>0)inp={...inp,act:false};   // layout: 作業 ignored (持つ still works, so the bot menu can open) for 3 s after the last screen (movement still works)
     if((p.frz||0)>0){p.frz-=dt;inp=NOINP}
     if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw,dt))inp=NOINP;p.prevAct=raw.act}
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});

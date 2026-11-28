@@ -1103,7 +1103,13 @@ function pollPads(){
   for(let i=0;i<4;i++){
     const gp=PADGP[i]; if(!gp){pads[i]=null;continue}
     const b=k=>!!(gp.buttons[k]&&gp.buttons[k].pressed);
-    const now={a:b(0),x:b(2),sw:b(4)||b(5),sk:b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8),bk:b(1)};   // bk = B: back on the character picker
+    let now;
+    if(gp.mapping!=='standard'&&/054c|dualshock|dualsense|wireless controller|ps4|ps5/i.test(gp.id||'')){
+      // a PlayStation pad the browser did not map (Firefox, some drivers): ✕=1 □=0 ○=2 △=3, options=9, the d-pad is a hat on axis 9 (or buttons 12-15)
+      const h=gp.axes.length>9?gp.axes[9]:null,hat=h!=null&&h<1.2?Math.round((h+1)*3.5):-1;   // 0 up, 1 up-right, 2 right, 3 down-right, 4 down, 5 down-left, 6 left, 7 up-left
+      const hu=hat===0||hat===1||hat===7,hr=hat===1||hat===2||hat===3,hd=hat===3||hat===4||hat===5,hl=hat===5||hat===6||hat===7;
+      now={a:b(1),x:b(0),sw:b(4)||b(5),sk:b(3),l:hl||b(14),r:hr||b(15),u:hu||b(12),d:hd||b(13),st:b(9),back:b(8),bk:b(2)}}
+    else now={a:b(0),x:b(2),sw:b(4)||b(5),sk:b(3),l:b(14),r:b(15),u:b(12),d:b(13),st:b(9),back:b(8),bk:b(1)};   // bk = B: back on the character picker
     const prev=padPrev[gp.index]||{};
     pads[i]={now,edge:k=>now[k]&&!prev[k],ax:gp.axes[0]||0,ay:gp.axes[1]||0,gp};
     padPrev[gp.index]=now;

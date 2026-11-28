@@ -1363,11 +1363,16 @@ function botInput(i){
   else if(t.mode==='hold')out.act=!p.lock;
   return out}
 // ----- the chef's command list for a bot: press 持つ / 作業 next to a bot, move with the cross, 持つ chooses -----
-function botCallOpen(p,inp){   // true when a bot is close enough and the chef's press opens its list
-  if(!S.botMenu&&S.phase==='stop'&&!p.menu&&!p.mk&&!p.g&&!p.seat&&!p.bn&&!p.cl&&(inp.pick||(inp.act&&!p.prevAct))){
-    let best=-1,bd=1.3;
-    S.players.forEach((q,i)=>{if(i===0||!S.bots||!S.bots.includes(i))return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best=i}});
-    if(best>=0){S.botMenu={i:best,sel:Math.max(0,BOT_ORDERS.indexOf(S.botS&&S.botS[best]&&S.botS[best].job||'おまかせ')),last:'0,0'};return true}}
+const BOT_CALL_DIST=0.65, BOT_CALL_HOLD=0.45;   // the chef must overlap the bot and hold 持つ / 作業 for a moment
+const pickHeldNow=()=>KB.some(k=>k.pick.some(c=>held.has(c)))||!!(pads[0]&&pads[0].now.a);
+function botCallOpen(p,inp,dt){   // true when the chef has held 持つ / 作業 long enough on top of a bot
+  const ok=!S.botMenu&&S.phase==='stop'&&!p.menu&&!p.mk&&!p.g&&!p.seat&&!p.bn&&!p.cl&&(inp.act||pickHeldNow());
+  let best=-1,bd=BOT_CALL_DIST;
+  if(ok)S.players.forEach((q,i)=>{if(i===0||!S.bots||!S.bots.includes(i))return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best=i}});
+  if(best<0){S.botHold=null;return false}
+  const H=S.botHold&&S.botHold.i===best?S.botHold:(S.botHold={i:best,t:0});
+  H.t+=dt||0.05;
+  if(H.t>=BOT_CALL_HOLD){S.botHold=null;S.botMenu={i:best,sel:Math.max(0,BOT_ORDERS.indexOf(S.botS&&S.botS[best]&&S.botS[best].job||'おまかせ')),last:'0,0'};return true}
   return false}
 function botMenuStep(p,inp){   // inp = the chef's real keys   // while the list is open the chef only moves the cursor, 持つ chooses, 作業 / B closes
   const M=S.botMenu;if(!M)return NOINP;
@@ -1383,6 +1388,7 @@ function drawBotUI(){
     const job=botJob(i)+(S.botS&&S.botS[i]&&S.botS[i].job?'*':'');
     ctx.font=`800 10px ${FNT}`;const w=ctx.measureText(job).width+10;
     ctx.fillStyle='rgba(16,26,30,.8)';rr(q.x*T-w/2,q.y*T+14,w,14,7);ctx.fill();text(job,q.x*T,q.y*T+21,10,'#fff',800)}
+  if(S.botHold&&!S.botMenu){const q=S.players[S.botHold.i];if(q)bar(q.x*T-18,q.y*T-34,36,S.botHold.t/BOT_CALL_HOLD,'#ffd84a')}
   const M=S.botMenu;if(!M)return;
   const q=S.players[M.i];if(!q)return;
   const w=130,rh=20,h=BOT_ORDERS.length*rh+24,x=q.x*T-w/2,y=q.y*T-h-30;
@@ -3452,7 +3458,7 @@ function update(dt){
     NET.quietFx=NET.role==='host'&&i>0;
     let inp=(S.phase==='stop'&&S.sub==='closing')||(S.phase==='layout'&&(S.layLock||0)>0)?NOINP:readInput(i);   // closing time: everyone stands still; layout: 3 s lock after the last screen
     if((p.frz||0)>0){p.frz-=dt;inp=NOINP}
-    if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw))inp=NOINP;p.prevAct=raw.act}
+    if(i===0&&S.bots&&S.bots.length){const raw=inp;if(S.botMenu)inp=botMenuStep(p,raw);else if(botCallOpen(p,raw,dt))inp=NOINP;p.prevAct=raw.act}
     if(pouchInput(p,inp,dt))inp=Object.assign({},inp,{mx:0,my:0,pick:false,act:false,sw:false});
     // ウマ: the time left stands still while a shop is at a window (the truck is slow there anyway)
     const horseWait=p.skill==='boost'&&S.phase==='drive'&&S.shops.some(inWindowZone);

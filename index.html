@@ -2710,7 +2710,7 @@ function evtUpdate(dt){
     E.n++;E.st='warn';E.t=EVT_WARN;E.obs=pl.obs.map(o=>Object.assign({},o));E.need=pl.need||0;E.by=[];E.cows=[];E.cn=pl.n||0;E.goldRid=pl.goldRid||null;E.gdone=false;E.fire=0.35;E.dur=40;E.ice=6;
     if(k==='cake'){const have=(S.stock.strawberry||0)+(S.seeds.strawberry||0);if(have<E.need){S.stock.strawberry=(S.stock.strawberry||0)+E.need}}   // never leave the team without a strawberry
     sfx('bell');return}
-  if(E.st==='warn'){E.t-=dt;if(E.t<=0){E.st='on';if(k==='train'){E.tx=GW+0.5;E.hit=[]}if(k==='wave'){E.tx=GH+0.2;E.hit=[];E.ph=0;E.pt=0}if(k==='spring')E.warm=0;if(k==='cow'){E.obs=[];const bx=GOBJ.barn.x+.5;for(let i=0;i<E.cn;i++)E.cows.push({x:bx+(Math.random()-.5)*1.4,y:11.3,dx:(Math.random()-.5)*2,dy:-Math.random(),t:0,f:1})}sfx('mystery');S.toast={text:EVT_HINT[k],t:0,life:3.5}}return}
+  if(E.st==='warn'){E.t-=dt;if(E.t<=0){E.st='on';if(k==='train'){E.tx=GW+0.5;E.hit=[]}if(k==='wave'){E.tx=GH+0.2;E.hit=[];E.ph=0;E.pt=0}if(k==='spring')E.warm=0;if(k==='cow'){E.obs=[];for(let i=0;i<E.cn;i++){const [cx,cy]=cowSpawnPos();E.cows.push({x:cx,y:cy,dx:(Math.random()-.5)*2,dy:(Math.random()-.5)*2,t:0,f:1})}}sfx('mystery');S.toast={text:EVT_HINT[k],t:0,life:3.5}}return}
   if(E.st==='on'){
     for(const o of E.obs)if(o.sh>0)o.sh=Math.max(0,o.sh-dt);
     if(k==='cake'){if(E.by.length>=E.need){evtEnd(E,'🎂 ケーキ完成！ ボス客が食べ始めた');sfx('ready')}}
@@ -2739,14 +2739,27 @@ function evtUpdate(dt){
     else if(k==='cow'){for(const w of E.cows)cowMove(w,dt);if(!E.cows.length&&!S.players.some(q=>q.hold&&q.hold.kind==='cow')){evtEnd(E,'🐄 牛を全部戻した！');sfx('ready')}}
     else{E.obs=E.obs.filter(o=>o.hp>0);if(!E.obs.length){evtEnd(E,k==='tree'?'🌳 大木を切り倒した！':'🥕 にんじんを全部抜いた！');sfx('ready')}}}
 }
+// where an escaped cow starts: anywhere across the plaza (left and right alike), not on top of a chef
+function cowSpawnPos(){
+  let best=[GOBJ.barn.x+.5,11.3];
+  for(let t=0;t<30;t++){
+    const x=1.2+Math.random()*(GW-2.4),y=8.2+Math.random()*2.8;
+    if(solid(Math.floor(x),Math.floor(y)))continue;
+    if(S.players.some(q=>Math.hypot(q.x-x,q.y-y)<3))continue;
+    if(E_COWS().some(w=>Math.hypot(w.x-x,w.y-y)<1.2))continue;
+    return [x,y]}
+  return best}
+const E_COWS=()=>(S.evt&&S.evt.cows)||[];
 function cowMove(w,dt){
   w.t-=dt;
   let near=null,nd=2.2;for(const q of S.players){const d=Math.hypot(q.x-w.x,q.y-w.y);if(d<nd){nd=d;near=q}}
-  if(near){const a=Math.atan2(w.y-near.y,w.x-near.x);w.dx=Math.cos(a);w.dy=Math.sin(a);w.t=0.4;w.sp=1.9}
+  if(near){const a=Math.atan2(w.y-near.y,w.x-near.x)+(Math.random()-.5)*0.9;w.dx=Math.cos(a);w.dy=Math.sin(a);w.t=0.4;w.sp=1.9}   // away from the chef, a little sideways each time (so they scatter both ways)
   else if(w.t<=0){const a=Math.random()*Math.PI*2;w.dx=Math.cos(a);w.dy=Math.sin(a);w.t=1+Math.random()*1.6;w.sp=Math.random()<0.35?0:1.0}
   const m=Math.hypot(w.dx,w.dy)||1,sp=(w.sp==null?1:w.sp)*dt;let nx=w.x+w.dx/m*sp,ny=w.y+w.dy/m*sp;
   nx=Math.max(0.6,Math.min(GW-0.6,nx));ny=Math.max(7.6,Math.min(11.4,ny));
   if(solid(Math.floor(nx),Math.floor(ny))){w.dx=-w.dx;w.dy=-w.dy;w.t=0.3;return}
+  const moved=Math.hypot(nx-w.x,ny-w.y);
+  if(near&&moved<sp*0.3){const s2=Math.random()<.5?1:-1,ox=w.dx,oy=w.dy;w.dx=-oy*s2;w.dy=ox*s2;w.t=0.3}   // pinned against an edge: slip sideways
   w.x=nx;w.y=ny;
 }
 function evtGoldSpawn(o){   // the golden mushroom appears on a free tile around the mountain (the right side first)
@@ -2878,7 +2891,7 @@ function drawEvt(){
     if(o.hp<o.max&&(E.k==='tree'||E.k==='mountain'||(E.k==='snow'&&o.k==='ice'))){const f=1-o.hp/o.max,bw=T*1.3,bx=X+W/2-bw/2,by=Y+H+3;ctx.fillStyle='rgba(0,0,0,.7)';rr(bx-2,by-2,bw+4,14,7);ctx.fill();ctx.fillStyle='#7be08a';rr(bx,by,Math.max(4,bw*f),10,5);ctx.fill()}
     else if(o.hp<o.max&&E.k==='carrot'){const f=1-o.hp/o.max;bar(X+4,Y-6,W-8,f,'#7be08a')}
   }
-  if(E.k==='cow'&&E.st==='on')for(const w of E.cows){softShadow(w.x*T,w.y*T+T*0.35,T*0.4,6,.3);emoji('🐄',w.x*T,w.y*T,T*1.0)}
+
   if(E.k==='mountain')S.players.forEach((q,i)=>{
     const c=S.guest?(E.cl&&E.cl.find(r=>r.i===i)):q.cl;if(!c||isBotP(q))return;const seq=S.guest?c.seq:c.seq,cur=S.guest?c.k:c.i,set=c.set;
     const w=170,h=62,x=q.x*T-w/2,y=(q.y-2.2)*T;
@@ -4671,8 +4684,10 @@ function drawTown(){
   drawTables(true);   // stools, then the seated customers, then the table tops (so the stool never covers a face)
   drawPlazaTiles();
   drawCustomers();
+  drawEvtCows();   // cows run in front of the red carpet, the tables and the waiting line
   if(S.sub==='prep')text('準備中：客はまだ来ません。市場と採集場所を使えます',GW*T/2,(VH-0.25)*T,13,'#1d2a20',800);
 }
+function drawEvtCows(){const E=S.evt;if(E&&E.k==='cow'&&E.st==='on')for(const w of E.cows){softShadow(w.x*T,w.y*T+T*0.35,T*0.4,6,.3);emoji('🐄',w.x*T,w.y*T,T*1.0)}}
 function drawQueueMat(){
   const x=QX*T+2,y=QY*T+5,w=(GW-QX)*T-2,h=T-10;   // the mat runs to the right edge (where customers come in)
   softShadow(x+w/2,y+h,w*0.52,6,.2);
